@@ -1,5 +1,6 @@
 
-import logging, os
+import logging
+import os
 from collections import OrderedDict
 from .batchutils import getBatchRunName
 from string import Template
@@ -8,10 +9,11 @@ from texttestlib import plugins
 from texttestlib.default.performance import getPerformance
 from xml.sax.saxutils import escape
 
+
 class JUnitResponder(plugins.Responder):
     """Respond to test results and write out results in format suitable for JUnit
     report writer. Only does anything if the app has batch_junit_format:true in its config file """
-    
+
     def __init__(self, optionMap, *args):
         plugins.Responder.__init__(self)
         self.runId = getBatchRunName(optionMap)
@@ -20,14 +22,14 @@ class JUnitResponder(plugins.Responder):
 
     def useJUnitFormat(self, app):
         return app.getBatchConfigValue("batch_junit_format") == "true"
-    
+
     def notifyComplete(self, test):
         if not self.useJUnitFormat(test.app):
             return
         if test.app not in self.appData:
             self._addApplication(test)
         self.appData[test.app].storeResult(test)
-        
+
     def notifyAllComplete(self):
         # allApps is {appname : [app]}
         for appList in list(self.allApps.values()):
@@ -36,7 +38,7 @@ class JUnitResponder(plugins.Responder):
                 if self.useJUnitFormat(app):
                     data = self.appData[app]
                     ReportWriter(self.runId).writeResults(app, data)
-      
+
     def _addApplication(self, test):
         app = test.app
         self.appData[app] = JUnitApplicationData()
@@ -46,14 +48,15 @@ class JUnitResponder(plugins.Responder):
 class JUnitApplicationData:
     """Data class to store test results in a format convenient for conversion to 
     JUnit report format """
+
     def __init__(self):
         self.testResults = {}
-        
+
     def storeResult(self, test):
         perfStem = test.getConfigValue("default_performance_stem")
         perfFile = test.makeTmpFileName(perfStem)
         t = getPerformance(perfFile) if os.path.isfile(perfFile) else 0
-        result = dict(full_test_name=self._fullTestName(test), 
+        result = dict(full_test_name=self._fullTestName(test),
                       test_name=test.name,
                       suite_name=self._suiteName(test),
                       encoding=getpreferredencoding(),
@@ -64,42 +67,42 @@ class JUnitApplicationData:
             self._success(result)
         else:
             self._failure(test, result)
-        
+
         self.testResults[test.getRelPath().replace("/", ".")] = result
-        
+
     def getResults(self):
         return self.testResults
-    
+
     def _suiteName(self, test):
         fullName = self._fullTestName(test)
         return ".".join(fullName.split(".")[:-1])
-    
+
     def _fullTestName(self, test):
         relpath = test.getRelPath()
         return test.app.fullName() + "." + relpath.replace("/", ".")
-    
+
     def _error(self, test, result):
         result["error"] = True
         result["success"] = False
-        result["failure"] = False                    
+        result["failure"] = False
         result["short_message"] = self._shortMessage(test)
-        result["long_message"] = self._longMessage(test)                   
+        result["long_message"] = self._longMessage(test)
 
     def _success(self, result):
         result["error"] = False
         result["success"] = True
-        result["failure"] = False        
-        
+        result["failure"] = False
+
     def _failure(self, test, result):
         result["error"] = False
         result["success"] = False
         result["failure"] = True
         result["short_message"] = self._shortMessage(test)
-        result["long_message"] = self._longMessage(test)                    
-    
+        result["long_message"] = self._longMessage(test)
+
     def _shortMessage(self, test):
         return escape(test.state.getTypeBreakdown()[1])
-    
+
     def _longMessage(self, test):
         message = test.state.freeText.replace("]]>", "END_MARKER")
         return self._char_filter(message)
@@ -167,11 +170,12 @@ success_template = """\
 </testsuite>
 """
 
+
 class ReportWriter:
     def __init__(self, runId):
         self.runId = runId
         self.diag = logging.getLogger("JUnit Report Writer")
-        
+
     def writeResults(self, app, appData):
         self.diag.info("writing results in junit format for app " + app.fullName())
         appResultsDir = self._createResultsDir(app)
@@ -184,25 +188,23 @@ class ReportWriter:
                 text = Template(failure_template).substitute(result)
             testFileName = os.path.join(appResultsDir, testName + ".xml")
             self._writeTestResult(testFileName, text)
-            
+
     def _writeTestResult(self, testFileName, text):
         testFile = open(testFileName, "w")
         testFile.write(text)
-        testFile.close()        
-            
+        testFile.close()
+
     def _createResultsDir(self, app):
         resultsDir = self.userDefinedFolder(app)
         if (resultsDir is None or resultsDir.strip() == ""):
             resultsDir = os.path.join(app.writeDirectory, "junitreport")
-    
+
         if not os.path.exists(resultsDir):
             os.mkdir(resultsDir)
         appResultsDir = os.path.join(resultsDir, app.name + app.versionSuffix())
         if not os.path.exists(appResultsDir):
             os.mkdir(appResultsDir)
         return appResultsDir
-            
+
     def userDefinedFolder(self, app):
         return app.getBatchConfigValue("batch_junit_folder")
-         
-        

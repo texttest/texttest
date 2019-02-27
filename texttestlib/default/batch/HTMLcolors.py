@@ -22,14 +22,14 @@ are set here.
 """
 __version__ = '$Id: HTMLcolors.py,v 1.1 2007/02/22 17:02:49 geoff Exp $'
 GREY1,     GREY2,    GREY3,     GREY4,   GREY5,    GREY6 = \
-GRAY1,     GRAY2,    GRAY3,     GRAY4,   GRAY5,    GRAY6 = \
-'#EEEEEE','#DDDDDD','#CCCCCC','#BBBBBB','#AAAAAA','#999999'
+    GRAY1,     GRAY2,    GRAY3,     GRAY4,   GRAY5,    GRAY6 = \
+    '#EEEEEE', '#DDDDDD', '#CCCCCC', '#BBBBBB', '#AAAAAA', '#999999'
 RED1,      RED2,     RED3,     RED4,     RED5,     RED6 = \
-'#FF0000','#EE0000','#DD0000','#CC0000','#BB0000','#990000'
+    '#FF0000', '#EE0000', '#DD0000', '#CC0000', '#BB0000', '#990000'
 BLUE1,     BLUE2,    BLUE3,    BLUE4,    BLUE5,    BLUE6 = \
-'#0000FF','#0000EE','#0000DD','#0000CC','#0000BB','#000099'
+    '#0000FF', '#0000EE', '#0000DD', '#0000CC', '#0000BB', '#000099'
 GREEN1,    GREEN2,   GREEN3,   GREEN4,   GREEN5,   GREEN6 = \
-'#00EE00','#00DD00','#00CC00','#00BB00','#00AA00','#009900'
+    '#00EE00', '#00DD00', '#00CC00', '#00BB00', '#00AA00', '#009900'
 RED = RED2
 GREEN = GREEN2
 BLUE = BLUE1

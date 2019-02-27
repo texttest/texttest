@@ -1,5 +1,7 @@
 
-import sys, logging, types
+import sys
+import logging
+import types
 from texttestlib import plugins
 from queue import Queue, Empty
 from collections import OrderedDict
@@ -7,14 +9,18 @@ from threading import Lock
 
 plugins.addCategory("cancelled", "cancelled", "were cancelled before starting")
 
+
 class Cancelled(plugins.TestState):
     def __init__(self, briefText, freeText):
-        plugins.TestState.__init__(self, "cancelled", briefText=briefText, freeText=freeText, \
+        plugins.TestState.__init__(self, "cancelled", briefText=briefText, freeText=freeText,
                                    started=1, completed=1, lifecycleChange="complete")
 
 # We're set up for running in a thread but we don't do so by default, for simplicity
+
+
 class BaseActionRunner(plugins.Responder, plugins.Observable):
     cancelFreeText = "Test run was cancelled before it had started"
+
     def __init__(self, optionMap, diag):
         plugins.Responder.__init__(self)
         plugins.Observable.__init__(self)
@@ -26,7 +32,7 @@ class BaseActionRunner(plugins.Responder, plugins.Observable):
         self.killSignal = None
         self.diag = diag
         self.lockDiag = logging.getLogger("locks")
-        
+
     def notifyAdd(self, test, initial):
         if test.classId() == "test-case":
             self.diag.info("Adding test " + test.uniqueName)
@@ -37,7 +43,7 @@ class BaseActionRunner(plugins.Responder, plugins.Observable):
 
     def notifyAllRead(self, *args):
         self.diag.info("All read, adding terminator")
-        self.testQueue.put(None)    
+        self.testQueue.put(None)
 
     def notifyComplete(self, test):
         if not self.exited and "stop" in self.optionMap and test.state.hasFailed():
@@ -51,12 +57,12 @@ class BaseActionRunner(plugins.Responder, plugins.Observable):
 
     def notifyAllComplete(self):
         self.allComplete = True
-    
+
     def notifyKill(self, test):
         self.lock.acquire()
         self.killOrCancel(test)
         self.lock.release()
-        
+
     def notifyKillProcesses(self, sig=None):
         self.diag.info("Got exit!")
         if self.allComplete:
@@ -70,20 +76,20 @@ class BaseActionRunner(plugins.Responder, plugins.Observable):
         self.killTests()
         self.notify("Status", "Killed all running tests.")
         self.lock.release()
-        
+
     def cancel(self, test, briefText="cancelled", freeText="", **kwargs):
         if not test.state.isComplete():
             if not freeText:
                 freeText = self.cancelFreeText
             self.changeState(test, Cancelled(briefText, freeText), **kwargs)
-            
+
     def changeState(self, test, state):
-        test.changeState(state) # for overriding in case we need other notifiers
-        
+        test.changeState(state)  # for overriding in case we need other notifiers
+
     def runQueue(self, getMethod, runMethod, desc, block=True):
         while True:
             test = getMethod(block)
-            if not test: # completed normally
+            if not test:  # completed normally
                 break
 
             if self.exited:
@@ -100,7 +106,7 @@ class BaseActionRunner(plugins.Responder, plugins.Observable):
             if replaceTerminators and item is None:
                 if not block:
                     item = self.getItemFromQueue(queue, False, True)
-                queue.put(None) 
+                queue.put(None)
             return item
         except Empty:
             return
@@ -109,9 +115,9 @@ class BaseActionRunner(plugins.Responder, plugins.Observable):
         return self.getItemFromQueue(self.testQueue, block=block)
 
     def canBeMainThread(self):
-        return False # We block, so we shouldn't be the main thread...
+        return False  # We block, so we shouldn't be the main thread...
 
-            
+
 class ActionRunner(BaseActionRunner):
     def __init__(self, optionMap, *args):
         BaseActionRunner.__init__(self, optionMap, logging.getLogger("Action Runner"))
@@ -127,7 +133,7 @@ class ActionRunner(BaseActionRunner):
     def notifyAllReadAndNotified(self):
         # kicks off processing. Don't use notifyAllRead as we end up running all the tests before
         # everyone's been notified of the reading.
-        self.runAllTests() 
+        self.runAllTests()
 
     def notifyRerun(self, test):
         if self.currentTestRunner and self.currentTestRunner.test is test:
@@ -166,27 +172,27 @@ class ActionRunner(BaseActionRunner):
             for action in appRunner.actionSequence:
                 classes.add(action.__class__)
         return classes
-            
+
     def cleanup(self):
         for actionClass in self.getAllActionClasses():
             actionClass.finalise()
         for appRunner in list(self.appRunners.values()):
             appRunner.cleanActions()
-            
+
 
 class ActionsCompleteAction(plugins.Action):
     def __call__(self, test):
         test.actionsCompleted()
-        
+
     def setUpSuite(self, suite):
         # Only occasionally needed, e.g. in ReplaceText script
         if suite.state.hasStarted():
             suite.actionsCompleted()
-            
+
     def callDuringAbandon(self, *args):
         return True
 
-    
+
 class ApplicationRunner:
     def __init__(self, testSuite, diag):
         self.testSuite = testSuite
@@ -195,26 +201,32 @@ class ApplicationRunner:
         self.diag = diag
         self.actionSequence = self.getActionSequence()
         self.setUpApplications()
+
     def cleanActions(self):
         # clean up the actions before we exit
         self.suitesToSetUp = {}
         self.suitesSetUp = {}
         self.actionSequence = []
+
     def setUpApplications(self):
         for action in self.actionSequence:
             self.setUpApplicationFor(action)
+
     def setUpApplicationFor(self, action):
         self.diag.info("Performing " + str(action) + " set up on " + repr(self.testSuite.app))
         try:
             action.setUpApplication(self.testSuite.app)
         except Exception:
-            sys.stderr.write("Exception thrown performing " + str(action) + " set up on " + repr(self.testSuite.app) + " :\n")
+            sys.stderr.write("Exception thrown performing " + str(action) +
+                             " set up on " + repr(self.testSuite.app) + " :\n")
             plugins.printException()
+
     def markForSetUp(self, suite):
         newActions = []
         for action in self.actionSequence:
             newActions.append(action)
         self.suitesToSetUp[suite] = newActions
+
     def setUpSuites(self, action, test):
         if test.parent:
             self.setUpSuites(action, test.parent)
@@ -222,13 +234,15 @@ class ApplicationRunner:
             if action in self.suitesToSetUp[test]:
                 self.setUpSuite(action, test)
                 self.suitesToSetUp[test].remove(action)
+
     def setUpSuite(self, action, suite):
         self.diag.info(str(action) + " set up " + repr(suite))
         action.setUpSuite(suite)
         if suite in self.suitesSetUp:
             self.suitesSetUp[suite].append(action)
         else:
-            self.suitesSetUp[suite] = [ action ]
+            self.suitesSetUp[suite] = [action]
+
     def tearDownSuite(self, suite):
         self.diag.info("Try tear down " + repr(suite))
         actionsToTearDown = self.suitesSetUp.get(suite, [])
@@ -243,7 +257,7 @@ class ApplicationRunner:
         # Collapse lists and remove None actions
         for action in actionSequenceFromConfig:
             self.addActionToList(action, actionSequence)
-            
+
         self.addActionToList(ActionsCompleteAction(), actionSequence)
         return actionSequence
 
@@ -253,7 +267,7 @@ class ApplicationRunner:
                 self.addActionToList(subAction, actionSequence)
         elif action != None:
             actionSequence.append(action)
-            
+
 
 class TestRunner:
     def __init__(self, test, appRunner, diag, killed, killSignal):
@@ -288,7 +302,7 @@ class TestRunner:
                                  " changing state to UNRUNNABLE :\n" + exceptionText.rstrip(), stdout=True)
             self.failTest(exceptionText)
         return False
-    
+
     def failTest(self, excString):
         execHosts = self.test.state.executionHosts
         failState = plugins.Unrunnable(freeText=excString, briefText="TEXTTEST EXCEPTION", executionHosts=execHosts)
@@ -334,7 +348,7 @@ class TestRunner:
         self.lock.acquire()
         self.currentAction = None
         self.lock.release()
-        
+
     def findSuitesToChange(self, previousTestRunner):
         tearDownSuites = []
         commonAncestor = None
@@ -346,7 +360,7 @@ class TestRunner:
         # We want to set up the earlier ones first
         setUpSuites.reverse()
         return tearDownSuites, setUpSuites
-    
+
     def findSuitesUpTo(self, ancestor):
         suites = []
         currCheck = self.test.parent
@@ -354,4 +368,3 @@ class TestRunner:
             suites.append(currCheck)
             currCheck = currCheck.parent
         return suites
-

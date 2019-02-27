@@ -1,14 +1,21 @@
 
-import os, filecmp, time, subprocess, logging, re
+import os
+import filecmp
+import time
+import subprocess
+import logging
+import re
 from texttestlib import plugins
 from shutil import copyfile
 
 from fnmatch import fnmatch
 
+
 class FileComparison:
     SAME = 0
     DIFFERENT = 1
     APPROVED = 2
+
     def __init__(self, test, stem, standardFile, tmpFile, testInProgress=False, **kw):
         self.stdFile = standardFile
         self.stdCmpFile = self.stdFile
@@ -35,7 +42,7 @@ class FileComparison:
         self.cacheDifferences(test, testInProgress)
         self.diag.info("Created file comparison std: " + repr(self.stdFile) + " tmp: " +
                        repr(self.tmpFile) + " diff: " + repr(self.differenceCache))
-        
+
     def stemForConfig(self):
         return self.stem
 
@@ -43,7 +50,7 @@ class FileComparison:
         self.stdFile = standardFile
         self.stdCmpFile = self.stdFile
         self.diag.info("Setting standard file for " + self.stem + " to " + repr(standardFile))
-        
+
     def recompute(self, test):
         self.freeTextBody = None
         if self.needsRecalculation():
@@ -55,11 +62,11 @@ class FileComparison:
                 # File has been removed
                 self.tmpFile = None
                 self.tmpCmpFile = None
-                self.differenceCache = self.SAME     
-            
+                self.differenceCache = self.SAME
+
     def split(self, test, separators):
         separator = separators.get(self.stem)
-        if not separator: # try wildcards
+        if not separator:  # try wildcards
             for key, value in list(separators.items()):
                 if fnmatch(self.stem, key):
                     separator = value
@@ -68,8 +75,8 @@ class FileComparison:
             sepRegex = re.compile(separator)
             tmpParts = self.splitFile(test, self.tmpCmpFile, sepRegex)
             origParts = self.splitFile(test, self.stdCmpFile, sepRegex)
-            return [ SplitFileComparison(self, test, self.stem, origPart, tmpPart) \
-                     for origPart, tmpPart in zip(origParts, tmpParts) ]
+            return [SplitFileComparison(self, test, self.stem, origPart, tmpPart)
+                    for origPart, tmpPart in zip(origParts, tmpParts)]
         else:
             return []
 
@@ -81,14 +88,14 @@ class FileComparison:
             return parts[0] + "_" + newdigit
         else:
             return name + "_2"
-    
+
     def getSplitFileName(self, match, partsDir, splitFileNames):
         localname = match.group(1).replace(" ", "_").lower()
         while localname in splitFileNames:
             localname = self.makeDeltaName(localname)
         splitFileNames.append(localname)
         return os.path.join(partsDir, localname)
-    
+
     def splitFile(self, test, filename, sepRegex):
         parts = []
         localPartsDir = os.path.basename(filename + "_split")
@@ -121,7 +128,7 @@ class FileComparison:
             if os.path.isdir(os.path.join(path, f)) and f.endswith("_split"):
                 dirs.append(f)
         return dirs
-        
+
     def __getstate__(self):
         # don't pickle the diagnostics
         state = {}
@@ -134,12 +141,12 @@ class FileComparison:
         self.__dict__ = state
         self.diag = logging.getLogger("TestComparison")
         self.recalculationTime = None
-        
+
     def __repr__(self):
         return self.stem
-    
+
     def modifiedDates(self):
-        files = [ self.stdFile, self.tmpFile, self.stdCmpFile, self.tmpCmpFile ]
+        files = [self.stdFile, self.tmpFile, self.stdCmpFile, self.tmpCmpFile]
         return " : ".join(map(self.modifiedDate, files))
 
     def modifiedDate(self, file):
@@ -166,39 +173,47 @@ class FileComparison:
             self.diag.info("Already recalculated, checking if file updated since then : " + self.stdFile)
             # If we're already recalculated, only do it again if standard file changes since then
             return stdModTime > self.recalculationTime
-        
+
         tmpModTime = plugins.modifiedTime(self.tmpFile)
         if stdModTime is not None and tmpModTime is not None and stdModTime >= tmpModTime:
             self.diag.info("Standard result newer than generated result at " + self.stdFile)
             return True
 
-        if self.stdFile == self.stdCmpFile: # no filters
+        if self.stdFile == self.stdCmpFile:  # no filters
             return False
-        
+
         stdCmpModTime = plugins.modifiedTime(self.stdCmpFile)
         self.diag.info("Comparing timestamps for standard files")
         return stdCmpModTime is not None and stdModTime is not None and stdModTime >= stdCmpModTime
+
     def getType(self):
         return "failure"
+
     def getDisplayFileName(self):
         if self.newResult():
             return self.tmpFile
         else:
             return self.stdFile
+
     def getDetails(self):
         # Nothing to report above what is already known
         return ""
+
     def newResult(self):
         return not self.stdFile and self.tmpFile
+
     def missingResult(self):
         return self.stdFile and not self.tmpFile
+
     def isDefunct(self):
         return not self.stdFile and not self.tmpFile
+
     def hasSucceeded(self):
         return self.stdFile and self.tmpFile and not self.hasDifferences()
+
     def hasDifferences(self):
         return self.differenceCache == self.DIFFERENT
-    
+
     def getStdFile(self, filtered, postfix=""):
         if filtered:
             return self.stdCmpFile + postfix
@@ -216,7 +231,7 @@ class FileComparison:
             return self.getStdFile(*args)
         else:
             return self.getTmpFile(*args)
-        
+
     def setCmpFiles(self, test, testInProgress):
         filterFileBase = test.makeTmpFileName(self.stem + "." + test.app.name, forFramework=1)
         origCmp = filterFileBase + "origcmp"
@@ -235,7 +250,8 @@ class FileComparison:
                     self.differenceCache = valueForEqual
             else:
                 self.differenceCache = self.DIFFERENT
-            self.diag.info("Caching differences " + repr(self.stdCmpFile) + " " + repr(self.tmpCmpFile) + " = " + repr(self.differenceCache))
+            self.diag.info("Caching differences " + repr(self.stdCmpFile) + " " +
+                           repr(self.tmpCmpFile) + " = " + repr(self.differenceCache))
 
     def cacheDifferences(self, test, testInProgress):
         self.setCmpFiles(test, testInProgress)
@@ -248,10 +264,13 @@ class FileComparison:
             return repr(self) + " missing"
         else:
             return self.getDifferencesSummary(includeNumbers)
+
     def getDifferencesSummary(self, includeNumbers=True):
         return repr(self) + " different"
+
     def getFreeText(self):
         return self.getFreeTextTitle() + "\n" + self.getFreeTextBody()
+
     def getFreeTextTitle(self):
         if self.missingResult():
             titleText = "Missing result in"
@@ -261,13 +280,15 @@ class FileComparison:
             titleText = "Differences in"
         titleText += " " + repr(self)
         return "-" * 10 + " " + titleText + " " + "-" * 10
+
     def getFreeTextBody(self):
         if self.freeTextBody is None:
             self.freeTextBody = self._getFreeTextBody()
         return self.freeTextBody
+
     def _getFreeTextBody(self):
         if self.binaryFile and \
-               (self.newResult() or self.missingResult()):
+                (self.newResult() or self.missingResult()):
             message = "Binary file, not showing any preview. " + \
                       "Edit the configuration entry 'binary_file' and re-run if you suspect that this file contains only text.\n"
             return self.previewGenerator.getWrappedLine(message)
@@ -280,7 +301,7 @@ class FileComparison:
             stdFileSize = os.path.getsize(self.stdCmpFile)
             tmpFileSize = os.path.getsize(self.tmpCmpFile)
             if self.textDiffToolMaxSize >= 0 and \
-                   (stdFileSize > self.textDiffToolMaxSize or \
+                (stdFileSize > self.textDiffToolMaxSize or
                     tmpFileSize > self.textDiffToolMaxSize):
                 message = "The result files were too large to compare - " + str(stdFileSize) + " and " + \
                           str(tmpFileSize) + " bytes, compared to the limit of " + str(self.textDiffToolMaxSize) + \
@@ -288,13 +309,14 @@ class FileComparison:
                           "' and re-run to see the difference in this text view.\n"
                 return self.previewGenerator.getWrappedLine(message)
 
-            cmdArgs = plugins.splitcmd(self.textDiffTool) + [ self.stdCmpFile, self.tmpCmpFile ]
+            cmdArgs = plugins.splitcmd(self.textDiffTool) + [self.stdCmpFile, self.tmpCmpFile]
             proc = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
             return self.previewGenerator.getPreview(proc.stdout)
         except OSError as e:
             self.diag.info("No diff report: full exception printout\n" + plugins.getExceptionString())
             return "No difference report could be created: could not find textual difference tool '" + self.textDiffTool + "'\n" + \
                    "(" + str(e) + ")"
+
     def updateAfterLoad(self, changedPaths):
         for oldPath, newPath in changedPaths:
             if self.stdFile:
@@ -303,7 +325,7 @@ class FileComparison:
             if self.tmpFile:
                 self.tmpCmpFile = self.tmpCmpFile.replace(oldPath, newPath)
                 self.tmpFile = self.tmpFile.replace(oldPath, newPath)
-                
+
     def versionise(self, fileName, versionString):
         if versionString:
             return fileName + "." + versionString
@@ -344,20 +366,21 @@ class FileComparison:
         self.stdFile = self.getStdFileForSave(versionString)
         self.backupOrRemove(self.stdFile, backupVersionStrings)
         self.saveTmpFile(test, exact)
-        
+
     def overwriteFromSplit(self, splitComps, test, exact, versionString, backupVersionStrings):
         self.stdFile = self.getStdFileForSave(versionString)
         self.diag.info("writing split files back to " + self.stdFile)
-        self.freeTextBody = None # clear the cache which may well be wrong now...
+        self.freeTextBody = None  # clear the cache which may well be wrong now...
         self.backupOrRemove(self.stdFile, backupVersionStrings)
         with open(self.stdFile, "w") as f:
             for splitComp in splitComps:
                 f.write(open(splitComp.stdFile).read())
         self.stdCmpFile = self.stdFile
         self.updateDifferenceCache(self.APPROVED)
-        
+
     def saveNew(self, test, versionString):
-        self.stdFile = os.path.join(test.getDirectory(), self.versionise(self.stem + "." + test.app.name, versionString))
+        self.stdFile = os.path.join(test.getDirectory(), self.versionise(
+            self.stem + "." + test.app.name, versionString))
         self.saveTmpFile(test)
 
     def getTmpFileForSave(self, test):
@@ -384,7 +407,8 @@ class FileComparison:
             else:
                 self.saveResults(tmpFile, self.stdFile)
         else:
-            raise plugins.TextTestError("The following file seems to have been removed since it was created:\n" + repr(tmpFile)) 
+            raise plugins.TextTestError(
+                "The following file seems to have been removed since it was created:\n" + repr(tmpFile))
         self.differenceCache = self.APPROVED
 
     def saveMissing(self, versionString, autoGenText, backupVersionStrings):
@@ -400,24 +424,25 @@ class FileComparison:
             newFile.close()
         self.stdFile = None
         self.stdCmpFile = None
-        
+
     def saveResults(self, tmpFile, destFile):
         copyfile(tmpFile, destFile)
-        
+
     def getParent(self):
         pass
+
 
 class SplitFileComparison(FileComparison):
     def __init__(self, parent, test, stem, stdFile, *args):
         self.parent = parent
         stemToUse = stem + "/" + os.path.basename(stdFile)
         FileComparison.__init__(self, test, stemToUse, stdFile, *args)
-        
+
     def getParent(self):
         return self.parent
-    
+
     def setCmpFiles(self, *args):
-        pass # Don't want to look for comparison files
-    
+        pass  # Don't want to look for comparison files
+
     def needsRecalculation(self):
-        return False # These cannot be recalculated in any sensible way, and are created nearly simultaneously
+        return False  # These cannot be recalculated in any sensible way, and are created nearly simultaneously

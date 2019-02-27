@@ -1,15 +1,21 @@
 
 from . import local
-import signal, logging, errno
-import time, os, sys
+import signal
+import logging
+import errno
+import time
+import os
+import sys
 from texttestlib import plugins
 from texttestlib.utils import getPortListenErrorCode, getUserName
 from threading import Thread, Lock
 from queue import Queue
 from fnmatch import fnmatch
 
+
 class Ec2Machine:
-    instanceTypeInfo = { "8xlarge" : 32, "4xlarge": 16, "2xlarge" : 8, "xlarge" : 4, "large" : 2, "medium" : 1 }
+    instanceTypeInfo = {"8xlarge": 32, "4xlarge": 16, "2xlarge": 8, "xlarge": 4, "large": 2, "medium": 1}
+
     def __init__(self, inst, synchDirs, app, subprocessLock, alreadyRunning):
         self.id = inst.id
         self.ip = inst.private_ip_address
@@ -28,10 +34,10 @@ class Ec2Machine:
         self.errorMessage = ""
         self.subprocessLock = subprocessLock
         self.startMethod = None if alreadyRunning else inst.start
-        
+
     def getNextJobId(self):
         return "job" + str(len(self.remoteProcessInfo)) + "_" + self.ip
-        
+
     def getParents(self, dirs):
         parents = []
         for dir in dirs:
@@ -39,13 +45,13 @@ class Ec2Machine:
             if parent not in parents:
                 parents.append(parent)
         return parents
-    
+
     def isFull(self):
         return len(self.remoteProcessInfo) >= self.cores
-    
+
     def hasJob(self, jobId):
         return jobId in self.remoteProcessInfo
-    
+
     def setLocalProcessId(self, jobId, localPid):
         with self.remoteProcessInfoLock:
             remotePid = None
@@ -53,20 +59,20 @@ class Ec2Machine:
                 _, remotePid = self.remoteProcessInfo[jobId]
             self.remoteProcessInfo[jobId] = localPid, remotePid
         self.diag.info("Job ID " + jobId + " now got local PID " + localPid)
-    
+
     def setRemoteProcessId(self, jobId, remotePid):
         with self.remoteProcessInfoLock:
             localPid, _ = self.remoteProcessInfo[jobId]
             self.remoteProcessInfo[jobId] = localPid, remotePid
         self.diag.info("Job ID " + jobId + " now got remote PID " + remotePid)
-    
+
     def synchronise(self):
         parents = self.getParents(self.synchDirs)
         self.app.ensureRemoteDirExists(self.fullMachine, *parents)
         for dir in self.synchDirs:
             if not self.errorMessage:
                 self.synchronisePath(dir)
-            
+
     def synchronisePath(self, path):
         dirName = os.path.dirname(path)
         for _ in range(5):
@@ -88,14 +94,14 @@ class Ec2Machine:
                 self.startWaitCounter = 0
                 break
             self.startWaitCounter += 1
-            timedout = ret in [ errno.EWOULDBLOCK, errno.ETIMEDOUT ]
+            timedout = ret in [errno.EWOULDBLOCK, errno.ETIMEDOUT]
             if not timedout:
                 time.sleep(1)
 
     def runThread(self):
         if self.startMethod:
-            self.startMethod() # should be self.waitForStart that is called here, not instance.start. Don't use boto methods in a thread!
-        
+            self.startMethod()  # should be self.waitForStart that is called here, not instance.start. Don't use boto methods in a thread!
+
         if self.errorMessage:
             return
         try:
@@ -103,11 +109,12 @@ class Ec2Machine:
             self.synchronise()
         except plugins.TextTestError as e:
             self.errorMessage = "Failed to synchronise files with EC2 instance with private IP address '" + self.ip + "'\n" + \
-                "Intended usage is to start an ssh-agent, and add the keypair for this instance to it, in your shell before starting TextTest from it.\n\n(" + str(e) + ")\n"
-            
+                "Intended usage is to start an ssh-agent, and add the keypair for this instance to it, in your shell before starting TextTest from it.\n\n(" + str(
+                    e) + ")\n"
+
         if self.errorMessage:
             return
-        
+
         while True:
             self.diag.info("Waiting for new job for IP '" + self.ip + "'...")
             jobId, submitCallable = self.queue.get()
@@ -117,19 +124,19 @@ class Ec2Machine:
             self.diag.info("Got job with ID " + jobId)
             localPid = self.doSubmit(submitCallable)
             self.setLocalProcessId(jobId, localPid)
-            
+
     def doSubmit(self, submitCallable):
         with self.subprocessLock:
             localPid, _ = submitCallable()
             return localPid
-            
+
     def cleanup(self, processes):
         # Return whether we are still using the machine in some way
         # i.e. if our thread is running or any of our processes are
         if self.thread.isAlive():
             self.queue.put((None, None))
             return True
-        
+
         for localPid, _ in list(self.remoteProcessInfo.values()):
             if localPid in processes:
                 proc = processes.get(localPid)
@@ -138,8 +145,8 @@ class Ec2Machine:
         return False
 
     def getCommandArgsWithEnvironment(self, cmdArgs, slaveEnv):
-        return [ envVar + "=" + value for (envVar, value) in list(slaveEnv.items()) ] + cmdArgs
-        
+        return [envVar + "=" + value for (envVar, value) in list(slaveEnv.items())] + cmdArgs
+
     def submitSlave(self, submitter, cmdArgs, slaveEnv, *args):
         jobId = self.getNextJobId()
         self.remoteProcessInfo[jobId] = None, None
@@ -149,16 +156,17 @@ class Ec2Machine:
                 try:
                     self.startMethod()
                 except Exception as e:
-                    sys.stderr.write("WARNING: failed to start instance with private IP address '" + self.ip + "'\n" + str(e))
+                    sys.stderr.write("WARNING: failed to start instance with private IP address '" +
+                                     self.ip + "'\n" + str(e))
                     return
                 self.startMethod = self.waitForStart
-        
+
             self.thread.start()
         argsWithEnv = self.getCommandArgsWithEnvironment(cmdArgs, slaveEnv)
         remoteCmdArgs = self.app.getCommandArgsOn(self.fullMachine, argsWithEnv, agentForwarding=True)
         self.queue.put((jobId, plugins.Callable(submitter, remoteCmdArgs, slaveEnv, *args)))
         return jobId
-    
+
     def killRemoteProcess(self, jobId, sig):
         if self.synchProc:
             self.errorMessage = "Terminated test during file synchronisation"
@@ -171,21 +179,21 @@ class Ec2Machine:
         # We need to find it ourselves and send it explicitly. Can assume python exists remotely, but not much else.
         localPid, remotePid = self.waitForRemoteProcessId(jobId)
         if remotePid:
-            cmdArgs = [ "python", "-c", "\"import os; os.kill(" + remotePid + ", " + str(sig) + ")\"" ]
+            cmdArgs = ["python", "-c", "\"import os; os.kill(" + remotePid + ", " + str(sig) + ")\""]
             self.app.runCommandOn(self.fullMachine, cmdArgs)
             return True, localPid
         else:
             return False, localPid
-                        
+
     def waitForRemoteProcessId(self, jobId):
         for _ in range(10):
             localPid, remotePid = self.remoteProcessInfo[jobId]
             if remotePid:
                 return localPid, remotePid
-            # Remote process exists but has not yet told us its process ID. Wait a bit and try again. 
+            # Remote process exists but has not yet told us its process ID. Wait a bit and try again.
             time.sleep(1)
         return None, None
-    
+
     def collectJobStatus(self, jobStatus, procStatus):
         if not self.errorMessage:
             for jobId, (localPid, _) in list(self.remoteProcessInfo.items()):
@@ -198,6 +206,7 @@ class Ec2Machine:
 
 class QueueSystem(local.QueueSystem):
     userTagName = "TextTest user"
+
     def __init__(self, app):
         local.QueueSystem.__init__(self)
         self.nextMachineIndex = 0
@@ -205,45 +214,50 @@ class QueueSystem(local.QueueSystem):
         self.subprocessLock = Lock()
         instances, runningIds = self.findInstances()
         synchDirs = self.getDirectoriesForSynch()
-        self.machines = [ Ec2Machine(inst, synchDirs, app, self.subprocessLock, inst.id in runningIds) for inst in instances ]
+        self.machines = [Ec2Machine(inst, synchDirs, app, self.subprocessLock,
+                                    inst.id in runningIds) for inst in instances]
         self.releasedMachines = []
         self.capacity = self.calculateCapacity()
 
     def calculateCapacity(self):
         return sum((m.cores for m in self.machines))
-        
+
     def makeEc2Connection(self):
         import boto.ec2
-        region = boto.ec2.connection.EC2Connection.DefaultRegionName # stick to single region for now
+        region = boto.ec2.connection.EC2Connection.DefaultRegionName  # stick to single region for now
         return boto.ec2.connect_to_region(region)
 
     def makeCloudwatchConnection(self):
         import boto.ec2.cloudwatch
-        region = boto.ec2.connection.EC2Connection.DefaultRegionName # stick to single region for now
+        region = boto.ec2.connection.EC2Connection.DefaultRegionName  # stick to single region for now
         return boto.ec2.cloudwatch.connect_to_region(region)
 
     def getCores(self, inst, defValue=0):
         instanceSize = inst.instance_type.split(".")[-1]
         return Ec2Machine.instanceTypeInfo.get(instanceSize, defValue)
-        
+
     def findInstances(self):
         if not self.app.getConfigValue("remote_copy_program"):
-            sys.stderr.write("Cannot run tests in EC2 cloud. You need to set 'remote_copy_program' in your config file to a program such as 'rsync'.\n")
+            sys.stderr.write(
+                "Cannot run tests in EC2 cloud. You need to set 'remote_copy_program' in your config file to a program such as 'rsync'.\n")
             return [], []
         try:
             conn = self.makeEc2Connection()
         except ImportError:
-            sys.stderr.write("Cannot run tests in EC2 cloud. You need to install Python's boto package for this to work.\n")
+            sys.stderr.write(
+                "Cannot run tests in EC2 cloud. You need to install Python's boto package for this to work.\n")
             return [], []
         except:
-            sys.stderr.write("Failed to establish a connection to the EC2 cloud. Make sure your credentials are available in your .boto file.\n")
+            sys.stderr.write(
+                "Failed to establish a connection to the EC2 cloud. Make sure your credentials are available in your .boto file.\n")
             return [], []
         instanceTags = self.app.getConfigValue("queue_system_resource")
         if "R" in self.app.inputOptions:
             instanceTags.append(self.app.inputOptions["R"])
         instances = self.findTaggedInstances(conn, instanceTags)
-        if instances:            
+        if instances:
             running = self.getRunningIds(conn, instances)
+
             def getSortKey(inst):
                 isRunning = inst.id in running
                 cores = self.getCores(inst)
@@ -255,14 +269,15 @@ class QueueSystem(local.QueueSystem):
             if freeInstances:
                 self.disableAlarmActions(self.getAlarmNames(freeInstances))
             else:
-                sys.stderr.write("Cannot run tests in EC2 cloud. " + str(len(instances)) + " running instances were found matching '" + \
-                                 ",".join(instanceTags) + "' in their tags, \nbut all are currently being used by the following users:\n" + \
+                sys.stderr.write("Cannot run tests in EC2 cloud. " + str(len(instances)) + " running instances were found matching '" +
+                                 ",".join(instanceTags) + "' in their tags, \nbut all are currently being used by the following users:\n" +
                                  "\n".join(otherOwners) + "\n\n")
             return freeInstances, running
         else:
-            sys.stderr.write("Cannot run tests in EC2 cloud. No instances were found matching '" + ",".join(instanceTags) + "' in their tags.\n")
+            sys.stderr.write("Cannot run tests in EC2 cloud. No instances were found matching '" +
+                             ",".join(instanceTags) + "' in their tags.\n")
             return [], []
-        
+
     def cleanup(self, final=False):
         if final:
             # Processes might not be quite terminated, so we just hardcode that we release everything anyway
@@ -277,43 +292,43 @@ class QueueSystem(local.QueueSystem):
             self.releaseOwnership(unusedMachines)
             self.machines = usedMachines
             self.releasedMachines = unusedMachines
-        return False # Submission is not really complete, as it happens in threads
-            
+        return False  # Submission is not really complete, as it happens in threads
+
     def matchesTag(self, instanceTags, tagName, tagPattern):
         tagValueForInstance = instanceTags.get(tagName, "")
         return fnmatch(tagValueForInstance, tagPattern)
-        
+
     def parseTag(self, tag):
-        return tag.split("=", 1) if "=" in tag else [ tag, "1" ]
+        return tag.split("=", 1) if "=" in tag else [tag, "1"]
 
     def findTaggedInstances(self, conn, instanceTags):
         instances = []
-        parsedTags = [ self.parseTag(tag) for tag in instanceTags ]
+        parsedTags = [self.parseTag(tag) for tag in instanceTags]
         for inst in conn.get_only_instances():
             if inst.private_ip_address is not None and \
-                all((self.matchesTag(inst.tags, tagName, tagPattern) for tagName, tagPattern in parsedTags)):
+                    all((self.matchesTag(inst.tags, tagName, tagPattern) for tagName, tagPattern in parsedTags)):
                 instances.append(inst)
         return instances
-        
+
     def getRunningIds(self, conn, instances):
-        ids = [ inst.id for inst in instances ]
+        ids = [inst.id for inst in instances]
         running = []
         for stat in conn.get_all_instance_status(ids):
-            if stat.instance_status.status in [ "ok", "initializing" ]:
+            if stat.instance_status.status in ["ok", "initializing"]:
                 running.append(stat.id)
-                
-        return running 
+
+        return running
 
     def tryAddTag(self, conn, instances, maxCapacity, myTag, otherOwners):
         # inst.tags is only a local cache. Try to avoid race conditions by getting the most up-to-date info possible.
-        instanceIds = [ instance.id for instance in instances ]
+        instanceIds = [instance.id for instance in instances]
         idsInUse = set()
         for inst in conn.get_only_instances(instance_ids=instanceIds):
             owner = inst.tags.get(self.userTagName, "")
             if owner:
                 otherOwners.add(owner.split("_")[0])
                 idsInUse.add(inst.id)
-            
+
         tryOwnInstances, fallbackInstances = [], []
         capacity = 0
         for inst in instances:
@@ -330,9 +345,9 @@ class QueueSystem(local.QueueSystem):
 
     def getAlarmNames(self, instances):
         return ["stop-" + self.getInstanceName(iId) for iId in instances]
-    
+
     def getInstanceName(self, instance):
-        return instance if isinstance(instance,str) else instance.id
+        return instance if isinstance(instance, str) else instance.id
 
     def enableAlarmActions(self, alarmNames):
         conn = self.makeCloudwatchConnection()
@@ -340,28 +355,28 @@ class QueueSystem(local.QueueSystem):
             conn.enable_alarm_actions(alarmNames)
         except:
             pass
-        
+
     def disableAlarmActions(self, alarmNames):
         conn = self.makeCloudwatchConnection()
         try:
             conn.disable_alarm_actions(alarmNames)
         except:
-            plugins.printWarning("Could not disable CloudWatch alarms. Your user does not have permission for this.\n" + 
+            plugins.printWarning("Could not disable CloudWatch alarms. Your user does not have permission for this.\n" +
                                  "The risk is that an instance will be shut down while you are using it, so it is suggested your request this permission from your administrator.\n")
 
     def takeOwnership(self, conn, instances, maxCapacity):
         myTag = getUserName() + "_" + plugins.startTimeString()
         otherOwners = set()
         tryOwnInstances, fallbackInstances = self.tryAddTag(conn, instances, maxCapacity, myTag, otherOwners)
-                
+
         if not tryOwnInstances:
             return [], sorted(otherOwners)
 
         currTryInstances = tryOwnInstances
         ownInstances = []
         lostCapacity = 0
-        time.sleep(0.5) # add and check too close together makes racing more likely
-        for _ in range(20): 
+        time.sleep(0.5)  # add and check too close together makes racing more likely
+        for _ in range(20):
             newInsts = conn.get_only_instances(instance_ids=currTryInstances)
             currTryInstances = []
             for inst in newInsts:
@@ -378,32 +393,32 @@ class QueueSystem(local.QueueSystem):
                 time.sleep(0.1)
             else:
                 break
-        
+
         def getOrigOrder(inst):
             return tryOwnInstances.index(inst.id)
         ownInstances.sort(key=getOrigOrder)
-            
+
         if lostCapacity:
             fallbackInstances, fallbackOwners = self.takeOwnership(conn, fallbackInstances, lostCapacity)
             ownInstances += fallbackInstances
             otherOwners.update(fallbackOwners)
-       
+
         return ownInstances, sorted(otherOwners)
 
     def releaseOwnership(self, machines):
         if machines:
             conn = self.makeEc2Connection()
-            instanceIds = [ machine.id for machine in machines ]
+            instanceIds = [machine.id for machine in machines]
             for inst in conn.get_only_instances(instance_ids=instanceIds):
                 inst.remove_tag(self.userTagName)
             self.enableAlarmActions(self.getAlarmNames(instanceIds))
-        
+
     def getCapacity(self):
         return self.capacity
-    
+
     def slavesOnRemoteSystem(self):
         return True
-        
+
     @classmethod
     def findSetUpDirectory(cls, dir):
         # Egg-link points at the Python package code, which may not be all of the checkout
@@ -414,8 +429,8 @@ class QueueSystem(local.QueueSystem):
                 return
             else:
                 dir = newDir
-        return dir 
-    
+        return dir
+
     @classmethod
     def findVirtualEnvLinkedDirectories(cls, checkout):
         # "Egg-links" are something found in Python virtual environments
@@ -438,12 +453,12 @@ class QueueSystem(local.QueueSystem):
                     if newDir != realPythonPrefix and newDir not in linkedDirs:
                         linkedDirs.append(newDir)
         return linkedDirs
-    
+
     def getDirectoriesForSynch(self):
         appDir = self.app.getDirectory()
-        dirs = [ appDir ]
+        dirs = [appDir]
         if self.synchSlaveCode():
-            dirs.append(plugins.installationRoots[0]) 
+            dirs.append(plugins.installationRoots[0])
             personalLog = os.getenv("TEXTTEST_PERSONAL_LOG")
             if personalLog:
                 dirs.append(personalLog)
@@ -452,7 +467,7 @@ class QueueSystem(local.QueueSystem):
             dirs.append(checkout)
             dirs += self.findVirtualEnvLinkedDirectories(checkout)
         return dirs
-            
+
     def getMachine(self, jobId, includeReleased=False):
         machines = self.machines
         if includeReleased:
@@ -460,12 +475,12 @@ class QueueSystem(local.QueueSystem):
         for machine in machines:
             if machine.hasJob(jobId):
                 return machine
-    
+
     def setRemoteProcessId(self, jobId, remotePid):
         machine = self.getMachine(jobId)
         if machine:
             machine.setRemoteProcessId(jobId, remotePid)
-            
+
     def getRemoteTestMachine(self, jobId):
         machine = self.getMachine(jobId)
         if machine:
@@ -477,19 +492,19 @@ class QueueSystem(local.QueueSystem):
             return machine.killRemoteProcess(jobId, self.getSignal())
         else:
             return False, None
-    
+
     def getJobFailureInfo(self, jobId):
         machine = self.getMachine(jobId, includeReleased=True)
         return machine.errorMessage if machine else ""
-    
+
     def getStatusForAllJobs(self):
         procStatus = super(QueueSystem, self).getStatusForAllJobs()
         jobStatus = {}
         for machine in self.machines:
             machine.collectJobStatus(jobStatus, procStatus)
-        self.cleanup() # Try to release any machines we're not using
+        self.cleanup()  # Try to release any machines we're not using
         return jobStatus
-        
+
     def killJob(self, jobId):
         # ssh doesn't forward signals to remote processes.
         # We need to find it ourselves and send it explicitly. Can assume python exists remotely, but not much else.
@@ -509,17 +524,17 @@ class QueueSystem(local.QueueSystem):
         if self.synchSlaveCode():
             return super(QueueSystem, self).getTextTestArgs()
         else:
-            return [ "texttest" ] # Assume remote nodes are UNIX-based with TextTest installed centrally
-     
+            return ["texttest"]  # Assume remote nodes are UNIX-based with TextTest installed centrally
+
     def submitSlaveJob(self, cmdArgs, *args):
         if self.nextMachineIndex >= len(self.machines):
             return None, "No more available machines to submit EC2 jobs to - existing jobs have failed"
-    
+
         machine = self.machines[self.nextMachineIndex]
         submitter = super(QueueSystem, self).submitSlaveJob
         jobId = machine.submitSlave(submitter, cmdArgs, *args)
         if jobId is None:
-            self.releaseOwnership([ machine ])
+            self.releaseOwnership([machine])
             self.machines.remove(machine)
             self.capacity = self.calculateCapacity()
             return self.submitSlaveJob(cmdArgs, *args)
@@ -527,5 +542,5 @@ class QueueSystem(local.QueueSystem):
             self.nextMachineIndex += 1
         return jobId, None
 
-        
+
 from .local import MachineInfo, getUserSignalKillInfo, getExecutionMachines

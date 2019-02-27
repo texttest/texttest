@@ -4,17 +4,20 @@ The various text info views, i.e. the bottom right-corner "Text Info" and
 the "Run Info" tab from the dynamic GUI
 """
 from gi.repository import Gtk, GObject, Gdk, Pango
-import os, sys, datetime
+import os
+import sys
+import datetime
 from . import guiutils, guiplugins
 from texttestlib import plugins
 from texttestlib.default import performance
 
+
 class TimeMonitor:
     def __init__(self):
         self.timingInfo = {}
-        
+
     def notifyLifecycleChange(self, test, dummyState, changeDesc):
-        if changeDesc in [ "start", "complete" ]:
+        if changeDesc in ["start", "complete"]:
             self.timingInfo.setdefault(test, []).append((changeDesc, datetime.datetime.now()))
 
     def shouldShow(self):
@@ -44,23 +47,22 @@ class TimeMonitor:
         return descToUse.ljust(17)
 
 
-
 class TextViewGUI(guiutils.SubGUI):
     hovering_over_link = False
     hand_cursor = Gdk.Cursor.new(Gdk.CursorType.HAND2)
     regular_cursor = Gdk.Cursor.new(Gdk.CursorType.XTERM)
     linkMarker = "URL=http"
     timeMonitor = TimeMonitor()
-    
+
     def __init__(self, dynamic):
         guiutils.SubGUI.__init__(self)
         self.dynamic = dynamic
         self.text = ""
         self.showingSubText = False
         self.view = None
-        
+
     def shouldShowCurrent(self, *args):
-        return len(self.text) > 0        
+        return len(self.text) > 0
 
     def forceVisible(self, rowCount):
         # Both TextInfo and RunInfo should stay visible when tests are selected
@@ -91,10 +93,10 @@ class TextViewGUI(guiutils.SubGUI):
 
     def getEnvironmentLookup(self):
         pass
-            
+
     # Links can be activated by clicking. Low-level code lifted from Maik Hertha's
     # GTK hypertext demo
-    def event_after(self, text_view, event): # pragma : no cover - external code and untested browser code
+    def event_after(self, text_view, event):  # pragma : no cover - external code and untested browser code
         if event.type != Gdk.BUTTON_RELEASE:
             return False
         if event.button != 1:
@@ -123,7 +125,7 @@ class TextViewGUI(guiutils.SubGUI):
     # Looks at all tags covering the position (x, y) in the text view,
     # and if one of them is a link, change the cursor to the "hands" cursor
     # typically used by web browsers.
-    def set_cursor_if_appropriate(self, text_view, x, y): # pragma : no cover - external code
+    def set_cursor_if_appropriate(self, text_view, x, y):  # pragma : no cover - external code
         hovering = False
 
         iter = text_view.get_iter_at_location(x, y)
@@ -137,7 +139,7 @@ class TextViewGUI(guiutils.SubGUI):
         else:
             text_view.get_window(Gtk.TextWindowType.TEXT).set_cursor(self.regular_cursor)
 
-    def findLinkTarget(self, iter): # pragma : no cover - called by external code
+    def findLinkTarget(self, iter):  # pragma : no cover - called by external code
         tags = iter.get_tags()
         for tag in tags:
             target = tag.get_data("target")
@@ -145,9 +147,9 @@ class TextViewGUI(guiutils.SubGUI):
                 return target
 
     # Update the cursor image if the pointer moved.
-    def motion_notify_event(self, text_view, event): # pragma : no cover - external code
+    def motion_notify_event(self, text_view, event):  # pragma : no cover - external code
         x, y = text_view.window_to_buffer_coords(Gtk.TextWindowType.WIDGET,
-            int(event.x), int(event.y))
+                                                 int(event.x), int(event.y))
         self.set_cursor_if_appropriate(text_view, x, y)
         text_view.window.get_pointer()
         return False
@@ -165,7 +167,7 @@ class TextViewGUI(guiutils.SubGUI):
         # Assumes text description followed by link
         tag = buffer.create_tag(None, foreground="blue", underline=Pango.Underline.SINGLE)
         words = line.strip().split()
-        linkTarget = words[-1][4:] # strip off the URL=
+        linkTarget = words[-1][4:]  # strip off the URL=
         newLine = " ".join(words[:-1]) + "\n"
         tag.target = linkTarget
         buffer.insert_with_tags(iter, newLine, tag)
@@ -175,8 +177,8 @@ class TextViewGUI(guiutils.SubGUI):
         return "\n\n".join(paragraphs)
 
     def getDescriptionParagraphs(self, test):
-        paragraphs = [ self.getDescription(test) ]
-        for stem in sorted(set([ "performance" ] + list(test.getConfigValue("performance_logfile_extractor").keys()))):
+        paragraphs = [self.getDescription(test)]
+        for stem in sorted(set(["performance"] + list(test.getConfigValue("performance_logfile_extractor").keys()))):
             fileName = test.getFileName(stem)
             if fileName and os.path.isfile(fileName):
                 paragraphs.append(self.getFilePreview(fileName))
@@ -208,7 +210,7 @@ class RunInfoGUI(TextViewGUI):
         return self.dynamic
 
     def appInfo(self, suite):
-        textToUse  = "Application name : " + suite.app.fullName() + "\n"
+        textToUse = "Application name : " + suite.app.fullName() + "\n"
         textToUse += "Version          : " + suite.app.getFullVersion() + "\n"
         textToUse += "Number of tests  : " + str(suite.size()) + "\n"
         if not self.reconnect:
@@ -311,13 +313,14 @@ class TextInfoGUI(TextViewGUI):
             if elapsed >= 0:
                 perc = (elapsed * 100) / expected
                 return "\nReckoned to be " + str(int(perc)) + "% complete comparing elapsed time with expected performance.\n" + \
-                       "(" + performance.getTimeDescription(elapsed) + " of " + performance.getTimeDescription(expected) + ")" 
+                       "(" + performance.getTimeDescription(elapsed) + \
+                    " of " + performance.getTimeDescription(expected) + ")"
         return ""
 
     def getDescriptionParagraphs(self, test):
         paragraphs = TextViewGUI.getDescriptionParagraphs(self, test)
         testPath = test.getRelPath()
-        if testPath: # Don't include this for root suite
+        if testPath:  # Don't include this for root suite
             paragraphs.insert(1, "Full path:\n" + testPath)
         return paragraphs
 

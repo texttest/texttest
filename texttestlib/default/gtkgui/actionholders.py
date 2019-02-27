@@ -4,12 +4,16 @@ The various "holders" for displaying the "ActionGUI" abstraction: i.e. menus, to
 to store the simple actions and the dialogs, and a notebook to store the tabs in.
 """
 from gi.repository import Gtk
-import os, sys, logging, types
+import os
+import sys
+import logging
+import types
 from . import guiutils
 from texttestlib import plugins
 from collections import OrderedDict
 from pprint import pformat
 from functools import cmp_to_key
+
 
 class MenuBarGUI(guiutils.SubGUI):
     def __init__(self, dynamic, uiManager, actionGUIs, menuNames, *args):
@@ -17,7 +21,7 @@ class MenuBarGUI(guiutils.SubGUI):
         # Create GUI manager, and a few default action groups
         self.menuNames = menuNames
         self.dynamic = dynamic
-        self.allFiles = plugins.findDataPaths([ "*.xml" ], *args)
+        self.allFiles = plugins.findDataPaths(["*.xml"], *args)
         self.uiManager = uiManager
         self.actionGUIs = actionGUIs
         self.actionGroup = self.uiManager.get_action_groups()[0]
@@ -30,7 +34,7 @@ class MenuBarGUI(guiutils.SubGUI):
         if not self.loadedModules:
             self.loadedModules = set((module.split(".")[-1] for module in list(sys.modules.keys())))
         return self.loadedModules
-    
+
     def shouldHide(self, name):
         return guiutils.guiConfig.getCompositeValue("hide_gui_element", name, modeDependent=True)
 
@@ -55,7 +59,7 @@ class MenuBarGUI(guiutils.SubGUI):
             self.actionGroup.add_action(gtkAction)
             gtkAction.connect("toggled", self.toggleVisibility, observer)
             self.toggleActions.append(gtkAction)
-            
+
     def createView(self):
         # Initialize
         for menuName in self.menuNames:
@@ -74,7 +78,7 @@ class MenuBarGUI(guiutils.SubGUI):
         self.uiManager.ensure_update()
         self.widget = self.uiManager.get_widget("/MainMenuBar")
         return self.widget
-    
+
     def notifyTopWindow(self, window):
         window.add_accel_group(self.uiManager.get_accel_group())
         if self.shouldHide("menubar"):
@@ -90,24 +94,27 @@ class MenuBarGUI(guiutils.SubGUI):
         return loadFiles
 
     def cmpDescFiles(self, file1, file2):
-        basicFiles = [ "default_gui.xml", "default_gui-dynamic.xml", "default_gui-static.xml" ]
+        basicFiles = ["default_gui.xml", "default_gui-dynamic.xml", "default_gui-static.xml"]
         base1 = os.path.basename(file1)
         base2 = os.path.basename(file2)
         default1 = base1 in basicFiles
         default2 = base2 in basicFiles
         if default1 != default2:
-            return (default2 > default1) - (default2 < default1) # Hard code the three files above, they define the basic framework and should come first
+            # Hard code the three files above, they define the basic framework and should come first
+            return (default2 > default1) - (default2 < default1)
         partCount1 = base1.count("-")
         partCount2 = base2.count("-")
         if partCount1 != partCount2:
-            return (partCount1 > partCount2) - (partCount1 < partCount2)# less - implies read first (not mode-specific)
-        return (base2 > base1) - (base2 < base1) # something deterministic, just to make sure it's the same for everyone
-    
+            # less - implies read first (not mode-specific)
+            return (partCount1 > partCount2) - (partCount1 < partCount2)
+        # something deterministic, just to make sure it's the same for everyone
+        return (base2 > base1) - (base2 < base1)
+
     def shouldLoad(self, fileName):
         # Infer whether a file should be loaded
         # The format is
         # <module_name>-<config setting>-<config setting...>-[|dynamic|static].xml
-        allParts = os.path.basename(fileName)[:-4].split("-") # drop .xml, split on "-"
+        allParts = os.path.basename(fileName)[:-4].split("-")  # drop .xml, split on "-"
         moduleName = allParts[0]
         if allParts[-1] == "dynamic":
             if self.dynamic:
@@ -127,7 +134,8 @@ class MenuBarGUI(guiutils.SubGUI):
         for configSetting in allParts[1:]:
             value = guiutils.guiConfig.getValue(configSetting)
             haveSet = self.haveSet(value)
-            self.diag.info("Checking if we have set " + configSetting + ": value = " + repr(value) + ", set = " + repr(haveSet))
+            self.diag.info("Checking if we have set " + configSetting +
+                           ": value = " + repr(value) + ", set = " + repr(haveSet))
             if not haveSet:
                 return False
         return True
@@ -138,38 +146,41 @@ class MenuBarGUI(guiutils.SubGUI):
                 if "" in val:
                     return val[""]
                 elif "default" in val:
-                    return False # Not set if we only have a default key...
+                    return False  # Not set if we only have a default key...
             else:
                 return True
         else:
             return val and val != "disabled"
 
-        
-    
 
 class ToolBarGUI(guiutils.ContainerGUI):
     def __init__(self, uiManager, subgui):
-        guiutils.ContainerGUI.__init__(self, [ subgui ])
+        guiutils.ContainerGUI.__init__(self, [subgui])
         self.uiManager = uiManager
+
     def getWidgetName(self):
         return "_Toolbar"
+
     def ensureVisible(self, toolbar):
         for item in toolbar.get_children():
-            item.set_is_important(True) # Or newly added children without stock ids won't be visible in Gtk.ToolbarStyle.BOTH_HORIZ style
+            # Or newly added children without stock ids won't be visible in Gtk.ToolbarStyle.BOTH_HORIZ style
+            item.set_is_important(True)
+
     def shouldShow(self):
-        return True # don't care about whether we have a progress bar or not
+        return True  # don't care about whether we have a progress bar or not
+
     def createView(self):
         self.uiManager.ensure_update()
         toolbar = self.uiManager.get_widget("/MainToolBar")
         self.ensureVisible(toolbar)
-        
+
         # replaced HandleBox with Box and widget.add with widget.pack_start, needs review MB 2018-12-07
         self.widget = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         self.widget.pack_start(toolbar, True, True, 0)
         progressBarGUI = self.subguis[0]
         if progressBarGUI.shouldShow():
             progressBar = progressBarGUI.createView()
-            width = 7 # Looks good, same as Gtk.Paned border width
+            width = 7  # Looks good, same as Gtk.Paned border width
             alignment = Gtk.Alignment.new(1.0, 1.0, 1.0, 1.0)
             alignment.set_padding(width, width, 1, width)
             alignment.add(progressBar)
@@ -181,19 +192,23 @@ class ToolBarGUI(guiutils.ContainerGUI):
         self.widget.show_all()
         return self.widget
 
+
 def createPopupGUIs(uiManager):
     return PopupMenuGUI("TestPopupMenu", uiManager), PopupMenuGUI("TestFilePopupMenu", uiManager), PopupMenuGUI("ConfigFilePopupMenu", uiManager)
+
 
 class PopupMenuGUI(guiutils.SubGUI):
     def __init__(self, name, uiManager):
         guiutils.SubGUI.__init__(self)
         self.name = name
         self.uiManager = uiManager
+
     def createView(self):
         self.uiManager.ensure_update()
         self.widget = self.uiManager.get_widget("/" + self.name)
         self.widget.show_all()
         return self.widget
+
     def showMenu(self, treeview, event):
         if event.button == 3 and len(self.widget.get_children()) > 0:
             time = event.time
@@ -209,7 +224,7 @@ class PopupMenuGUI(guiutils.SubGUI):
                 treeview.grab_focus()
                 self.widget.popup(None, None, None, None, event.button, time)
                 treeview.emit_stop_by_name("button-press-event")
-                
+
 
 class NotebookGUI(guiutils.SubGUI):
     def __init__(self, tabInfo):
@@ -259,7 +274,7 @@ class NotebookGUI(guiutils.SubGUI):
         for pageNum, tabGUI in enumerate(self.tabInfo):
             page = self.notebook.get_nth_page(pageNum)
             if page is None:
-                continue # Can happen if tests terminate when the GUI is being taken down
+                continue  # Can happen if tests terminate when the GUI is being taken down
             name = tabGUI.getTabTitle()
             if tabGUI.shouldShowCurrent(*args):
                 if not page.get_property("visible"):
@@ -269,7 +284,7 @@ class NotebookGUI(guiutils.SubGUI):
             else:
                 self.diag.info("Remaining hidden " + name)
         return changed
-    
+
     def pageSwitched(self, dummy, dummy2, newNum, *args):
         newTabGUI = self.tabInfo[newNum]
         self.diag.info("Resetting current page to page " + repr(newNum) + " = " + repr(newTabGUI.getTabTitle()))
@@ -315,7 +330,8 @@ class NotebookGUI(guiutils.SubGUI):
             self.diag.info("New selection of size " + str(len(tests)) + ", adjusting notebook")
             # only change pages around if a test is directly selected and we haven't already selected another important tab
             changeCurrentPage = direct and not self.currentTabGUI.forceVisible(rowCount)
-            self.diag.info("Current tab gui " + repr(self.currentTabGUI.__class__) + " will change = " + repr(changeCurrentPage))
+            self.diag.info("Current tab gui " + repr(self.currentTabGUI.__class__) +
+                           " will change = " + repr(changeCurrentPage))
             self.updatePages(rowCount=rowCount, changeCurrentPage=changeCurrentPage)
 
     def updatePages(self, test=None, state=None, rowCount=0, changeCurrentPage=False):

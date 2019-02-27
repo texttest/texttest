@@ -5,6 +5,7 @@ from gi.repository import Gtk
 from storytext.gtktoolkit.simulator.treeviewevents import TreeColumnHelper
 from storytext.gtktoolkit.simulator.baseevents import RightClickEvent
 
+
 class TreeColumnRightClickEvent(RightClickEvent):
     def __init__(self, name, widget, argumentParseData):
         column = TreeColumnHelper.findColumn(widget, argumentParseData)
@@ -21,5 +22,6 @@ class TreeColumnRightClickEvent(RightClickEvent):
             if hasattr(column, "get_button"):
                 signatures.append(cls.signalName + "." + TreeColumnHelper.getColumnName(column))
         return signatures
-    
-customEventTypes = [ (Gtk.TreeView, [ TreeColumnRightClickEvent ]) ]
+
+
+customEventTypes = [(Gtk.TreeView, [TreeColumnRightClickEvent])]

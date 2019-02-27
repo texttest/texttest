@@ -1,16 +1,20 @@
 
-import os, shutil, subprocess, sys
+import os
+import shutil
+import subprocess
+import sys
 from texttestlib import plugins
 from locale import getpreferredencoding
+
 
 class SetUpCaptureMockHandlers(plugins.Action):
     def __init__(self, recordSetting):
         self.recordSetting = recordSetting
         libexecDir = plugins.installationDir("libexec")
         self.siteCustomizeFile = os.path.join(libexecDir, "sitecustomize.py")
-        
+
     def __call__(self, test):
-        pythonCustomizeFiles = test.getAllPathNames("testcustomize.py") 
+        pythonCustomizeFiles = test.getAllPathNames("testcustomize.py")
         pythonCoverage = test.hasEnvironment("COVERAGE_PROCESS_START")
         captureMock = test.app.usesCaptureMock() and self.recordSetting != 3
         if captureMock or pythonCoverage or pythonCustomizeFiles:
@@ -21,7 +25,7 @@ class SetUpCaptureMockHandlers(plugins.Action):
             self.disableCaptureMockComparison(test.app)
 
     def disableCaptureMockComparison(self, app):
-        for name in [ "traffic", "externalmocks", "pythonmocks" ]:
+        for name in ["traffic", "externalmocks", "pythonmocks"]:
             app.removeConfigEntry("regenerate", name, "definition_file_stems")
             app.addConfigEntry("builtin", name, "definition_file_stems")
 
@@ -30,14 +34,14 @@ class SetUpCaptureMockHandlers(plugins.Action):
         captureMockActive = False
         if rcFiles:
             captureMockActive = self.setUpCaptureMock(test, interceptDir, rcFiles)
-            
+
         if pythonCustomizeFiles:
-            self.intercept(pythonCustomizeFiles[-1], interceptDir) # most specific
-                
+            self.intercept(pythonCustomizeFiles[-1], interceptDir)  # most specific
+
         useSiteCustomize = captureMockActive or pythonCoverage or pythonCustomizeFiles
         if useSiteCustomize:
             self.intercept(self.siteCustomizeFile, interceptDir)
-            for var in [ "PYTHONPATH", "JYTHONPATH" ]:
+            for var in ["PYTHONPATH", "JYTHONPATH"]:
                 test.setEnvironment(var, interceptDir + os.pathsep + test.getEnvironment(var, ""))
 
     def setUpCaptureMock(self, test, interceptDir, rcFiles):
@@ -58,15 +62,16 @@ class SetUpCaptureMockHandlers(plugins.Action):
         try:
             from capturemock import setUpServer, setUpPython
             externalActive = setUpServer(self.recordSetting, extRecordFile, extReplayFile,
-                                         recordEditDir=recordEditDir, replayEditDir=replayEditDir, 
+                                         recordEditDir=recordEditDir, replayEditDir=replayEditDir,
                                          rcFiles=rcFiles, interceptDir=interceptDir,
                                          sutDirectory=sutDirectory, environment=test.environment)
             pythonActive = setUpPython(self.recordSetting, pyRecordFile, pyReplayFile, rcFiles=rcFiles,
                                        environment=test.environment)
             return externalActive or pythonActive
         except ImportError:
-            raise plugins.TextTestError("Test requires CaptureMock to be installed, but the capturemock module could not be found\nSearched in " + repr(sys.path))
-            
+            raise plugins.TextTestError(
+                "Test requires CaptureMock to be installed, but the capturemock module could not be found\nSearched in " + repr(sys.path))
+
     def intercept(self, moduleFile, interceptDir):
         interceptName = os.path.join(interceptDir, os.path.basename(moduleFile))
         plugins.ensureDirExistsForFile(interceptName)
@@ -86,17 +91,20 @@ class TerminateCaptureMockHandlers(plugins.Action):
             terminate()
         except ImportError:
             pass
-                
+
 
 class ModifyTraffic(plugins.ScriptWithArgs):
     scriptDoc = "Apply a script to all the client server data"
+
     def __init__(self, args):
-        argDict = self.parseArguments(args, [ "script", "types", "file" ])
+        argDict = self.parseArguments(args, ["script", "types", "file"])
         self.script = argDict.get("script")
         self.fileName = argDict.get("file", "traffic")
         self.trafficTypes = plugins.commasplit(argDict.get("types", "CLI,SRV"))
+
     def __repr__(self):
         return "Updating CaptureMock files in"
+
     def __call__(self, test):
         fileName = test.getFileName(self.fileName)
         if not fileName:
@@ -104,7 +112,7 @@ class ModifyTraffic(plugins.ScriptWithArgs):
 
         self.describe(test)
         try:
-            newTexts = [ self.getModified(t, test.getDirectory()) for t in self.readIntoList(fileName) ]
+            newTexts = [self.getModified(t, test.getDirectory()) for t in self.readIntoList(fileName)]
         except plugins.TextTestError as e:
             print(str(e).strip())
             return
@@ -112,10 +120,10 @@ class ModifyTraffic(plugins.ScriptWithArgs):
         newFileName = fileName + "tmpedit"
         newFile = open(newFileName, "w")
         for text in newTexts:
-            self.write(newFile, text) 
+            self.write(newFile, text)
         newFile.close()
         shutil.move(newFileName, fileName)
-        
+
     def readIntoList(self, fileName):
         # Copied from CaptureMock ReplayInfo, easier than trying to reuse it
         trafficList = []
@@ -129,12 +137,12 @@ class ModifyTraffic(plugins.ScriptWithArgs):
         if currTraffic:
             trafficList.append(currTraffic)
         return trafficList
-            
+
     def getModified(self, fullLine, dir):
         trafficType = fullLine[2:5]
         if trafficType in self.trafficTypes:
-            proc = subprocess.Popen([ self.script, fullLine[6:]], cwd=dir,
-                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=os.name=="nt")
+            proc = subprocess.Popen([self.script, fullLine[6:]], cwd=dir,
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=os.name == "nt")
             stdout, stderr = proc.communicate()
             if len(stderr) > 0:
                 raise plugins.TextTestError("Couldn't modify traffic :\n " + str(stderr, getpreferredencoding()))
@@ -142,7 +150,7 @@ class ModifyTraffic(plugins.ScriptWithArgs):
                 return fullLine[:6] + str(stdout, getpreferredencoding())
         else:
             return fullLine
-            
+
     def write(self, newFile, desc):
         if not desc.endswith("\n"):
             desc += "\n"
@@ -188,7 +196,7 @@ class ConvertToCaptureMock(plugins.Action):
             if ignore_callers:
                 parser.set("python", "ignore_callers", ",".join(ignore_callers))
 
-        if len(parser.sections()) > 0: # don't write empty files
+        if len(parser.sections()) > 0:  # don't write empty files
             print("Wrote file at", newFile)
             parser.write(open(newFile, "w"))
 

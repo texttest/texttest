@@ -24,16 +24,22 @@
  'votes': '0'}
 """
 
-import xmlrpc.client, re, urllib.request, urllib.parse, urllib.error
+import xmlrpc.client
+import re
+import urllib.request
+import urllib.parse
+import urllib.error
 from collections import OrderedDict
+
 
 def convertToString(value):
     if type(value) in (str, bytes):
         if type(value) == str:
-            value = value.replace("\r", "") # Get given Windows line endings but Python doesn't use them internally
+            value = value.replace("\r", "")  # Get given Windows line endings but Python doesn't use them internally
         return value
     else:
         return ", ".join(map(convertDictToString, value))
+
 
 def convertDictToString(dict):
     if "name" in dict:
@@ -43,20 +49,24 @@ def convertDictToString(dict):
     else:
         return "No value defined"
 
+
 def transfer(oldDict, newDict, key, postfix=""):
     if key in oldDict:
         newDict[key] = convertToString(oldDict[key]) + postfix
+
 
 def findId(info, currId):
     for item in info:
         if item["id"] == currId:
             return item["name"]
 
+
 def isInteresting(value):
     return value and value != "0"
 
+
 def filterReply(bugInfo, statuses, resolutions):
-    ignoreFields = [ "id", "type", "description", "project" ]
+    ignoreFields = ["id", "type", "description", "project"]
     newBugInfo = OrderedDict()
     transfer(bugInfo, newBugInfo, "key")
     transfer(bugInfo, newBugInfo, "summary")
@@ -67,8 +77,9 @@ def filterReply(bugInfo, statuses, resolutions):
         transfer(bugInfo, newBugInfo, "assignee", "\n")
     newBugInfo["components"] = convertToString(bugInfo["components"])
     priorityStr = convertToString(bugInfo["priority"])
-    priorityStr = str(int(priorityStr) -1) if priorityStr.isdigit() else priorityStr
-    remainder = [k for k in list(bugInfo.keys()) if k not in ignoreFields and (k not in newBugInfo or k == "priority") and isInteresting(bugInfo[k])]
+    priorityStr = str(int(priorityStr) - 1) if priorityStr.isdigit() else priorityStr
+    remainder = [k for k in list(bugInfo.keys()) if k not in ignoreFields and (
+        k not in newBugInfo or k == "priority") and isInteresting(bugInfo[k])]
     remainder.sort()
     for key in remainder:
         if key == "priority":
@@ -76,10 +87,12 @@ def filterReply(bugInfo, statuses, resolutions):
         else:
             transfer(bugInfo, newBugInfo, key)
     return newBugInfo
-    
+
+
 def makeURL(location, bugText):
     return location + "/browse/" + bugText
-    
+
+
 def parseReply(bugInfo, statuses, resolutions, location, id):
     try:
         newBugInfo = filterReply(bugInfo, statuses, resolutions)
@@ -95,9 +108,11 @@ def parseReply(bugInfo, statuses, resolutions, location, id):
         statusText = newBugInfo["resolution"].strip() if isResolved else newBugInfo['status']
         return statusText, message, isResolved, id
     except (IndexError, KeyError):
-        message = "Could not parse reply from Jira's web service, maybe incompatible interface. Text of reply follows : \n" + str(bugInfo)
+        message = "Could not parse reply from Jira's web service, maybe incompatible interface. Text of reply follows : \n" + \
+            str(bugInfo)
         return "BAD SCRIPT", message, False, id
-    
+
+
 def findBugInfo(bugId, location, username, password):
     scriptLocation = location + "/rpc/xmlrpc"
     proxy = xmlrpc.client.ServerProxy(scriptLocation)
@@ -106,7 +121,8 @@ def findBugInfo(bugId, location, username, password):
     except xmlrpc.client.Fault as e:
         return "LOGIN FAILED", e.faultString, False, bugId
     except Exception as e:
-        message = "Failed to log in to '" + scriptLocation + "': " + str(e) + ".\n\nPlease make sure that the configuration entry 'bug_system_location' points to a correct location of a Jira version 3.x installation. The current value is '" + location + "'."
+        message = "Failed to log in to '" + scriptLocation + "': " + \
+            str(e) + ".\n\nPlease make sure that the configuration entry 'bug_system_location' points to a correct location of a Jira version 3.x installation. The current value is '" + location + "'."
         return "BAD SCRIPT", message, False, bugId
 
     try:
@@ -127,6 +143,7 @@ def findBugInfo(bugId, location, username, password):
         message = "Failed to fetch data from '" + scriptLocation + "': " + str(e)
         return "BAD SCRIPT", message, False, bugId
 
+
 def getRenamedBug(bugId, location):
     try:
         url = urllib.request.urlopen(makeURL(location, bugId))
@@ -139,6 +156,8 @@ def getRenamedBug(bugId, location):
             return renamed
 
 # Used by Jenkins plugin
+
+
 def getBugsFromText(text, location):
     bugRegex = re.compile("[A-Z]{2,}-[0-9]+")
     bugs = []
@@ -146,4 +165,3 @@ def getBugsFromText(text, location):
         bugText = match.group(0)
         bugs.append((bugText, makeURL(location, bugText)))
     return bugs
-    

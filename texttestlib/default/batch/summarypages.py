@@ -1,7 +1,12 @@
 """ Code related to building the summary page and the graphs etc. """
 
 from . import testoverview
-import logging, os, shutil, time, operator, sys
+import logging
+import os
+import shutil
+import time
+import operator
+import sys
 from texttestlib import plugins
 from html.parser import HTMLParser
 from collections import OrderedDict
@@ -10,12 +15,14 @@ from .batchutils import BatchVersionFilter, parseFileName, convertToUrl, getEnvi
 import datetime
 from functools import reduce
 
+
 class GenerateFromSummaryData(plugins.ScriptWithArgs):
     locationApps = OrderedDict()
     summaryFileName = "index.html"
     basePath = ""
+
     def __init__(self, args=[""]):
-        argDict = self.parseArguments(args, [ "basepath", "file" ])
+        argDict = self.parseArguments(args, ["basepath", "file"])
         if "basepath" in argDict:
             GenerateFromSummaryData.basePath = argDict["basepath"]
         if "file" in argDict:
@@ -43,7 +50,8 @@ class GenerateFromSummaryData(plugins.ScriptWithArgs):
             if predicate is None or predicate(apps):
                 if not all((rejected for app, usePie, rejected in apps)):
                     defaultUsePie = all((usePie for app, usePie, rejected in apps))
-                    plugins.log.info("Generating index page at " + os.path.join(location, cls.summaryFileName) + ", from following:")
+                    plugins.log.info("Generating index page at " + os.path.join(location,
+                                                                                cls.summaryFileName) + ", from following:")
                     for app, _, rejected in apps:
                         text = "- " + app.description()
                         if rejected:
@@ -60,6 +68,7 @@ class GenerateFromSummaryData(plugins.ScriptWithArgs):
 
 class GenerateSummaryPage(GenerateFromSummaryData):
     scriptDoc = "Generate a summary page which links all the other generated pages"
+
     @classmethod
     def generate(cls, *args):
         generator = SummaryGenerator()
@@ -68,6 +77,7 @@ class GenerateSummaryPage(GenerateFromSummaryData):
 
 class GenerateGraphs(GenerateFromSummaryData):
     scriptDoc = "Generate standalone graphs along the lines of the ones that appear in the HTML report"
+
     @classmethod
     def generate(cls, dataFinder, appsWithVersions, *args):
         from .resultgraphs import GraphGenerator
@@ -79,6 +89,7 @@ class GenerateGraphs(GenerateFromSummaryData):
                     graphTitle = "Test results for Application: '" + appName + "'  Version: '" + version + "'"
                     graphGenerator = GraphGenerator()
                     graphGenerator.generateGraph(fileName, graphTitle, results, dataFinder.colourFinder)
+
 
 class TitleFinder(HTMLParser):
     def __init__(self):
@@ -93,6 +104,7 @@ class TitleFinder(HTMLParser):
         if self.active:
             self.title = content
             self.active = False
+
 
 class SummaryDataFinder:
     def __init__(self, location, apps, summaryFileName, basePath, defaultUsePie):
@@ -124,7 +136,7 @@ class SummaryDataFinder:
 
         if os.path.isdir(location):
             for dirName in os.listdir(location):
-                if dirName not in appnames and not dirName.endswith("_history") and dirName not in [ "images", "javascript", "jenkins_changes" ]:
+                if dirName not in appnames and not dirName.endswith("_history") and dirName not in ["images", "javascript", "jenkins_changes"]:
                     fullDir = os.path.join(location, dirName)
                     if os.path.isdir(fullDir):
                         appFullName = self.findFullName(fullDir)
@@ -159,7 +171,7 @@ class SummaryDataFinder:
             plugins.ensureDirExistsForFile(locationFile)
             plugins.log.info("No file at '" + locationFile + "', copying default file from installation")
             includeSite, includePersonal = self.inputOptions.configPathOptions()
-            srcFile = plugins.findDataPaths([ fileName ], includeSite, includePersonal, dataDirName)[-1]
+            srcFile = plugins.findDataPaths([fileName], includeSite, includePersonal, dataDirName)[-1]
             shutil.copyfile(srcFile, locationFile)
         return locationFile
 
@@ -213,7 +225,6 @@ class SummaryDataFinder:
     def getOverviewPage(self, appName, version):
         return os.path.join(self.basePath, self.getShortAppName(appName), self.getOverviewPageName(version))
 
-
     def getAppRunDirectory(self, appName):
         if appName in self.appRuns:
             return self.appRuns.get(appName)
@@ -229,7 +240,8 @@ class SummaryDataFinder:
         allInfo = {}
         for appName, appInfo in list(self.appVersionInfo.items()):
             for version, versionData in list(appInfo.items()):
-                lastInfoPerEnv = self.getLastInfoPerEnvironment(list(versionData.keys()), self.getAppRunDirectory(appName))
+                lastInfoPerEnv = self.getLastInfoPerEnvironment(
+                    list(versionData.keys()), self.getAppRunDirectory(appName))
                 for envData, lastInfo in lastInfoPerEnv:
                     allInfo.setdefault(envData, []).append(lastInfo[0])
                 self.diag.info("Most recent date for " + appName + " version " + version + " = " + repr(lastInfoPerEnv))
@@ -244,29 +256,30 @@ class SummaryDataFinder:
     def usePieChart(self, appName):
         if self.appUsePie.get(appName):
             try:
-                from .resultgraphs import PieGraph #@UnusedImport
+                from .resultgraphs import PieGraph  # @UnusedImport
                 return True
             except Exception as e:
                 sys.stderr.write("Not producing pie charts for index pages: " + str(e) + "\n")
                 self.appUsePie = {}
-                return False # if matplotlib isn't installed or is too old
+                return False  # if matplotlib isn't installed or is too old
         else:
             return False
 
     def extractLast(self, tags, count=1):
         if count == 1:
-            return [ max(tags, key=self.getDateTagKey) ]
+            return [max(tags, key=self.getDateTagKey)]
         else:
             return sorted(tags, key=self.getDateTagKey)[-count:]
 
     def getLastInfoPerEnvironment(self, allTags, runDir, count=1):
         if runDir is None:
             value = self.extractLast(allTags, count)
-            return [ ((None, None), value) ] if value is not None else []
+            return [((None, None), value)] if value is not None else []
+
         def getEnvironmentData(tag):
             date, actualTag = tag
             fullTag = time.strftime("%d%b%Y", date) + "_" + actualTag
-            runEnv = getEnvironmentFromRunFiles([ runDir ], fullTag)
+            runEnv = getEnvironmentFromRunFiles([runDir], fullTag)
             return runEnv.get("JENKINS_URL"), runEnv.get("JOB_NAME")
 
         groupedData = {}
@@ -308,28 +321,32 @@ class SummaryDataFinder:
             path = versionData[lastInfo]
             self.diag.info("Extracting summary information from " + path)
             self.extractSummary(path, summary)
-            self.diag.info("For app " + appName + " version " + version + " environment " + repr(envData) + ", found summary info " + repr(summary))
+            self.diag.info("For app " + appName + " version " + version + " environment " +
+                           repr(envData) + ", found summary info " + repr(summary))
             if len(lastInfoList) == 2:
                 nextLastInfo = lastInfoList[0]
                 path = versionData[nextLastInfo]
                 self.diag.info("Extracting previous summary information from " + path)
                 self.extractSummary(path, prevSummary)
-                self.diag.info("For app " + appName + " version " + version + " environment " + repr(envData) + ", found previous summary info " + repr(prevSummary))
-        self.diag.info("Last Info for version " + version + " = " + repr(lastInfo) + ", previous = " + repr(nextLastInfo))
+                self.diag.info("For app " + appName + " version " + version + " environment " +
+                               repr(envData) + ", found previous summary info " + repr(prevSummary))
+        self.diag.info("Last Info for version " + version + " = " +
+                       repr(lastInfo) + ", previous = " + repr(nextLastInfo))
         return summary, lastInfo, prevSummary, nextLastInfo
 
     def getAllSummaries(self, appName, version):
         versionData = self.appVersionInfo[appName][version]
         allDates = list(versionData.keys())
         allDates.sort(key=self.getDateTagKey)
-        summaries = [ (time.strftime("%d%b%Y", currInfo[0]), self.extractSummary(versionData[currInfo], OrderedDict())) for currInfo in allDates ]
+        summaries = [(time.strftime("%d%b%Y", currInfo[0]), self.extractSummary(
+            versionData[currInfo], OrderedDict())) for currInfo in allDates]
         self.diag.info("All Summaries = " + repr(summaries))
         return summaries
 
     def extractSummary(self, datedFile, summary):
         for line in open(datedFile):
             if line.strip().startswith("<H2>"):
-                text = line.strip()[4:-5] # drop the tags
+                text = line.strip()[4:-5]  # drop the tags
                 for cat, num in list(self.parseSummaryText(text).items()):
                     if cat in summary:
                         summary[cat] += num
@@ -339,19 +356,19 @@ class SummaryDataFinder:
         return summary
 
     def parseSummaryText(self, text):
-        words = text.split()[3:] # Drop "Version: 12 tests"
+        words = text.split()[3:]  # Drop "Version: 12 tests"
         index = 0
         categories = []
         while index < len(words):
             try:
                 count = int(words[index])
-                categories.append([ "", count ])
+                categories.append(["", count])
             except ValueError:
                 categories[-1][0] += words[index]
             index += 1
         self.diag.info("Category information is " + repr(categories))
         colourCount = OrderedDict()
-        for colourKey in [ "success", "knownbug", "performance", "failure", "incomplete" ]:
+        for colourKey in ["success", "knownbug", "performance", "failure", "incomplete"]:
             colourCount[colourKey] = 0
         for categoryName, count in categories:
             colourKey = self.getColourKey(categoryName)
@@ -367,10 +384,10 @@ class SummaryDataFinder:
         elif categoryName == "knownbugs":
             return "knownbug"
         else:
-            for perfCat in [ "faster", "slower", "memory+", "memory-", "larger", "smaller" ]:
+            for perfCat in ["faster", "slower", "memory+", "memory-", "larger", "smaller"]:
                 if categoryName.startswith(perfCat):
                     return "performance"
-            if categoryName in [ "killed", "unrunnable", "cancelled", "abandoned" ]:
+            if categoryName in ["killed", "unrunnable", "cancelled", "abandoned"]:
                 return "incomplete"
             else:
                 return "failure"
@@ -390,7 +407,7 @@ class SummaryGenerator:
         return var + " " + dataFinder.getColour(colourKey) + ";\n"
 
     def getDateRangeText(self, info):
-        dates = [ i[0] for i in info ]
+        dates = [i[0] for i in info]
         if len(dates) == 0:
             return ""
         firstDate = min(dates)
@@ -405,7 +422,7 @@ class SummaryGenerator:
             return str(len(mostRecentInfo)) + " test runs" + self.getDateRangeText(mostRecentInfo)
         else:
             suffix = "s" if len(mostRecentInfo) > 1 else ""
-            mostRecentTags = [ i[1] for i in mostRecentInfo ]
+            mostRecentTags = [i[1] for i in mostRecentInfo]
             return "test run" + suffix + " " + ", ".join(mostRecentTags)
 
     def generatePage(self, dataFinder, appsWithVersions, fileToUrl):
@@ -414,14 +431,15 @@ class SummaryGenerator:
         if os.getenv("JENKINS_URL") and os.getenv("JOB_NAME") and os.getenv("BUILD_NUMBER"):
             jobPath = os.path.join(os.getenv("JENKINS_URL"), "job", os.getenv("JOB_NAME"), os.getenv("BUILD_NUMBER"))
             if jobPath:
-                jobLink = "<br>(built by Jenkins job '" + os.getenv("JOB_NAME") + "', "+ "<a href='" + jobPath + "'> "+ "build number "+ os.getenv("BUILD_NUMBER")+ "</a>" + ")"
+                jobLink = "<br>(built by Jenkins job '" + os.getenv("JOB_NAME") + "', " + "<a href='" + \
+                    jobPath + "'> " + "build number " + os.getenv("BUILD_NUMBER") + "</a>" + ")"
 
         summaryPageTimeStamp = dataFinder.summaryPageName + "." + plugins.startTimeString(self.timeFormat)
         with open(summaryPageTimeStamp, "w") as f:
-            versionOrder = [ "default" ]
+            versionOrder = ["default"]
             appOrder = []
             mostRecentInfo = dataFinder.getMostRecentDateAndTags()
-            mostRecentTags = [ i[1] for i in mostRecentInfo ]
+            mostRecentTags = [i[1] for i in mostRecentInfo]
             self.diag.info("Most recent results are from " + repr(mostRecentTags))
             cssColours = []
             for line in open(dataFinder.getTemplateFile()):
@@ -440,7 +458,8 @@ class SummaryGenerator:
                 if "<h1" in line:
                     f.write("<h3 align=\"center\">(from " + self.getRecentTagText(mostRecentInfo) + ")</h3>\n")
                 if "Insert table here" in line:
-                    self.insertSummaryTable(f, dataFinder, mostRecentInfo, appsWithVersions, appOrder, versionOrder, cssColours)
+                    self.insertSummaryTable(f, dataFinder, mostRecentInfo, appsWithVersions,
+                                            appOrder, versionOrder, cssColours)
                 if "Insert footer here" in line:
                     f.write(creationDate + (jobLink if jobLink else ""))
 
@@ -470,7 +489,7 @@ class SummaryGenerator:
             try:
                 return datetime.datetime.strptime(timeStampString, self.oldTimeFormat)
             except ValueError:
-                pass # Might not be the right format
+                pass  # Might not be the right format
 
     def cleanOldest(self, fileNames):
         numberOfFilesToKeep = 5
@@ -481,7 +500,7 @@ class SummaryGenerator:
             # Don't remove newer files in order to mitigate the risk of
             # removing index.html links created by a job running at the
             # same time.
-            deleteOlderThan = datetime.datetime.now() - datetime.timedelta(minutes = 5)
+            deleteOlderThan = datetime.datetime.now() - datetime.timedelta(minutes=5)
             for _ in range(numberOfFilesToRemove):
                 timeStamp, fileName = fileNames.pop(0)
                 if timeStamp >= deleteOlderThan:
@@ -619,18 +638,21 @@ class SummaryGenerator:
                     if version in versionWithColumns:
                         columnVersions[columnIndex] = version
 
-                    resultSummary, lastInfo, prevResultSummary, nextLastInfo = dataFinder.getLatestSummaries(appName, version)
+                    resultSummary, lastInfo, prevResultSummary, nextLastInfo = dataFinder.getLatestSummaries(
+                        appName, version)
                     oldResults = self.showResultAsOld(lastInfo, mostRecentInfo)
                     fileToLink = dataFinder.getOverviewPage(appName, version)
                     if dataFinder.usePieChart(appName):
                         summaryGraphName = "summary_pie_" + version + ".png"
                         self.createPieChart(dataFinder, resultSummary, summaryGraphName, version, lastInfo, oldResults)
-                        file.write('    <td><a href="' + fileToLink + '"><img border=\"0\" src=\"' + summaryGraphName + '\"></a></td>\n')
+                        file.write('    <td><a href="' + fileToLink + '"><img border=\"0\" src=\"' +
+                                   summaryGraphName + '\"></a></td>\n')
                     else:
                         file.write('    <td><h3><a href="' + fileToLink + '">' + version + '</a></h3></td>\n')
                         for colourKey, count in list(resultSummary.items()):
                             if count:
-                                file.write('    <td ' + self.getColourAttribute(colourKey, cssColours, dataFinder) + '><h3>')
+                                file.write('    <td ' + self.getColourAttribute(colourKey,
+                                                                                cssColours, dataFinder) + '><h3>')
                                 if oldResults:
                                     # Highlight old data by putting it in a paler foreground colour
                                     file.write('<font color="#999999">' + str(count) + "</font>")
@@ -641,7 +663,8 @@ class SummaryGenerator:
                         image = self.getTrendImage(resultSummary, prevResultSummary)
                         dataFinder.ensureLocationFileExists(image)
                         tooltip = self.getTooltipForPrevious(prevResultSummary, nextLastInfo[1])
-                        file.write('    <td class="arrow_cell"><img src="' + dataFinder.getLink(image) + '" title="' + tooltip + '"/></td>\n')
+                        file.write('    <td class="arrow_cell"><img src="' +
+                                   dataFinder.getLink(image) + '" title="' + tooltip + '"/></td>\n')
                     file.write("  </tr></table>")
                 file.write("</td>\n")
             file.write("</tr>\n")

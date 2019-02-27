@@ -3,7 +3,12 @@
 Code to do with the grid engine master process, i.e. submitting slave jobs and waiting for them to report back
 """
 
-import os, sys, socket, signal, logging, time
+import os
+import sys
+import socket
+import signal
+import logging
+import time
 from .utils import *
 from queue import Queue
 from socketserver import ThreadingTCPServer, StreamRequestHandler
@@ -19,17 +24,21 @@ from locale import getpreferredencoding
 
 plugins.addCategory("abandoned", "abandoned", "were abandoned")
 
+
 class Abandoned(plugins.TestState):
     def __init__(self, freeText):
-        plugins.TestState.__init__(self, "abandoned", briefText="job deletion failed", \
-                                                      freeText=freeText, completed=1, lifecycleChange="complete")
-        
+        plugins.TestState.__init__(self, "abandoned", briefText="job deletion failed",
+                                   freeText=freeText, completed=1, lifecycleChange="complete")
+
+
 class Pending(plugins.TestState):
     defaultBriefText = "PEND"
+
     def __init__(self, freeText, briefText=None, lifecycleChange="become pending"):
         briefText = briefText or self.defaultBriefText
-        plugins.TestState.__init__(self, "pending", freeText=freeText, briefText=briefText, lifecycleChange=lifecycleChange)
-    
+        plugins.TestState.__init__(self, "pending", freeText=freeText,
+                                   briefText=briefText, lifecycleChange=lifecycleChange)
+
     def makeModifiedState(self, newRunStatus, newDetails, lifecycleChange):
         if newRunStatus != self.briefText:
             newFreeText = self.freeText + "\n" + newDetails
@@ -38,6 +47,7 @@ class Pending(plugins.TestState):
 
 class QueueSystemServer(BaseActionRunner):
     instance = None
+
     def __init__(self, optionMap, allApps):
         BaseActionRunner.__init__(self, optionMap, logging.getLogger("Queue System Submit"))
         # queue for putting tests when we couldn't reuse the originals
@@ -45,7 +55,7 @@ class QueueSystemServer(BaseActionRunner):
         self.counterLock = Lock()
         self.testCount = 0
         self.testsSubmitted = 0
-        self.maxCapacity = 100000 # infinity, sort of
+        self.maxCapacity = 100000  # infinity, sort of
         self.allApps = allApps
         self.jobs = OrderedDict()
         self.submissionRules = {}
@@ -62,7 +72,7 @@ class QueueSystemServer(BaseActionRunner):
         appCapacities = []
         for app in allApps:
             appCapacity = self.maxCapacity
-            queueSystem = self.getQueueSystem(app) # populate cache
+            queueSystem = self.getQueueSystem(app)  # populate cache
             queueCapacity = queueSystem.getCapacity() if queueSystem else None
             # If the slaves run somewhere else, they won't create directories for us
             if queueSystem:
@@ -73,20 +83,21 @@ class QueueSystemServer(BaseActionRunner):
                     appCapacity = currCap
             appCapacities.append(appCapacity)
         if all((c == 0 for c in appCapacities)):
-            raise plugins.TextTestError("The queue system module is reporting zero capacity.\nEither you have set 'queue_system_max_capacity' to 0 or something is uninstalled or unavailable. Exiting.")
-        
+            raise plugins.TextTestError(
+                "The queue system module is reporting zero capacity.\nEither you have set 'queue_system_max_capacity' to 0 or something is uninstalled or unavailable. Exiting.")
+
         self.maxCapacity = min((c for c in appCapacities if c != 0))
         capacityPerSuite = self.maxCapacity / len(allApps)
         for app in allApps:
             self.remainingForApp[app.name] = capacityPerSuite
         QueueSystemServer.instance = self
-        
+
     def addSuites(self, suites):
         for suite in suites:
             self.slaveLogDirs.add(suite.app.makeWriteDirectory("slavelogs"))
             plugins.log.info("Using " + queueSystemName(suite.app) + " queues for " +
                              suite.app.description(includeCheckout=True))
-           
+
     def setSlaveServerAddress(self, address):
         self.submitAddress = os.getenv("CAPTUREMOCK_SERVER", address)
         self.testQueue.put("TextTest slave server started on " + address)
@@ -100,10 +111,10 @@ class QueueSystemServer(BaseActionRunner):
             self.remainingForApp[test.app.name] = capacityForApp - 1
         else:
             if test.app.name == list(self.remainingForApp.keys())[-1]:
-                self.addTestToQueues(test) # For the last app (which may be the only one) there is no point in delaying
+                self.addTestToQueues(test)  # For the last app (which may be the only one) there is no point in delaying
             else:
                 self.delayedTestsForAdd.append(test)
-                
+
     def queueTestForRerun(self, test):
         # Clear out the previous job reference, otherwise our grid polling will kill it off
         self.jobs[test] = []
@@ -126,21 +137,24 @@ class QueueSystemServer(BaseActionRunner):
         BaseActionRunner.notifyAllRead(self, suites)
         self.allRead = True
 
-    def run(self): # picked up by core to indicate running in a thread
+    def run(self):  # picked up by core to indicate running in a thread
         self.runAllTests()
         if len(self.jobs):
             self.diag.info("All jobs submitted, polling the queue system now.")
             if self.canPoll():
                 self.pollQueueSystem()
-                
+
         self.diag.info("No jobs left to poll, exiting thread")
 
     def pollQueueSystem(self):
         # Start by polling after 5 seconds, ever after try every 15
-        interval = float(os.getenv("TEXTTEST_QS_POLL_INTERVAL", "0.5")) # Amount of time to wait between checks for exit/completion when polling grid/cloud
-        attempts = int(float(os.getenv("TEXTTEST_QS_POLL_WAIT", "5")) / interval) # Amount of time to wait before initiating polling of grid/cloud
-        subsequentAttempts = int(float(os.getenv("TEXTTEST_QS_POLL_SUBSEQUENT_WAIT", "15")) / interval) # Amount of time to wait before subsequent polling of grid/cloud
-        if attempts >= 0: 
+        # Amount of time to wait between checks for exit/completion when polling grid/cloud
+        interval = float(os.getenv("TEXTTEST_QS_POLL_INTERVAL", "0.5"))
+        # Amount of time to wait before initiating polling of grid/cloud
+        attempts = int(float(os.getenv("TEXTTEST_QS_POLL_WAIT", "5")) / interval)
+        # Amount of time to wait before subsequent polling of grid/cloud
+        subsequentAttempts = int(float(os.getenv("TEXTTEST_QS_POLL_SUBSEQUENT_WAIT", "15")) / interval)
+        if attempts >= 0:
             while True:
                 for _ in range(attempts):
                     time.sleep(interval)
@@ -151,19 +165,20 @@ class QueueSystemServer(BaseActionRunner):
                 if not self.exited:
                     self.updateJobStatus()
                 attempts = subsequentAttempts
-                self.diag.info("Trying to rerun queues " + repr(self.testsSubmitted) + " out of " + repr(self.maxCapacity) + " tests submitted")
+                self.diag.info("Trying to rerun queues " + repr(self.testsSubmitted) +
+                               " out of " + repr(self.maxCapacity) + " tests submitted")
                 # In case any tests have had reruns triggered since we stopped submitting
                 self.runQueue(self.getTestForRun, self.runTest, "rerunning", block=False)
 
     def canPoll(self):
         queueSystem = self.getQueueSystem(list(self.jobs.keys())[0])
         return queueSystem.supportsPolling()
-    
+
     def updateJobStatus(self):
         queueSystem = self.getQueueSystem(list(self.jobs.keys())[0])
         statusInfo = queueSystem.getStatusForAllJobs()
         self.diag.info("Got status for all jobs : " + repr(statusInfo))
-        if statusInfo is not None: # queue system not available for some reason
+        if statusInfo is not None:  # queue system not available for some reason
             for test, jobs in list(self.jobs.items()):
                 if not test.state.isComplete():
                     for jobId, jobName in jobs:
@@ -175,7 +190,7 @@ class QueueSystemServer(BaseActionRunner):
                         elif not status and not self.jobCompleted(test, jobName):
                             # Do this to any jobs
                             self.setSlaveFailed(test, self.jobStarted(test, jobName), True, jobId)
-        
+
     def updateRunStatus(self, test, status):
         newRunStatus, newExplanation = status
         newState = test.state.makeModifiedState(newRunStatus, newExplanation, "grid status update")
@@ -190,13 +205,13 @@ class QueueSystemServer(BaseActionRunner):
         else:
             self.diag.info("Putting " + test.uniqueName + " in normal queue " + self.remainStr())
             return self.testQueue
-                
+
     def handleLocalError(self, test, previouslySubmitted):
         self.handleErrorState(test, previouslySubmitted)
         if (self.testCount == 0 and self.allRead) or (self.reuseOnly and self.testsSubmitted == 0):
             self.diag.info("Submitting terminators after local error")
             self.submitTerminators()
-            
+
     def submitTerminators(self):
         # snap out of our loop if this was the last one. Rely on others to manage the test queue
         self.reuseFailureQueue.put(None)
@@ -222,7 +237,7 @@ class QueueSystemServer(BaseActionRunner):
                             postText = self.remainStr()
                         else:
                             # Don't allow test count to drop to 0 here, can cause race conditions
-                            self.submitTerminators() 
+                            self.submitTerminators()
                             postText = ": submitting terminators as final test"
                     self.diag.info("Reusing slave from " + test.uniqueName + " for " + newTest.uniqueName + postText)
                     return newTest
@@ -232,15 +247,16 @@ class QueueSystemServer(BaseActionRunner):
             else:
                 self.diag.info("No tests available for reuse : " + test.uniqueName)
             self.reusedTests[test] = None
-                    
+
         # Allowed a submitted job to terminate
         with self.counterLock:
             self.testsSubmitted -= 1
-            self.diag.info("No reuse for " + test.uniqueName + " : " + repr(self.testsSubmitted) + " tests still submitted")
+            self.diag.info("No reuse for " + test.uniqueName + " : " +
+                           repr(self.testsSubmitted) + " tests still submitted")
             if self.exited and self.testsSubmitted == 0:
                 self.diag.info("Forcing termination")
                 self.submitTerminators()
-            
+
     def allowReuse(self, oldTest, oldState, newTest):
         # Don't reuse jobs that have been killed
         if newTest.state.isComplete() or oldState.category == "killed":
@@ -252,9 +268,9 @@ class QueueSystemServer(BaseActionRunner):
 
         # Jobs maintain the same virtual display instance where possible, if they require different settings they can't be reused
         if oldTest.getConfigValue("virtual_display_extra_args") != newTest.getConfigValue("virtual_display_extra_args") or \
-            oldTest.getConfigValue("virtual_display_count") != newTest.getConfigValue("virtual_display_count"):
+                oldTest.getConfigValue("virtual_display_count") != newTest.getConfigValue("virtual_display_count"):
             return False
-        
+
         oldRules = self.getSubmissionRules(oldTest)
         newRules = self.getSubmissionRules(newTest)
         return oldRules.allowsReuse(newRules)
@@ -294,7 +310,7 @@ class QueueSystemServer(BaseActionRunner):
             sock.connect(serverAddress)
             sock.sendall(("SUT_SERVER:" + state + "\n").encode(getpreferredencoding()))
             sock.close()
-            
+
     def getTestForRunNormalMode(self, block):
         self.reuseOnly = False
         reuseFailure = self.getItemFromQueue(self.reuseFailureQueue, block=False)
@@ -310,7 +326,7 @@ class QueueSystemServer(BaseActionRunner):
                 # Make sure we pick up anything that failed in reuse while we were submitting the final test...
                 self.diag.info("No normal test found, checking reuse failures...")
                 return self.getItemFromQueue(self.reuseFailureQueue, block=False)
-            
+
     def getTestForRunReuseOnlyMode(self, block):
         self.reuseOnly = True
         self.diag.info("Waiting for reuse failures...")
@@ -355,7 +371,7 @@ class QueueSystemServer(BaseActionRunner):
 
         for msg, jobName in list(errors.items()):
             sys.stderr.write("WARNING: error produced by slave job '" + jobName + "'\n" + msg)
-    
+
     def cleanup(self, final=False):
         cleanupComplete = True
         if self.jobs:
@@ -363,20 +379,20 @@ class QueueSystemServer(BaseActionRunner):
             cleanupComplete &= queueSystem.cleanup(final)
         if cleanupComplete and not final:
             self.sendServerState("Completed submission of all tests")
-    
+
     def remainStr(self):
         return " : " + str(self.testCount) + " tests remain, " + str(self.testsSubmitted) + " are submitted."
 
-    def runTest(self, test):   
+    def runTest(self, test):
         submissionRules = self.getSubmissionRules(test)
         commandArgs = self.getSlaveCommandArgs(test, submissionRules)
         plugins.log.info("Q: Submitting " + repr(test) + submissionRules.getSubmitSuffix())
         sys.stdout.flush()
-        self.jobs[test] = [] # Preliminary jobs aren't interesting any more
+        self.jobs[test] = []  # Preliminary jobs aren't interesting any more
         slaveEnv = OrderedDict()
         if not self.submitJob(test, submissionRules, commandArgs, slaveEnv):
             return
-        
+
         with self.counterLock:
             self.testCount -= 1
             self.testsSubmitted += 1
@@ -395,13 +411,13 @@ class QueueSystemServer(BaseActionRunner):
     def fixProxyVar(self, env, test, withProxy):
         if withProxy and test.getConfigValue("queue_system_proxy_executable"):
             env["TEXTTEST_SUBMIT_COMMAND_ARGS"] = "?"
- 
+
     def fixDisplay(self, env):
         # Must make sure SGE jobs don't get a locally referencing DISPLAY
         display = os.environ.get("DISPLAY")
         if display and display.startswith(":"):
             env["DISPLAY"] = plugins.gethostname() + display
-        
+
     def getPendingState(self, test):
         return Pending(freeText="Job pending in " + queueSystemName(test.app))
 
@@ -409,15 +425,15 @@ class QueueSystemServer(BaseActionRunner):
         queueSystem = self.getQueueSystem(test)
         args = queueSystem.getTextTestArgs()
         if queueSystem.slavesOnRemoteSystem():
-            args += [ "-home", os.path.expanduser("~") ]
-        return args + [ "-d", ":".join(self.optionMap.rootDirectories),
-                 "-a", test.app.name + test.app.versionSuffix(),
-                 "-l", "-tp", test.getRelPath() ] + \
-                 self.getSlaveArgs(test) + self.getRunOptions(test.app, submissionRules)
+            args += ["-home", os.path.expanduser("~")]
+        return args + ["-d", ":".join(self.optionMap.rootDirectories),
+                       "-a", test.app.name + test.app.versionSuffix(),
+                       "-l", "-tp", test.getRelPath()] + \
+            self.getSlaveArgs(test) + self.getRunOptions(test.app, submissionRules)
 
     def getSlaveArgs(self, test):
-        return [ "-slave", test.app.writeDirectory, "-servaddr", self.submitAddress ]
-    
+        return ["-slave", test.app.writeDirectory, "-servaddr", self.submitAddress]
+
     def getRunOptions(self, app, submissionRules):
         runOptions = []
         for slaveSwitch in app.getSlaveSwitches():
@@ -435,7 +451,7 @@ class QueueSystemServer(BaseActionRunner):
             runOptions.append("-xw")
             runOptions.append(os.path.expandvars("$TEXTTEST_PERSONAL_LOG/" + submissionRules.getJobName()))
         return runOptions
-        
+
     def getSlaveLogDir(self, test):
         return os.path.join(test.app.writeDirectory, "slavelogs")
 
@@ -443,20 +459,20 @@ class QueueSystemServer(BaseActionRunner):
         jobInfo = self.getJobInfo(test)
         if len(jobInfo) > 0:
             # Take the most recent job, it's hopefully the most interesting
-            jobId = jobInfo[-1][0] 
+            jobId = jobInfo[-1][0]
             queueSystem = self.getQueueSystem(test)
             queueSystem.setRemoteProcessId(jobId, pid)
-            
+
     def getRemoteTestTmpDir(self, test):
         jobInfo = self.getJobInfo(test)
         if len(jobInfo) > 0:
             # Take the most recent job, it's hopefully the most interesting
-            jobId = jobInfo[-1][0] 
+            jobId = jobInfo[-1][0]
             queueSystem = self.getQueueSystem(test)
             remoteMachine = queueSystem.getRemoteTestMachine(jobId)
             if remoteMachine:
                 return remoteMachine, test.writeDirectory
-        
+
     def getSubmitCmdArgs(self, test, *args):
         queueSystem = self.getQueueSystem(test)
         return queueSystem.getSubmitCmdArgs(*args)
@@ -465,7 +481,7 @@ class QueueSystemServer(BaseActionRunner):
         submissionRules = self.getSubmissionRules(test)
         cmdArgs = self.getSubmitCmdArgs(test, submissionRules)
         text = queueSystemName(test) + " Command   : " + plugins.commandLineString(cmdArgs) + " ...\n" + \
-               "Slave Command : " + " ".join(self.getSlaveCommandArgs(test, submissionRules)) + "\n"
+            "Slave Command : " + " ".join(self.getSlaveCommandArgs(test, submissionRules)) + "\n"
         proxyArgs = self.getProxyCmdArgs(test)
         if proxyArgs:
             return queueSystemName(test) + " Proxy Command   : " + plugins.commandLineString(proxyArgs) + "\n" + text
@@ -476,7 +492,7 @@ class QueueSystemServer(BaseActionRunner):
         proxyCmd = test.getConfigValue("queue_system_proxy_executable")
         if proxyCmd:
             proxyOptions = test.getCommandLineOptions("proxy_options")
-            fullProxyCmdArgs = [ proxyCmd ] + proxyOptions
+            fullProxyCmdArgs = [proxyCmd] + proxyOptions
             proxyRules = self.getJobSubmissionRules(test)
             return self.getSubmitCmdArgs(test, proxyRules, fullProxyCmdArgs, slaveEnv)
         else:
@@ -485,13 +501,14 @@ class QueueSystemServer(BaseActionRunner):
     def modifyCommandForProxy(self, test, cmdArgs, slaveEnv):
         proxyArgs = self.getProxyCmdArgs(test, slaveEnv)
         if proxyArgs:
-            cmdArgs[1:1] = [ "-sync", "y", "-V" ] # must sychronise in the proxy
+            cmdArgs[1:1] = ["-sync", "y", "-V"]  # must sychronise in the proxy
             # Proxy likes to set environment variables, make sure they get forwarded
-            slaveEnv["TEXTTEST_SUBMIT_COMMAND_ARGS"] = repr(cmdArgs) # Exact command arguments to run TextTest slave, for use by proxy
+            # Exact command arguments to run TextTest slave, for use by proxy
+            slaveEnv["TEXTTEST_SUBMIT_COMMAND_ARGS"] = repr(cmdArgs)
             return proxyArgs
         else:
             return cmdArgs
-        
+
     def submitJob(self, test, submissionRules, commandArgs, slaveEnv, withProxy=True, jobType=""):
         self.diag.info("Submitting job at " + plugins.localtime() + ":" + repr(commandArgs))
         self.diag.info("Creating job at " + plugins.localtime())
@@ -501,7 +518,7 @@ class QueueSystemServer(BaseActionRunner):
         cmdArgs = self.getSubmitCmdArgs(test, submissionRules, commandArgs, slaveEnv)
         if withProxy:
             cmdArgs = self.modifyCommandForProxy(test, cmdArgs, slaveEnv)
-        
+
         jobName = submissionRules.getJobName()
         self.diag.info("Creating job " + jobName + " with command arguments : " + " ".join(cmdArgs))
         with self.lock:
@@ -509,7 +526,7 @@ class QueueSystemServer(BaseActionRunner):
                 self.cancel(test)
                 plugins.log.info("Q: Submission cancelled for " + repr(test) + " - exit underway")
                 return False
-        
+
             self.lockDiag.info("Got lock for submission")
             queueSystem = self.getQueueSystem(test)
             logDir = self.getSlaveLogDir(test)
@@ -525,14 +542,14 @@ class QueueSystemServer(BaseActionRunner):
                 test.changeState(plugins.Unrunnable(errorMessage, "NOT SUBMITTED"))
                 self.handleErrorState(test)
                 return False
-            
+
     def checkQueueCapacity(self, queueSystem):
         queueCapacity = queueSystem.getCapacity()
         if queueCapacity:
             with self.counterLock:
                 if queueCapacity < self.maxCapacity:
                     self.maxCapacity = queueCapacity
-        
+
     def handleErrorState(self, test, previouslySubmitted=False):
         with self.counterLock:
             if self.maxCapacity > 1:
@@ -545,24 +562,25 @@ class QueueSystemServer(BaseActionRunner):
         bugchecker = CheckForBugs()
         self.setUpSuites(bugchecker, test)
         bugchecker(test)
-        test.actionsCompleted()        
-    
+        test.actionsCompleted()
+
     def setUpSuites(self, bugchecker, test):
         if test.parent:
             bugchecker.setUpSuite(test.parent)
             self.setUpSuites(bugchecker, test.parent)
-    
+
     def _getJobFailureInfo(self, test):
         jobInfo = self.getJobInfo(test)
         # Take the most recent job, it's hopefully the most interesting
         jobId = jobInfo[-1][0] if len(jobInfo) > 0 else None
         queueSystem = self.getQueueSystem(test)
         return queueSystem.getJobFailureInfo(jobId)
-    
+
     def getSlaveErrors(self, test, name):
-        errorTexts = [ self.getSlaveErrorText(test, jobName, desc) for jobName, desc in self.getErrorJobNames(test, name) ]
+        errorTexts = [self.getSlaveErrorText(test, jobName, desc)
+                      for jobName, desc in self.getErrorJobNames(test, name)]
         return "\n".join([text for text in errorTexts if text])
-    
+
     def getErrorJobNames(self, test, name):
         jobNames = []
         for _, jobName in self.getJobInfo(test):
@@ -570,19 +588,19 @@ class QueueSystemServer(BaseActionRunner):
             if jobName.startswith("Test-"):
                 jobNames.append(("Proxy-" + jobName[5:], name + " Proxy"))
         return jobNames
-    
+
     def getSlaveErrorText(self, test, jobName, desc):
         errFile = os.path.join(self.getSlaveLogDir(test), jobName + ".errors")
         if os.path.isfile(errFile):
             errors = open(errFile).read()
             if errors:
                 return "-" * 10 + " Error messages written by " + desc + " job " + "-" * 10 + \
-                              "\n" + errors
+                    "\n" + errors
         return ""
-     
+
     def getJobInfo(self, test):
         return self.jobs.get(test, [])
- 
+
     def killJob(self, test, jobId, jobName):
         prevTest, prevJobExisted = self.killedJobs.get(jobId, (None, False))
         # Killing the same job for other tests should result in the cached result being returned
@@ -594,7 +612,7 @@ class QueueSystemServer(BaseActionRunner):
         jobExisted = queueSystem.killJob(jobId)
         self.killedJobs[jobId] = test, jobExisted
         return jobExisted
-    
+
     def getQueueSystem(self, test):
         queueModuleText = queueSystemName(test)
         if queueModuleText is None:
@@ -602,22 +620,22 @@ class QueueSystemServer(BaseActionRunner):
         queueModule = queueModuleText.lower()
         if queueModule in self.queueSystems:
             return self.queueSystems[queueModule]
-        
+
         namespace = {}
         command = "from ." + queueModule + " import QueueSystem as _QueueSystem"
         exec(command, globals(), namespace)
         system = namespace["_QueueSystem"](test)
         self.queueSystems[queueModule] = system
         return system
-    
+
     def changeState(self, test, newState, previouslySubmitted=True):
         test.changeState(newState)
         self.handleLocalError(test, previouslySubmitted)
-    
+
     def killTests(self):
         # If we've been killed with some sort of limit signal, wait here until we know
         # all tests terminate. Otherwise we rely on them terminating naturally, and if they don't
-        wantStatus = self.killSignal and self.killSignal not in [ signal.SIGINT, signal.SIGTERM ]
+        wantStatus = self.killSignal and self.killSignal not in [signal.SIGINT, signal.SIGTERM]
         killedTests = []
         for test, jobList in list(self.jobs.items()):
             if not test.state.isComplete():
@@ -636,7 +654,7 @@ class QueueSystemServer(BaseActionRunner):
                 return
             time.sleep(1)
             for test, jobId in stillRunning:
-                plugins.log.info("T: Cancellation in progress for " + repr(test) + 
+                plugins.log.info("T: Cancellation in progress for " + repr(test) +
                                  ", waited " + str(attempt) + " seconds so far.")
         for test, jobId in stillRunning:
             name = queueSystemName(test.app)
@@ -652,7 +670,7 @@ class QueueSystemServer(BaseActionRunner):
         else:
             self.diag.info("No job info found from queue system server, changing state to cancelled")
             return self.cancel(test)
-        
+
     def killTest(self, test, jobId, jobName, wantStatus):
         self.diag.info("Killing test " + repr(test) + " in state " + test.state.category)
         jobExisted = self.killJob(test, jobId, jobName)
@@ -677,15 +695,15 @@ class QueueSystemServer(BaseActionRunner):
             queueSystem = self.getQueueSystem(test)
             for jobId, _ in self.getJobInfo(test):
                 queueSystem.setSuspendState(jobId, newState)
-    
+
     def jobStarted(self, test, *args):
         return test.state.hasStarted()
-    
+
     def jobCompleted(self, test, *args):
         return test.state.isComplete()
-    
+
     def setKilledPending(self, test, jobId):
-        timeStr =  plugins.localtime("%H:%M")
+        timeStr = plugins.localtime("%H:%M")
         briefText = "cancelled pending job at " + timeStr
         freeText = "Test job " + jobId + " was cancelled (while still pending in " + queueSystemName(test.app) +\
                    ") at " + timeStr
@@ -697,7 +715,7 @@ class QueueSystemServer(BaseActionRunner):
         else:
             # Job accounting info can take ages to find, don't do it from GUI quit
             return "No accounting info found as quitting..."
-        
+
     def setSlaveFailed(self, test, startNotified, wantStatus, jobId):
         failReason, fullText = self.getSlaveFailure(test, startNotified, wantStatus)
         fullText = failReason + "\nJob ID was " + jobId + "\n" + fullText
@@ -721,11 +739,11 @@ class QueueSystemServer(BaseActionRunner):
 
     def getSlaveFailureState(self, startNotified, failReason, fullText):
         if startNotified:
-            return plugins.TestState("killed", briefText=failReason, \
-                              freeText=fullText, completed=1, lifecycleChange="complete")
+            return plugins.TestState("killed", briefText=failReason,
+                                     freeText=fullText, completed=1, lifecycleChange="complete")
         else:
             return plugins.Unrunnable(briefText=failReason, freeText=fullText, lifecycleChange="complete")
-        
+
     def getPostText(self, test, jobId):
         name = queueSystemName(test.app)
         return "in " + name + " (job " + jobId + ")"
@@ -733,10 +751,13 @@ class QueueSystemServer(BaseActionRunner):
     def describeJob(self, test, jobId, *args):
         postText = self.getPostText(test, jobId)
         plugins.log.info("T: Cancelling " + repr(test) + " " + postText)
-        
+
 # Used in slave
+
+
 class BasicSubmissionRules:
     classPrefix = "Test"
+
     def __init__(self, test):
         self.test = test
         self.diag = logging.getLogger("Submission Rules")
@@ -751,7 +772,7 @@ class BasicSubmissionRules:
     def getJobFiles(self):
         jobName = self.getJobName()
         return jobName + ".log", jobName + ".errors"
- 
+
 
 class SubmissionRules(BasicSubmissionRules):
     def __init__(self, optionMap, test):
@@ -759,11 +780,11 @@ class SubmissionRules(BasicSubmissionRules):
         self.optionMap = optionMap
         self.configResources = self.getConfigResources(test)
         self.processesNeeded = self.getProcessesNeeded()
-        
+
     def getProcessesNeeded(self):
         return 1
 
-    def getExtraSubmitArgs(self): # pragma: no cover - documentation only
+    def getExtraSubmitArgs(self):  # pragma: no cover - documentation only
         return []
 
     def getParallelEnvironment(self):
@@ -804,29 +825,35 @@ class SubmissionRules(BasicSubmissionRules):
 
 class ProxySubmissionRules(SubmissionRules):
     classPrefix = "Proxy"
+
     def getConfigResources(self, test):
         return test.getConfigValue("queue_system_proxy_resource")
 
+
 class TestSubmissionRules(SubmissionRules):
     classPrefix = "Test"
+
     def getConfigResources(self, test):
         if "reconnect" not in self.optionMap:
             configSettings = test.getConfigValue("queue_system_resource")
-            envSetting = os.path.expandvars(test.getEnvironment("QUEUE_SYSTEM_RESOURCE", "")) # Deprecated. See "queue_system_resource" in config file docs
-            return configSettings + [ envSetting ] if envSetting else configSettings
+            # Deprecated. See "queue_system_resource" in config file docs
+            envSetting = os.path.expandvars(test.getEnvironment("QUEUE_SYSTEM_RESOURCE", ""))
+            return configSettings + [envSetting] if envSetting else configSettings
         else:
             return ""
 
     def getProcessesNeeded(self):
         if "reconnect" not in self.optionMap:
-            envSetting = self.test.getEnvironment("QUEUE_SYSTEM_PROCESSES", "") # Deprecated. See "queue_system_processes" in config file docs
+            # Deprecated. See "queue_system_processes" in config file docs
+            envSetting = self.test.getEnvironment("QUEUE_SYSTEM_PROCESSES", "")
             return int(envSetting) if envSetting else self.test.getConfigValue("queue_system_processes")
         else:
             return 1
 
     def getExtraSubmitArgs(self):
         if "reconnect" not in self.optionMap:
-            envSetting = os.path.expandvars(self.test.getEnvironment("QUEUE_SYSTEM_SUBMIT_ARGS", "")) #  Deprecated. See "queue_system_submit_args" in config file docs
+            # Deprecated. See "queue_system_submit_args" in config file docs
+            envSetting = os.path.expandvars(self.test.getEnvironment("QUEUE_SYSTEM_SUBMIT_ARGS", ""))
             argStr = envSetting or self.test.getConfigValue("queue_system_submit_args")
             return plugins.splitcmd(argStr)
         else:
@@ -853,12 +880,14 @@ class TestSubmissionRules(SubmissionRules):
         resourceList += self.configResources
         machine = self.optionMap.get("m")
         if machine and machine != "localhost":
-            machineResource = "hostname=" + machine # Won't work with LSF, but can't be bothered to figure it out there for now...
+            # Won't work with LSF, but can't be bothered to figure it out there for now...
+            machineResource = "hostname=" + machine
             self.diag.info("Adding from command line machine: " + repr(machineResource))
-            resourceList.append(machineResource) 
+            resourceList.append(machineResource)
         if self.forceOnPerformanceMachines():
             resources = self.getConfigValue("performance_test_resource")
-            self.diag.info("Forcing on performance machines: adding from all keys in performance_test_resource : " + repr(",".join(resources)))
+            self.diag.info(
+                "Forcing on performance machines: adding from all keys in performance_test_resource : " + repr(",".join(resources)))
             for resource in resources:
                 resourceList.append(resource)
         self.diag.info("Resource list for " + repr(self.test) + " = " + ",".join(resourceList))
@@ -895,23 +924,24 @@ class TestSubmissionRules(SubmissionRules):
         if minTimeForce >= 0:
             testPerf = getTestPerformance(self.test)
             if testPerf > minTimeForce:
-                self.diag.info("Test expects to take " + repr(testPerf) + " seconds, min_time_for_performance_force = " + repr(minTimeForce) + " seconds")
+                self.diag.info("Test expects to take " + repr(testPerf) +
+                               " seconds, min_time_for_performance_force = " + repr(minTimeForce) + " seconds")
                 return True
         # If we haven't got a log_file yet, we should do this so we collect performance reliably
         logFileStem = self.test.getConfigValue("log_file")
         logFile = self.test.getFileName(logFileStem)
         if logFile is None:
-            self.diag.info("No log file (file with stem " + repr(logFileStem) + 
+            self.diag.info("No log file (file with stem " + repr(logFileStem) +
                            ") exists in test yet, forcing on performance machines to collect initial files")
         return logFile is None
 
     def allowsReuse(self, newRules):
         if "reconnect" in self.optionMap:
-            return True # should be able to reconnect anywhere...
+            return True  # should be able to reconnect anywhere...
         else:
             # Don't care about the order of the resources
             return set(self.findResourceList()) == set(newRules.findResourceList()) and \
-                   self.processesNeeded == newRules.processesNeeded
+                self.processesNeeded == newRules.processesNeeded
 
 
 class SlaveRequestHandler(StreamRequestHandler):
@@ -921,21 +951,22 @@ class SlaveRequestHandler(StreamRequestHandler):
             return
 
         self.handleMessage(identifier)
-        
+
     def handleMessage(self, identifier):
         # Don't use port, it changes all the time
         identifier, sendFiles, getFiles, tryReuse, rerun = parseIdentifier(identifier)
         testString = str(self.rfile.readline().strip(), getpreferredencoding())
-        test = self.server.getTest(testString)    
+        test = self.server.getTest(testString)
         if test is None:
             clientHost = self.client_address[0]
             sys.stderr.write("WARNING: Received request from hostname " + self.getHostName(clientHost) +
                              " (process " + identifier + ")\nwhich could not be parsed:\n'" + testString + "'\n")
         elif getFiles:
             self.pushFiles(test)
-        elif not test.state.isComplete() or not test.state.hasResults(): # we might have killed it already...
+        elif not test.state.isComplete() or not test.state.hasResults():  # we might have killed it already...
             if sendFiles:
-                self.server.diag.info("Test " + test.uniqueName + " - receiving files sent from slave to sandbox directory")
+                self.server.diag.info("Test " + test.uniqueName +
+                                      " - receiving files sent from slave to sandbox directory")
                 directoryUnserialise(test.writeDirectory, self.rfile)
             # Don't use port, it changes all the time
             self.handleRequestFromHost(test, identifier, tryReuse, rerun)
@@ -943,20 +974,20 @@ class SlaveRequestHandler(StreamRequestHandler):
             self.server.diag.info("Test " + test.uniqueName + " already complete, ignoring new results")
             self.sendReuseResponse(test, test.state, tryReuse, False)
         self.connection.shutdown(socket.SHUT_RDWR)
-            
+
     def getHostName(self, ipAddress):
         try:
             return socket.gethostbyaddr(ipAddress)[0].split(".")[0]
         except socket.error:
             return ipAddress
-        
+
     def pushFiles(self, test):
         userAndHost = str(self.rfile.readline().strip(), getpreferredencoding())
         paths = []
         for line in self.rfile:
             paths.append(line.strip())
         self.server.pushFiles(test, userAndHost, paths)
-        
+
     def sendReuseResponse(self, *args):
         newTest = QueueSystemServer.instance.getTestForReuse(*args)
         if newTest:
@@ -980,12 +1011,13 @@ class SlaveRequestHandler(StreamRequestHandler):
             self.sendReuseResponse(test, state, tryReuse, doneRerun)
         else:
             QueueSystemServer.instance.setRemoteProcessId(test, pid)
-            
+
 
 class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
     # Python's default value of 5 isn't very much...
     # There doesn't seem to be any disadvantage of allowing a longer queue, so we will use the system's maximum size
-    request_queue_size = socket.SOMAXCONN    
+    request_queue_size = socket.SOMAXCONN
+
     def __init__(self, optionMap, allApps):
         plugins.Responder.__init__(self)
         ThreadingTCPServer.__init__(self, (getIPAddress(allApps), 0), self.handlerClass())
@@ -996,8 +1028,9 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
         self.diag = logging.getLogger("Slave Server")
         self.terminate = False
         self.totalReruns = 0
-        self.maxReruns = max(filter(lambda x: x is not None, (app.getBatchConfigValue("queue_system_max_reruns") for app in allApps)))
-        
+        self.maxReruns = max(filter(lambda x: x is not None,
+                                    (app.getBatchConfigValue("queue_system_max_reruns") for app in allApps)))
+
         # If a client rings in and then the connectivity is lost, we don't want to hang waiting for it forever
         # So we enable keepalive that will check the connection if no data is received for a while
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, True)
@@ -1005,7 +1038,7 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
         # We give up after 5 minutes
         if hasattr(socket, "TCP_KEEPIDLE"):
             self.socket.setsockopt(socket.SOL_TCP, socket.TCP_KEEPIDLE, 300)
-    
+
     def addSuites(self, *args):
         # use this as an opportunity to broadcast our address
         serverAddress = self.getAddress()
@@ -1013,11 +1046,11 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
         # Tell the submission code where we are
         QueueSystemServer.instance.setSlaveServerAddress(serverAddress)
 
-    def handlerClass(self):    
+    def handlerClass(self):
         return SlaveRequestHandler
 
     def canBeMainThread(self):
-        return False # We wait for sockets and stuff
+        return False  # We wait for sockets and stuff
 
     def run(self):
         while not self.terminate:
@@ -1028,13 +1061,13 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
                 # e.g. can get interrupted system call here in 'select' if we get a signal
                 sys.stderr.write("WARNING: slave server caught exception while processing request!\n")
                 plugins.printException()
-            
+
         self.diag.info("Terminating slave server")
-        
+
     def notifyAllRead(self, *args):
         if len(self.testMap) == 0:
             self.notifyAllComplete()
-            
+
     def notifyAllComplete(self):
         self.diag.info("Notified all complete, shutting down soon...")
         self.terminate = True
@@ -1042,7 +1075,7 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
         sendSocket.connect(self.socket.getsockname())
         sendSocket.sendall("TERMINATE_SERVER\n".encode(getpreferredencoding()))
         sendSocket.close()
-        
+
     def getAddress(self):
         host, port = self.socket.getsockname()
         return host + ":" + str(port)
@@ -1050,7 +1083,7 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
     def notifyAdd(self, test, initial):
         if test.classId() == "test-case":
             self.storeTest(test)
-            
+
     def storeTest(self, test):
         testPath = test.getRelPath()
         testApp = test.app.name + test.app.versionSuffix()
@@ -1067,23 +1100,25 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
             if allow:
                 test.changeState(state)
             else:
-                self.diag.info("Rejecting state change, old state " + test.state.category + " is complete, new state " + state.category + " is not.")
-        return allow            
+                self.diag.info("Rejecting state change, old state " + test.state.category +
+                               " is complete, new state " + state.category + " is not.")
+        return allow
 
     def changeStateOrRerun(self, test, state, rerun):
         oldBt = test.state.briefText
-        self.diag.info("Changed from '" + oldBt + "' to '" + state.briefText + "'")    
+        self.diag.info("Changed from '" + oldBt + "' to '" + state.briefText + "'")
         if rerun and self.totalReruns < self.maxReruns:
             lock = self.testLocks.get(test)
             with lock:
                 self.totalReruns += 1
-            self.diag.info("Instructed to rerun test " + test.uniqueName + ", now performed " + 
+            self.diag.info("Instructed to rerun test " + test.uniqueName + ", now performed " +
                            str(self.totalReruns) + " reruns of max " + str(self.maxReruns) + ".")
             QueueSystemServer.instance.queueTestForRerun(test)
             return True
         else:
             if rerun:
-                self.diag.info("Instructed to rerun test " + test.uniqueName + ", but refusing, already rerun maximum " + str(self.totalReruns) + " times.")
+                self.diag.info("Instructed to rerun test " + test.uniqueName +
+                               ", but refusing, already rerun maximum " + str(self.totalReruns) + " times.")
             self.changeState(test, state)
             return False
 
@@ -1097,17 +1132,17 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
             return self.testMap[appName][testPath]
         except ValueError:
             return
-        
+
     def getFilePushProcess(self, test, userAndHost, path):
         key = userAndHost, path
         with self.filePushLock:
             if key in self.filePushProcesses:
                 return self.filePushProcesses[key], False
-            else:   
+            else:
                 proc = test.app.getRemoteCopyFileProcess(path, "localhost", os.path.dirname(path), userAndHost)
                 self.filePushProcesses[key] = proc
                 return proc, True
-        
+
     def pushFiles(self, test, userAndHost, paths):
         for path in paths:
             proc, started = self.getFilePushProcess(test, userAndHost, path)
@@ -1126,13 +1161,12 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
 
 class MasterTextResponder(TextDisplayResponder):
     def getPrefix(self, test):
-        return "S: " # don't get things in order, so indenting is pointless
-    
+        return "S: "  # don't get things in order, so indenting is pointless
+
     def shouldDescribe(self, test):
-        return True # Write the successful tests also
+        return True  # Write the successful tests also
+
 
 class MasterInteractiveResponder(InteractiveResponder):
     def getPrefix(self, test):
-        return "" # don't get things in order, so indenting is pointless
-
-
+        return ""  # don't get things in order, so indenting is pointless

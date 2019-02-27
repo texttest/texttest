@@ -3,7 +3,12 @@
 Module containing code that's only run in the slave jobs when running with a grid engine / queue system
 """
 
-import os, sys, time, socket, signal, logging
+import os
+import sys
+import time
+import socket
+import signal
+import logging
 from .utils import *
 from texttestlib import plugins
 from texttestlib.default.runtest import RunTest
@@ -12,6 +17,7 @@ from texttestlib.default.actionrunner import ActionRunner
 from texttestlib.utils import getUserName
 from pickle import dumps
 from locale import getpreferredencoding
+
 
 def importAndCallFromQueueSystem(app, *args):
     moduleName = "queuesystem." + queueSystemName(app).lower()
@@ -29,17 +35,20 @@ class RunTestInSlave(RunTest):
                 return self.getUserSignalKillInfo(test, "1")
             elif self.killSignal == signal.SIGUSR2:
                 return self.getUserSignalKillInfo(test, "2")
-            
+
         return RunTest.getKillInfoOtherSignal(self, test)
-    
+
     def getUserSignalKillInfo(self, test, userSignalNumber):
         return importAndCallFromQueueSystem(test.app, "getUserSignalKillInfo", userSignalNumber, self.getExplicitKillInfo)
 
 # Redirect the log mechanism locally in the slave
 # Workaround for NFS slowness, essentially: we can't create these files in the master process in case they
 # don't propagate in time
+
+
 class RedirectLogResponder(plugins.Responder):
     done = False
+
     def notifyAdd(self, test, *args, **kw):
         if not self.done:
             RedirectLogResponder.done = True
@@ -58,8 +67,9 @@ class RedirectLogResponder(plugins.Responder):
                 plugins.log.addHandler(handler)
 
 
-class SocketResponder(plugins.Responder,plugins.Observable):
+class SocketResponder(plugins.Responder, plugins.Observable):
     synchFiles = False
+
     def __init__(self, optionMap, *args):
         plugins.Responder.__init__(self)
         plugins.Observable.__init__(self)
@@ -67,14 +77,14 @@ class SocketResponder(plugins.Responder,plugins.Observable):
         self.transferAll = optionMap.get("keepslave") or optionMap.get("keeptmp")
         self.testsForRerun = []
         self.serverAddress = self.getServerAddress(optionMap)
-    
+
     def getServerAddress(self, optionMap):
         servAddrStr = optionMap.get("servaddr", os.getenv("CAPTUREMOCK_SERVER"))
         if not servAddrStr:
             raise plugins.TextTestError("Cannot run slave, no server address has been provided to send results to!")
         host, port = servAddrStr.split(":")
         return host, int(port)
-    
+
     def connect(self, sendSocket):
         for _ in range(5):
             try:
@@ -112,7 +122,7 @@ class SocketResponder(plugins.Responder,plugins.Observable):
             fullData += directorySerialise(test.writeDirectory) + os.linesep
         fullDataBytes = fullData.encode(getpreferredencoding()) + pickleData
         return self.sendAndInterpret(fullDataBytes, self.interpretResponse, state)
-        
+
     def sendAndInterpret(self, fullData, responseMethod, *args):
         sleepTime = 1
         for _ in range(9):
@@ -133,11 +143,11 @@ class SocketResponder(plugins.Responder,plugins.Observable):
         sys.stderr.write(message)
         plugins.log.info(message.strip())
         self.notify("NoMoreExtraTests")
-        
+
     def sendData(self, sendSocket, fullData):
         sendSocket.sendall(fullData)
         sendSocket.shutdown(socket.SHUT_WR)
-        if self.synchFiles: 
+        if self.synchFiles:
             # Remote socket, possibly firewalls that kill connections, possibly other things. Use timeout and be prepared to retry...
             # TCP timeout is typically 30 seconds, give up a bit before that
             sendSocket.settimeout(25)
@@ -152,15 +162,15 @@ class SocketResponder(plugins.Responder,plugins.Observable):
             self.notify("ExtraTest", testPath, appParts[0], appParts[1:])
         elif state.isComplete():
             self.notify("NoMoreExtraTests")
-            
+
     def notifyRequiredTestData(self, test, paths):
         if self.synchFiles:
             for path in paths:
                 plugins.log.info(test.getIndent() + "Fetching required test data at " + repr(path) + " ...")
             data = makeIdentifierLine(str(os.getpid()), getFiles=True) + "\n" + socketSerialise(test) + "\n" + \
-                getUserName() + "@" + getIPAddress([ test ]) + "\n" + "\n".join(paths)
-            self.sendAndInterpret(data, None) # Just wait, no response to interpret
-            
+                getUserName() + "@" + getIPAddress([test]) + "\n" + "\n".join(paths)
+            self.sendAndInterpret(data, None)  # Just wait, no response to interpret
+
 
 class SlaveActionRunner(ActionRunner):
     def notifyAllRead(self, goodSuites):
@@ -168,9 +178,9 @@ class SlaveActionRunner(ActionRunner):
         # Need to add one if we haven't found any tests though
         if len(goodSuites) == 0:
             ActionRunner.notifyAllRead(self, goodSuites)
-        
+
     def notifyRerun(self, *args):
-        pass # don't rerun directly in the slave, tell the master and give it a chance to send the job elsewhere
+        pass  # don't rerun directly in the slave, tell the master and give it a chance to send the job elsewhere
 
     def notifyNoMoreExtraTests(self):
         self.diag.info("No more extra tests, adding terminator")
@@ -185,7 +195,7 @@ class FindExecutionHostsInSlave(FindExecutionHosts):
 class SlaveMachineInfoFinder(MachineInfoFinder):
     def __init__(self):
         self.queueMachineInfo = None
-        
+
     def findPerformanceMachines(self, test, fileStem):
         perfMachines = []
         resources = test.getCompositeConfigValue("performance_test_resource", fileStem)
@@ -224,4 +234,4 @@ class SlaveMachineInfoFinder(MachineInfoFinder):
         jobs = []
         for user, jobId, jobName in jobsFromQueue:
             jobs.append("Also on " + machine + " : " + user + "'s job " + jobId + " '" + jobName + "'")
-        return jobs    
+        return jobs

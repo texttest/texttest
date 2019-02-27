@@ -5,7 +5,9 @@ from distutils.core import setup
 from distutils.command.build_py import build_py
 from distutils.command.install_scripts import install_scripts
 
-import os, shutil
+import os
+import shutil
+
 
 class build_py_preserve_permissions(build_py):
     def copy_file(self, src, dst, preserve_mode=True, **kw):
@@ -20,6 +22,7 @@ class build_py_preserve_permissions(build_py):
 class windows_install_scripts(install_scripts):
     """ Customized install_scripts distutils action.
     """
+
     def run(self):
         install_scripts.run(self)   # standard action
         src = os.path.join(self.install_dir, "texttest")
@@ -36,7 +39,7 @@ class windows_install_scripts(install_scripts):
                         writeFile.write(line)
 
 
-command_classes = {"build_py" : build_py_preserve_permissions }
+command_classes = {"build_py": build_py_preserve_permissions}
 if os.name == "nt":
     command_classes['install_scripts'] = windows_install_scripts
 
@@ -46,10 +49,10 @@ packages = ["texttestlib", "texttestlib.default", "texttestlib.queuesystem",
             "texttestlib.default.batch", "texttestlib.default.gtkgui", "texttestlib.default.knownbugs",
             "texttestlib.default.gtkgui.default_gui", "texttestlib.default.gtkgui.version_control"]
 
-package_data = {"texttestlib" : ["doc/ChangeLog", "doc/quick_start.txt", "doc/CREDITS.txt", "doc/MigrationNotes*", "doc/LICENSE.txt", 
-                                 "etc/*", "etc/.*", "libexec/*", "log/*", "images/*.*", "images/retro/*" ], 
-                "texttestlib.default.batch":["testoverview_javascript/*"]}
-scripts = ["bin/texttest", "bin/filter_rundependent.py", "bin/filter_fpdiff.py" ]
+package_data = {"texttestlib": ["doc/ChangeLog", "doc/quick_start.txt", "doc/CREDITS.txt", "doc/MigrationNotes*", "doc/LICENSE.txt",
+                                "etc/*", "etc/.*", "libexec/*", "log/*", "images/*.*", "images/retro/*"],
+                "texttestlib.default.batch": ["testoverview_javascript/*"]}
+scripts = ["bin/texttest", "bin/filter_rundependent.py", "bin/filter_fpdiff.py"]
 if os.name == "posix":
     scripts.append("texttestlib/libexec/interpretcore")
 
@@ -66,17 +69,17 @@ setup(name='TextTest',
       package_dir={},
       py_modules=py_modules,
       package_data=package_data,
-      classifiers=[ "Programming Language :: Python",
-                    "License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)",
-                    "Operating System :: OS Independent",
-                    "Development Status :: 5 - Production/Stable",
-                    "Environment :: X11 Applications :: GTK",
-                    "Environment :: Win32 (MS Windows)",
-                    "Environment :: Console",
-                    "Intended Audience :: Developers",
-                    "Intended Audience :: Information Technology",
-                    "Topic :: Software Development :: Testing",
-                    "Topic :: Software Development :: Libraries :: Python Modules" ],
+      classifiers=["Programming Language :: Python",
+                   "License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)",
+                   "Operating System :: OS Independent",
+                   "Development Status :: 5 - Production/Stable",
+                   "Environment :: X11 Applications :: GTK",
+                   "Environment :: Win32 (MS Windows)",
+                   "Environment :: Console",
+                   "Intended Audience :: Developers",
+                   "Intended Audience :: Information Technology",
+                   "Topic :: Software Development :: Testing",
+                   "Topic :: Software Development :: Libraries :: Python Modules"],
       scripts=scripts,
       cmdclass=command_classes
       )

@@ -1,13 +1,22 @@
 #!/usr/local/bin/python
 
-import os, sys, time, shutil, datetime, logging, re, tarfile, stat
+import os
+import sys
+import time
+import shutil
+import datetime
+import logging
+import re
+import tarfile
+import stat
 from texttestlib.default.batch import testoverview
 from texttestlib import plugins
-from .summarypages import GenerateSummaryPage, GenerateGraphs # only so they become package level entities
+from .summarypages import GenerateSummaryPage, GenerateGraphs  # only so they become package level entities
 from collections import OrderedDict
 from .batchutils import getBatchRunName, BatchVersionFilter, parseFileName, convertToUrl
 import subprocess
 from glob import glob
+
 
 class BatchCategory(plugins.Filter):
     def __init__(self, state):
@@ -16,27 +25,34 @@ class BatchCategory(plugins.Filter):
         self.setsFailureCode = state.getExitCode()
         self.tests = {}
         self.testSuites = []
+
     def addTest(self, test):
         self.tests[test.getRelPath()] = test
+
     def getTestLine(self, test):
         postText = test.state.getTypeBreakdown()[1]
         if len(postText) > 0:
             postText = " : " + postText
             return test.getIndent() + "- " + test.paddedRepr() + postText + "\n"
         return test.getIndent() + "- " + repr(test) + postText + "\n"
+
     def size(self):
         return len(self.tests)
+
     def acceptsTestCase(self, test):
         return test.getRelPath() in self.tests
+
     def acceptsTestSuiteContents(self, suite):
         return not suite.isEmpty()
+
     def describeBrief(self, app):
         if self.size() > 0:
-            filters = [ self ]
+            filters = [self]
             suite = app.createExtraTestSuite(filters)
             self.testSuites.append(suite)
             return "The following tests " + self.longDescription + " : \n" + \
                    self.getTestLines(suite) + "\n"
+
     def getTestLines(self, test):
         if test.classId() == "test-case":
             realTest = self.tests[test.getRelPath()]
@@ -46,18 +62,21 @@ class BatchCategory(plugins.Filter):
             for subtest in test.testcases:
                 lines += self.getTestLines(subtest)
             return lines
+
     def getAllTests(self):
         allTests = []
         for suite in self.testSuites:
             for test in suite.testCaseList():
                 allTests.append(self.tests[test.getRelPath()])
         return allTests
+
     def describeFull(self):
         fullDescriptionString = self.getFullDescription()
         if fullDescriptionString:
             return "\nDetailed information for the tests that " + self.longDescription + " follows...\n" + fullDescriptionString
         else:
             return ""
+
     def getFreeTextData(self):
         data = OrderedDict()
         for test in self.getAllTests():
@@ -67,8 +86,10 @@ class BatchCategory(plugins.Filter):
                     data[freeText] = []
                 data[freeText].append(test)
         return list(data.items())
+
     def testOutput(self, test):
         return repr(test) + " (under " + test.getRelPath() + ")"
+
     def getFullDescription(self):
         fullText = ""
         for freeText, tests in self.getFreeTextData():
@@ -87,6 +108,7 @@ class BatchCategory(plugins.Filter):
                     fullText += "-- " + self.testOutput(test) + "\n"
         return fullText
 
+
 class BatchApplicationData:
     def __init__(self, suite):
         self.suite = suite
@@ -94,6 +116,7 @@ class BatchApplicationData:
         self.errorCategories = []
         self.failureCategories = []
         self.successCategories = []
+
     def storeCategory(self, test):
         category = test.state.category
         if category not in self.categories:
@@ -106,33 +129,43 @@ class BatchApplicationData:
                 self.failureCategories.append(batchCategory)
             self.categories[category] = batchCategory
         self.categories[category].addTest(test)
+
     def failureCount(self):
         return self.totalTests(self.failCategories())
+
     def successCount(self):
         return self.totalTests(self.successCategories)
+
     def failCategories(self):
         return self.errorCategories + self.failureCategories
+
     def triggersExitCode(self):
         return any((c.setsFailureCode and c.size() for c in self.failCategories()))
+
     def allCategories(self):
         return self.failCategories() + self.successCategories
+
     def testCount(self):
         return self.totalTests(self.allCategories())
+
     def totalTests(self, categoryList):
         count = 0
         for category in categoryList:
             count += category.size()
         return count
+
     def getFailuresBrief(self):
         contents = ""
         for category in self.failCategories():
             contents += category.describeBrief(self.suite.app)
         return contents
+
     def getSuccessBrief(self):
         contents = ""
         for category in self.successCategories:
             contents += category.describeBrief(self.suite.app)
         return contents
+
     def getDetails(self):
         contents = ""
         for category in self.allCategories():
@@ -172,8 +205,9 @@ class EmailResponder(plugins.Responder):
             mailSender.send(batchDataList)
 
 
+sectionHeaders = ["Summary of all Unsuccessful tests",
+                  "Details of all Unsuccessful tests", "Summary of all Successful tests"]
 
-sectionHeaders = [ "Summary of all Unsuccessful tests", "Details of all Unsuccessful tests", "Summary of all Successful tests" ]
 
 class MailSender:
     def __init__(self, runId=""):
@@ -188,26 +222,29 @@ class MailSender:
     def makeContents(self, batchDataList, headerSection=True):
         app = batchDataList[0].suite.app
         mailTitle = self.getMailTitle(app, batchDataList)
-        mailContents = self.createMailHeaderSection(mailTitle, app, batchDataList) if headerSection else mailTitle + "\n"
+        mailContents = self.createMailHeaderSection(
+            mailTitle, app, batchDataList) if headerSection else mailTitle + "\n"
         if len(batchDataList) > 1:
             for batchData in batchDataList:
-                mailContents += self.getMailTitle(app, [ batchData ]) + "\n"
+                mailContents += self.getMailTitle(app, [batchData]) + "\n"
             mailContents += "\n"
         if not self.isAllSuccess(batchDataList):
-            mailContents += self.performForAll(app, batchDataList, BatchApplicationData.getFailuresBrief, sectionHeaders[0])
+            mailContents += self.performForAll(app, batchDataList,
+                                               BatchApplicationData.getFailuresBrief, sectionHeaders[0])
             mailContents += self.performForAll(app, batchDataList, BatchApplicationData.getDetails, sectionHeaders[1])
         if not self.isAllFailure(batchDataList):
-            mailContents += self.performForAll(app, batchDataList, BatchApplicationData.getSuccessBrief, sectionHeaders[2])
+            mailContents += self.performForAll(app, batchDataList,
+                                               BatchApplicationData.getSuccessBrief, sectionHeaders[2])
         return mailContents
 
     def performForAll(self, app, batchDataList, method, headline):
         contents = headline + " follows...\n" + \
-                   "---------------------------------------------------------------------------------" + "\n"
+            "---------------------------------------------------------------------------------" + "\n"
         for resp in batchDataList:
             if len(batchDataList) > 1:
                 if headline.find("Details") != -1 and not resp is batchDataList[0]:
                     contents += "---------------------------------------------------------------------------------" + "\n"
-                contents += self.getMailTitle(app, [ resp ]) + "\n\n"
+                contents += self.getMailTitle(app, [resp]) + "\n\n"
             contents += method(resp) + "\n"
         return contents
 
@@ -256,7 +293,7 @@ class MailSender:
         smtp = smtplib.SMTP()
         try:
             smtp.connect(smtpServer)
-        except Exception: # Can't use SMTPException, because this raises socket.error usually
+        except Exception:  # Can't use SMTPException, because this raises socket.error usually
             return "Could not connect to SMTP server at " + smtpServer + "\n" + self.exceptionOutput()
         if smtpUsername:
             try:
@@ -279,7 +316,7 @@ class MailSender:
     def createMailHeaderSection(self, title, app, batchDataList):
         if self.useCollection(app):
             return self.getMachineTitle(batchDataList) + "\n" + self.runId + "\n" + \
-                   title + "\n\n" # blank line separating headers from body
+                title + "\n\n"  # blank line separating headers from body
         else:
             return self.createMailHeaderForSend(self.runId, title, app)
 
@@ -347,26 +384,31 @@ class MailSender:
         for resp in batchDataList:
             total += method(resp)
         return str(total)
+
     def getCategoryCount(self, categoryName, batchDataList):
         total = 0
         for resp in batchDataList:
             if categoryName in resp.categories:
                 total += resp.categories[categoryName].size()
         return total
+
     def getBriefDescription(self, categoryName, batchDataList):
         for resp in batchDataList:
             if categoryName in resp.categories:
                 return resp.categories[categoryName].briefDescription
+
     def getVersionString(self, versions):
         if len(versions) > 0:
             return " " + ".".join(versions)
         else:
             return ""
+
     def briefText(self, count, description):
         if count == 0 or description == "succeeded":
             return ""
         else:
             return " " + str(count) + " " + description + ","
+
     def findCommonVersions(self, app, batchDataList):
         if len(batchDataList) == 0:
             return app.versions
@@ -376,6 +418,7 @@ class MailSender:
             if self.allContain(otherBatchData, trialVersion):
                 commonVersions.append(trialVersion)
         return commonVersions
+
     def allContain(self, otherBatchData, trialVersion):
         for batchData in otherBatchData:
             if not trialVersion in batchData.suite.app.versions:
@@ -389,6 +432,7 @@ def findExtraVersionParent(app, allApps):
             return parentApp
     return app
 
+
 def getVersionName(app, allApps):
     parent = findExtraVersionParent(app, allApps)
     parentVersion = parent.getFullVersion()
@@ -400,16 +444,20 @@ def getVersionName(app, allApps):
     else:
         return "default"
 
+
 def getBatchRepository(suite):
     repo = suite.app.getBatchConfigValue("batch_result_repository", envMapping=suite.environment)
     return os.path.expanduser(repo)
 
+
 def dateInSeconds(val):
     return time.mktime(time.strptime(val, "%d%b%Y"))
+
 
 def matchesApp(dir, app):
     suffix = app.versionSuffix()
     return dir.startswith(app.name + suffix) or dir.startswith(app.getBatchSession() + suffix)
+
 
 def getPreviousWriteDirsUnder(rootDir, app):
     dirs = []
@@ -419,9 +467,11 @@ def getPreviousWriteDirsUnder(rootDir, app):
             dirs.append(fullDir)
     return dirs
 
+
 def getPreviousWriteDirs(app):
     rootDir = app.getPreviousWriteDirInfo()
     return getPreviousWriteDirsUnder(rootDir, app) if os.path.isdir(rootDir) else []
+
 
 def writeSuccessLine(f, runPostfix, state):
     f.write(runPostfix)
@@ -455,7 +505,7 @@ class SaveState(plugins.Responder):
         return "_".join(parts)
 
     def notifyComplete(self, test):
-        if test.state.isComplete(): # might look weird but this notification also comes in scripts, e.g collecting
+        if test.state.isComplete():  # might look weird but this notification also comes in scripts, e.g collecting
             test.saveState()
             if test.app in self.repositories:
                 self.diag.info("Saving " + repr(test) + " to repository")
@@ -465,8 +515,8 @@ class SaveState(plugins.Responder):
 
     def saveToRepository(self, test):
         testRepository = self.repositories[test.app]
-        targetDir = os.path.join(testRepository, test.app.name, getVersionName(test.app, self.allApps), \
-                                    test.getRelPath())
+        targetDir = os.path.join(testRepository, test.app.name, getVersionName(test.app, self.allApps),
+                                 test.getRelPath())
         try:
             plugins.ensureDirectoryExists(targetDir)
         except EnvironmentError:
@@ -531,8 +581,8 @@ class SaveState(plugins.Responder):
             repository = os.path.expanduser(app.getBatchConfigValue("batch_result_repository"))
             runFile = self.getRunFileName(repository)
             if os.path.isfile(runFile) and self.runAlreadyExists(runFile, app):
-                raise plugins.TextTestError("ERROR: Cannot run batch tests with run name '" + self.runPostfix + "', name has already been used for a different run\n" + \
-                    "See file at " + runFile + ", which contains the entry '" + repr(app) + "'")
+                raise plugins.TextTestError("ERROR: Cannot run batch tests with run name '" + self.runPostfix + "', name has already been used for a different run\n" +
+                                            "See file at " + runFile + ", which contains the entry '" + repr(app) + "'")
 
 
 class MigrateBatchRepository(plugins.Action):
@@ -561,7 +611,8 @@ class MigrateBatchRepository(plugins.Action):
         if suite.parent is None:
             resources = suite.app.getBatchConfigValue("historical_report_resources")
             if len(resources) > 0:
-                raise plugins.TextTestError("Cannot migrate repository: historical_report_sources set to '" + ", ".join(resources) + "' - these require the full format")
+                raise plugins.TextTestError("Cannot migrate repository: historical_report_sources set to '" +
+                                            ", ".join(resources) + "' - these require the full format")
             repository = getBatchRepository(suite)
             if not os.path.isdir(repository):
                 raise plugins.TextTestError("Batch result repository " + repository + " does not exist")
@@ -600,7 +651,7 @@ class ArchiveScript(plugins.ScriptWithArgs):
         return time.mktime(time.strptime(val, dateFormat))
 
     def getShortDescriptorText(self):
-        shortDescriptors = [ d.split(" ", 1)[-1] for d in self.descriptors ]
+        shortDescriptors = [d.split(" ", 1)[-1] for d in self.descriptors]
         return "_".join(shortDescriptors).replace(" ", "_")
 
     def makeTarArchive(self, suite, repository):
@@ -627,7 +678,8 @@ class ArchiveScript(plugins.ScriptWithArgs):
             elif os.path.isdir(fullPath):
                 self.archiveFilesUnder(fullPath, app, *args)
         if count > 0:
-            plugins.log.info("Archived " + str(count) + " files " + ", ".join(self.descriptors) + " under " + repository.replace(self.repository + os.sep, ""))
+            plugins.log.info("Archived " + str(count) + " files " + ", ".join(self.descriptors) +
+                             " under " + repository.replace(self.repository + os.sep, ""))
 
     def setUpSuite(self, suite):
         if suite.parent is None:
@@ -668,8 +720,9 @@ class ArchiveScript(plugins.ScriptWithArgs):
 
 class ArchiveRepository(ArchiveScript):
     scriptDoc = "Archive parts of the batch result repository to a history directory"
+
     def __init__(self, args):
-        argDict = self.parseArguments(args, [ "before", "after", "weekday_pages_before", "name" ])
+        argDict = self.parseArguments(args, ["before", "after", "weekday_pages_before", "name"])
         ArchiveScript.__init__(self, argDict)
         self.name = self.extractArg(argDict, "name")
         self.weekdayBeforeDate = self.parseDate(argDict, "weekday_pages_before")
@@ -769,8 +822,9 @@ class ArchiveRepository(ArchiveScript):
 
 class ArchiveHTML(ArchiveScript):
     scriptDoc = "Archive parts of the historical report location to a history directory"
+
     def __init__(self, args):
-        argDict = self.parseArguments(args, [ "before", "after" ])
+        argDict = self.parseArguments(args, ["before", "after"])
         ArchiveScript.__init__(self, argDict)
 
     def getRepository(self, suite):
@@ -778,7 +832,7 @@ class ArchiveHTML(ArchiveScript):
 
     def parseDateFromFile(self, file):
         for part in reversed(file[:-5].split("_")):
-            if len(part) in [ 7, 9 ]:
+            if len(part) in [7, 9]:
                 try:
                     return self.dateInSeconds(part)
                 except ValueError:
@@ -806,7 +860,7 @@ class ArchiveExtractor:
     def getArchives(self, suite):
         repository = getBatchRepository(suite)
         dirList = os.listdir(repository)
-        return [os.path.join(repository,f) for f in dirList if f.endswith(".tar.gz") and self.shouldOpen(f)]
+        return [os.path.join(repository, f) for f in dirList if f.endswith(".tar.gz") and self.shouldOpen(f)]
 
     def shouldOpen(self, tarFileName):
         beforePos = tarFileName.rfind("before_")
@@ -814,7 +868,7 @@ class ArchiveExtractor:
             return False
 
         startPos = beforePos + len("before_")
-        dateStr = tarFileName[startPos:startPos + 9] # %d%b%Y dates are always of length 9
+        dateStr = tarFileName[startPos:startPos + 9]  # %d%b%Y dates are always of length 9
         return dateInSeconds(self.dateStr) <= dateInSeconds(dateStr)
 
     def extractUnder(self, archivedFile, targetPath):
@@ -838,10 +892,12 @@ class ArchiveExtractor:
             if os.path.isdir(repository):
                 plugins.rmtree(repository)
 
+
 class WebPageResponder(plugins.Responder):
     def __init__(self, optionMap, allApps):
         plugins.Responder.__init__(self)
-        self.archiveExtractor = ArchiveExtractor(optionMap.get("collarchive")) if optionMap.get("collarchive") is not None else None
+        self.archiveExtractor = ArchiveExtractor(optionMap.get(
+            "collarchive")) if optionMap.get("collarchive") is not None else None
         self.diag = logging.getLogger("GenerateWebPages")
         self.suitesToGenerate = []
         self.archiveUnused = "manualarchive" not in optionMap
@@ -849,7 +905,8 @@ class WebPageResponder(plugins.Responder):
         self.summaryGenerator = GenerateSummaryPage()
 
     def notifyAdd(self, test, *args, **kw):
-        self.descriptionInfo.setdefault(test.app, {}).setdefault(test.getRelPath().replace(os.sep, " "), test.description)
+        self.descriptionInfo.setdefault(test.app, {}).setdefault(
+            test.getRelPath().replace(os.sep, " "), test.description)
 
     def addSuites(self, suites):
         # Don't blanket remove rejected apps automatically when collecting
@@ -886,7 +943,7 @@ class WebPageResponder(plugins.Responder):
                 self.generateCommonPage(pageTitle, pageInfo)
 
             if self.summaryGenerator:
-                appsUsed = [ app for app, _, _ in pageInfo ]
+                appsUsed = [app for app, _, _ in pageInfo]
                 self.summaryGenerator.generateForApps(appsUsed)
         if len(appInfo) == 0 and self.summaryGenerator:
             # Describe errors, if any
@@ -908,9 +965,9 @@ class WebPageResponder(plugins.Responder):
             self.diag.info("Found extra versions " + repr(extraVersions))
             relevantSubDirs = self.findRelevantSubdirectories(repositories, app, extraVersions)
             version = getVersionName(app, self.getAppsToGenerate())
-            pageSubTitles = self.makePageSubTitles([ app ])
+            pageSubTitles = self.makePageSubTitles([app])
             self.makeAndGenerate(relevantSubDirs, self.getConfigValueMethod(app), pageDir, pageTitle, pageSubTitles,
-                                 version, extraVersions, self.getDescriptionInfo([ app ]))
+                                 version, extraVersions, self.getDescriptionInfo([app]))
 
     def getConfigValueMethod(self, app):
         def getConfigValue(key, subKey=app.getBatchSession(), allSubKeys=False):
@@ -923,7 +980,7 @@ class WebPageResponder(plugins.Responder):
     def makePageSubTitles(self, apps):
         cmdLine = self.makeCommandLine(apps)
         startText = "To start TextTest for these tests, run:"
-        subtitles = [ (startText, cmdLine) ]
+        subtitles = [(startText, cmdLine)]
         if len(apps) == 1:
             reconnectCmdLine = self.makeReconnectCommandLine(apps[0], cmdLine)
             if reconnectCmdLine:
@@ -983,17 +1040,18 @@ class WebPageResponder(plugins.Responder):
 
     def checkRepository(self, repository, app):
         if not os.path.isdir(repository):
-            plugins.printWarning("Batch result repository " + repository + " does not exist - not creating pages for " + repr(app))
+            plugins.printWarning("Batch result repository " + repository +
+                                 " does not exist - not creating pages for " + repr(app))
             return False
         return True
 
     def getAppsToGenerate(self):
-        return [ suite.app for suite in self.suitesToGenerate ]
+        return [suite.app for suite in self.suitesToGenerate]
 
     def getDescriptionInfo(self, apps):
         descriptionInfo = {}
         for app in apps:
-            for appToUse in [ app ] + app.extras:
+            for appToUse in [app] + app.extras:
                 descriptionInfo.update(self.descriptionInfo.get(appToUse, {}))
 
         return descriptionInfo
@@ -1002,13 +1060,14 @@ class WebPageResponder(plugins.Responder):
         # We've sorted by number of tests already, but on the same page we want applications in a more predictable order
         # Sort by name again.
         pageInfo.sort(key=lambda info: info[0].name)
-        allApps = [ app for app, _, _ in pageInfo ]
+        allApps = [app for app, _, _ in pageInfo]
         version = getVersionName(allApps[0], self.getAppsToGenerate())
         extraVersions, relevantSubDirs = [], OrderedDict()
         for app, repositories, extraApps in pageInfo:
             extraVersions += self.getExtraVersions(app, extraApps)
-            relevantSubDirs.update(self.findRelevantSubdirectories(repositories, app, extraVersions, self.getVersionTitle))
-        getConfigValue = plugins.ResponseAggregator([ self.getConfigValueMethod(app) for app in allApps ])
+            relevantSubDirs.update(self.findRelevantSubdirectories(
+                repositories, app, extraVersions, self.getVersionTitle))
+        getConfigValue = plugins.ResponseAggregator([self.getConfigValueMethod(app) for app in allApps])
         pageSubTitles = self.makePageSubTitles(allApps)
         descriptionInfo = self.getDescriptionInfo(allApps)
         return relevantSubDirs, getConfigValue, version, extraVersions, pageSubTitles, descriptionInfo
@@ -1020,7 +1079,8 @@ class WebPageResponder(plugins.Responder):
         return title
 
     def generateCommonPage(self, pageTitle, pageInfo):
-        relevantSubDirs, getConfigValue, version, extraVersions, pageSubTitles, descriptionInfo = self.transformToCommon(pageInfo)
+        relevantSubDirs, getConfigValue, version, extraVersions, pageSubTitles, descriptionInfo = self.transformToCommon(
+            pageInfo)
         pageDir = os.path.expanduser(getConfigValue("historical_report_location"))
         self.copyJavaScript(pageDir, pageDir)
         self.makeAndGenerate(relevantSubDirs, getConfigValue, pageDir, pageTitle,
@@ -1032,7 +1092,7 @@ class WebPageResponder(plugins.Responder):
         plugins.ensureDirectoryExists(jsDir)
         plugins.ensureDirectoryExists(pageDir)
         for fn in sorted(os.listdir(srcDir)):
-            targetDir = pageDir if fn.endswith(".php") else jsDir # Server-side stuff is per application
+            targetDir = pageDir if fn.endswith(".php") else jsDir  # Server-side stuff is per application
             targetPath = os.path.join(targetDir, fn)
             try:
                 shutil.copyfile(os.path.join(srcDir, fn), targetPath)
@@ -1044,7 +1104,7 @@ class WebPageResponder(plugins.Responder):
         plugins.ensureDirectoryExists(pageDir)
         try:
             self.generateWebPages(subDirs, getConfigValue, pageDir, resourceNames, *args)
-        except Exception: # pragma: no cover - robustness only, shouldn't be reachable
+        except Exception:  # pragma: no cover - robustness only, shouldn't be reachable
             sys.stderr.write("Caught exception while generating web pages :\n")
             plugins.printException()
 
@@ -1097,11 +1157,12 @@ class WebPageResponder(plugins.Responder):
                 extraVersions.append(version)
         return extraVersions
 
+
 class CollectFilesResponder(plugins.Responder):
     def __init__(self, optionMap, allApps):
         plugins.Responder.__init__(self)
         self.mailSender = MailSender()
-        self.runId = "" # depends on what we pick up from collected files
+        self.runId = ""  # depends on what we pick up from collected files
         self.diag = logging.getLogger("batch collect")
         self.allApps = allApps
 
@@ -1116,7 +1177,7 @@ class CollectFilesResponder(plugins.Responder):
             htmlIndex, htmlBody = self.getHtmlReportLocation(app, reportLocation)
             if htmlIndex is not None:
                 return "Please see detailed results at " + htmlBody + "\n\n" + \
-                        "The main index page can be found at " + htmlIndex + "\n"
+                    "The main index page can be found at " + htmlIndex + "\n"
 
         return self.getBody(fileBodies, missingVersions)
 
@@ -1144,7 +1205,7 @@ class CollectFilesResponder(plugins.Responder):
         mailContents = self.mailSender.createMailHeaderForSend(self.runId, mailTitle, app)
         mailContents += self.getMailBody(app, fileBodies, missingVersions)
         allCats = set(totalValues.keys())
-        noMailCats = set([ "succeeded", "known bugs" ])
+        noMailCats = set(["succeeded", "known bugs"])
         allSuccess = allCats.issubset(noMailCats)
         self.mailSender.sendOrStoreMail(app, mailContents, isAllSuccess=allSuccess)
 
@@ -1191,12 +1252,12 @@ class CollectFilesResponder(plugins.Responder):
 
     @staticmethod
     def runIsRelevant(runId, maxDays):
-        if maxDays >= 100000: # Default value
+        if maxDays >= 100000:  # Default value
             return True
         try:
             runDate = datetime.date.fromtimestamp(time.mktime(time.strptime(runId, "%d%b%Y")))
         except ValueError:
-            return True # Isn't necessarily a date, in which case we have no grounds for rejecting it
+            return True  # Isn't necessarily a date, in which case we have no grounds for rejecting it
         todaysDate = datetime.date.today()
         timeElapsed = todaysDate - runDate
         return timeElapsed.days <= maxDays
@@ -1227,7 +1288,9 @@ class CollectFilesResponder(plugins.Responder):
                     totalValues[catName] = 0
                 totalValues[catName] += int(count)
         except ValueError:
-            plugins.printWarning("Found truncated or old format batch report (" + localName + ") - could not parse result correctly.")
+            plugins.printWarning("Found truncated or old format batch report (" +
+                                 localName + ") - could not parse result correctly.")
+
     def getTitle(self, app, totalValues):
         title = self.mailSender.getMailHeader(app, [])
         total = 0
@@ -1241,10 +1304,12 @@ class CollectFilesResponder(plugins.Responder):
             title += self.mailSender.briefText(count, catName)
         # Lose trailing comma
         return title[:-1]
+
     def extractHeader(self, body):
         firstSep = body.find("\n") + 1
         header = body[0:firstSep]
         return header, body[firstSep:]
+
     def extractSection(self, sectionHeader, body):
         headerLoc = body.find(sectionHeader)
         if headerLoc == -1:
@@ -1255,6 +1320,7 @@ class CollectFilesResponder(plugins.Responder):
         section = body[0:headerLoc].strip()
         newBody = body[nextLine:].strip()
         return section, newBody
+
     def getBody(self, bodies, missingVersions):
         totalBody = ""
         for version in sorted(missingVersions):
@@ -1285,6 +1351,7 @@ class CollectFilesResponder(plugins.Responder):
             prevSectionHeader = sectionHeader
         totalBody += self.getSectionBody(prevSectionHeader, parsedBodies)
         return totalBody
+
     def getSectionBody(self, sectionHeader, parsedSections):
         if len(sectionHeader) == 0 or len(parsedSections) == 0:
             return ""

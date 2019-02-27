@@ -1,11 +1,13 @@
 
-import sys, os
+import sys
+import os
 
-def trySetupCoverage(): # pragma: no cover - can hardly measure coverage here :)
+
+def trySetupCoverage():  # pragma: no cover - can hardly measure coverage here :)
     try:
         import coverage
-        coverage.process_startup() # doesn't do anything unless COVERAGE_PROCESS_START is set
-    except Exception: 
+        coverage.process_startup()  # doesn't do anything unless COVERAGE_PROCESS_START is set
+    except Exception:
         pass
 
 
@@ -16,14 +18,16 @@ def loadTestCustomize():
     except ImportError:
         pass
 
+
 def trySetupCaptureMock():
     try:
         import capturemock
-        capturemock.process_startup() # doesn't do anything unless CAPTUREMOCK_PROCESS_START is set
+        capturemock.process_startup()  # doesn't do anything unless CAPTUREMOCK_PROCESS_START is set
     except Exception:
         pass
 
-def loadRealSiteCustomize(fileName): # pragma: no cover - coverage not set up yet
+
+def loadRealSiteCustomize(fileName):  # pragma: no cover - coverage not set up yet
     # must do this before setting up coverage as real sitecustomize might
     # manipulate PYTHONPATH in such a way that coverage can be found
     import imp
@@ -39,7 +43,8 @@ def loadRealSiteCustomize(fileName): # pragma: no cover - coverage not set up ye
     except ImportError:
         pass
 
-loadRealSiteCustomize(__file__) # pragma: no cover - coverage not set up yet
-trySetupCoverage() # pragma: no cover - coverage not set up yet
-loadTestCustomize() # pragma: no cover - coverage not set up yet
-trySetupCaptureMock() # pragma: no cover - coverage not set up yet
+
+loadRealSiteCustomize(__file__)  # pragma: no cover - coverage not set up yet
+trySetupCoverage()  # pragma: no cover - coverage not set up yet
+loadTestCustomize()  # pragma: no cover - coverage not set up yet
+trySetupCaptureMock()  # pragma: no cover - coverage not set up yet

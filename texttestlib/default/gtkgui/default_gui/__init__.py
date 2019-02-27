@@ -12,20 +12,20 @@ try:
     from .runningactions import *
     from .changeteststate import *
     from .housekeeping import *
-    
+
     from ..guiplugins import InteractiveActionConfig as BaseInteractiveActionConfig
 except ImportError as e:
     # Might want the default accelerators, don't crash if so
     if "No module named gtk" in str(e):
         class BaseInteractiveActionConfig:
             pass
-    else: # pragma: no cover - debugging aid only
+    else:  # pragma: no cover - debugging aid only
         raise
 
 
 class InteractiveActionConfig(BaseInteractiveActionConfig):
     def getMenuNames(self):
-        return [ "file", "edit", "view", "actions", "reorder", "help" ]
+        return ["file", "edit", "view", "actions", "reorder", "help"]
 
     def getInteractiveActionClasses(self, dynamic):
         classes = housekeeping.getInteractiveActionClasses(dynamic)
@@ -35,12 +35,12 @@ class InteractiveActionConfig(BaseInteractiveActionConfig):
             classes += adminactions.getInteractiveActionClasses()
 
         classes += selectandfilter.getInteractiveActionClasses(dynamic)
-        classes += runningactions.getInteractiveActionClasses(dynamic)    
+        classes += runningactions.getInteractiveActionClasses(dynamic)
         classes += helpdialogs.getInteractiveActionClasses()
         classes += fileproperties.getInteractiveActionClasses()
         classes += fileviewers.getInteractiveActionClasses(dynamic)
         return classes
-    
+
     def getDefaultAccelerators(self):
         dict = {}
         dict["quit"] = "<control>q"
@@ -72,4 +72,3 @@ class InteractiveActionConfig(BaseInteractiveActionConfig):
         dict["mark"] = "<control><shift>m"
         dict["unmark"] = "<control><shift>u"
         return dict
-    

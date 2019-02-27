@@ -1,15 +1,21 @@
 from gi.repository import Gtk, GObject
 
-import os, subprocess, types, logging, sys
+import os
+import subprocess
+import types
+import logging
+import sys
 from . import entrycompletion
 from texttestlib import plugins
 from .guiutils import guiConfig, SubGUI, GUIConfig, createApplicationEvent
 from texttestlib.jobprocess import killSubProcessAndChildren
 from collections import OrderedDict
-        
+
 # The purpose of this class is to provide a means to monitor externally
 # started process, so that (a) code can be called when they exit, and (b)
 # they can be terminated when TextTest is terminated.
+
+
 class ProcessTerminationMonitor(plugins.Observable):
     def __init__(self):
         plugins.Observable.__init__(self)
@@ -19,18 +25,18 @@ class ProcessTerminationMonitor(plugins.Observable):
     def listQueryKillProcesses(self):
         processesToCheck = guiConfig.getCompositeValue("query_kill_processes", "", modeDependent=True)
         if "all" in processesToCheck:
-            processesToCheck = [ ".*" ]
+            processesToCheck = [".*"]
         if len(processesToCheck) == 0:
             return []
-        
+
         running = []
         triggerGroup = plugins.TextTriggerGroup(processesToCheck)
         for process, description in self.getProcesses():
             if triggerGroup.stringContainsText(description):
                 running.append("PID " + str(process.pid) + " : " + description)
-                
+
         return running
-    
+
     def getProcesses(self):
         return list(self.processesForKill.values())
 
@@ -42,7 +48,7 @@ class ProcessTerminationMonitor(plugins.Observable):
         else:
             return process._handle
 
-    def startProcess(self, cmdArgs, description = "", killOnTermination=True, exitHandler=None, exitHandlerArgs=(), **kwargs):
+    def startProcess(self, cmdArgs, description="", killOnTermination=True, exitHandler=None, exitHandlerArgs=(), **kwargs):
         process = subprocess.Popen(cmdArgs, stdin=open(os.devnull), **kwargs)
         pidOrHandle = self.getProcessIdentifier(process)
         self.exitHandlers[int(pidOrHandle)] = (exitHandler, exitHandlerArgs)
@@ -58,7 +64,7 @@ class ProcessTerminationMonitor(plugins.Observable):
             if process.stdout is not None:
                 output = process.stdout.read().strip()
             del self.processesForKill[pidOrHandle]
-            
+
         if pidOrHandle in self.exitHandlers:
             exitHandler, exitHandlerArgs = self.exitHandlers.pop(pidOrHandle)
             if exitHandler:
@@ -66,7 +72,7 @@ class ProcessTerminationMonitor(plugins.Observable):
                 if output:
                     command, arg = output.split(" ", 1)
                     self.notify(command, arg)
-                    
+
     def notifyKillProcesses(self, sig=None):
         # Don't leak processes
         if len(self.processesForKill) == 0:
@@ -75,23 +81,27 @@ class ProcessTerminationMonitor(plugins.Observable):
         self.notify("Status", "Terminating all external viewers ...")
         for pid, (process, description) in list(self.processesForKill.items()):
             if pid in self.exitHandlers:
-                self.exitHandlers.pop(pid) # don't call exit handlers in this case, we're terminating
+                self.exitHandlers.pop(pid)  # don't call exit handlers in this case, we're terminating
             self.notify("ActionProgress")
             diag.info("Killing '" + description + "' interactive process")
             killSubProcessAndChildren(process, sig)
-        
+
+
 processMonitor = ProcessTerminationMonitor()
+
 
 def openLinkInBrowser(*files):
     if os.name == "nt" and "BROWSER" not in os.environ and len(files) == 1:
-        os.startfile(files[0]) #@UndefinedVariable
+        os.startfile(files[0])  # @UndefinedVariable
         createApplicationEvent("the browser to be closed", "browser")
         return 'Started "<default browser> ' + files[0] + '" in background.'
     else:
         browser = os.getenv("BROWSER", "firefox")
-        cmdArgs = [ browser ] + list(files)
-        processMonitor.startProcess(cmdArgs, exitHandler=createApplicationEvent, exitHandlerArgs=("the browser to be closed", "browser"))
+        cmdArgs = [browser] + list(files)
+        processMonitor.startProcess(cmdArgs, exitHandler=createApplicationEvent,
+                                    exitHandlerArgs=("the browser to be closed", "browser"))
         return 'Started "' + " ".join(cmdArgs) + '" in background.'
+
 
 class GtkActionWrapper:
     def __init__(self):
@@ -99,7 +109,7 @@ class GtkActionWrapper:
         self.diag = logging.getLogger("Interactive Actions")
         title = self.getTitle(includeMnemonics=True)
         actionName = self.getActionName()
-        self.gtkAction = Gtk.Action(actionName, title, \
+        self.gtkAction = Gtk.Action(actionName, title,
                                     self.getTooltip(), self.getStockId())
         self.gtkAction.connect("activate", self.runInteractive)
         if not self.isActiveOnCurrent():
@@ -115,11 +125,12 @@ class GtkActionWrapper:
             if Gtk.accelerator_valid(key, mod):
                 return realAcc
             else:
-                plugins.printWarning("Keyboard accelerator '" + realAcc + "' for action '" \
+                plugins.printWarning("Keyboard accelerator '" + realAcc + "' for action '"
                                      + title + "' is not valid, ignoring ...")
 
     def addToGroups(self, actionGroup, accelGroup):
-        self.accelerator = self._addToGroups(self.gtkAction.get_name().rstrip("."), self.gtkAction, actionGroup, accelGroup)
+        self.accelerator = self._addToGroups(self.gtkAction.get_name().rstrip("."),
+                                             self.gtkAction, actionGroup, accelGroup)
 
     def _addToGroups(self, actionName, gtkAction, actionGroup, accelGroup):
         # GTK 2.12 got fussy about this...
@@ -127,13 +138,13 @@ class GtkActionWrapper:
         if existingAction:
             self.diag.info("Removing action with label " + existingAction.get_property("label"))
             actionGroup.remove_action(existingAction)
-            
+
         accelerator = self.getAccelerator(actionName)
         actionGroup.add_action_with_accel(gtkAction, accelerator)
         gtkAction.set_accel_group(accelGroup)
         gtkAction.connect_accelerator()
         return accelerator
-    
+
     def setSensitivity(self, newValue):
         self._setSensitivity(self.gtkAction, newValue)
 
@@ -143,11 +154,11 @@ class GtkActionWrapper:
             gtkAction.set_property("sensitive", newValue)
 
 
-
 # Introduce an extra level without all the selection-dependent stuff, some actions want
 # to inherit from here and it provides a separation
-class BasicActionGUI(SubGUI,GtkActionWrapper):
+class BasicActionGUI(SubGUI, GtkActionWrapper):
     busy = False
+
     def __init__(self, *args):
         SubGUI.__init__(self)
         GtkActionWrapper.__init__(self)
@@ -155,7 +166,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
 
     def checkValid(self, app):
         pass
-    
+
     def notifyTopWindow(self, window):
         self.topWindow = window
 
@@ -167,13 +178,13 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
 
     def isActiveOnCurrent(self, *args):
         return True
-    
+
     def getDialogTitle(self):
         return self.getTooltip()
 
     def createDialog(self):
         if self.isModal():
-            dialog = Gtk.Dialog(self.getDialogTitle(), self.getParentWindow(), flags=Gtk.DialogFlags.MODAL) 
+            dialog = Gtk.Dialog(self.getDialogTitle(), self.getParentWindow(), flags=Gtk.DialogFlags.MODAL)
             dialog.set_modal(True)
         else:
             dialog = Gtk.Dialog(self.getDialogTitle())
@@ -183,7 +194,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         # there may be a flag achieving the behavior, as mentioned here http://docs.adacore.com/live/wave/gtkada/html/gtkada_ug/transition.html
         # dialog.set_has_separator(False)
         return dialog
-    
+
     def getTitle(self, includeMnemonics=False):
         title = self._getTitle()
         if includeMnemonics:
@@ -199,17 +210,17 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
 
     def allAppsValid(self):
         return True
-    
+
     def getStockId(self):
         stockId = self._getStockId()
         if stockId:
-            return "gtk-" + stockId 
+            return "gtk-" + stockId
 
-    def _getStockId(self): # The stock ID for the action, in toolbar and menu.
+    def _getStockId(self):  # The stock ID for the action, in toolbar and menu.
         pass
-                
+
     def setObservers(self, observers):
-        signals = [ "Status", "ActionStart" ] + self.getSignalsSent()
+        signals = ["Status", "ActionStart"] + self.getSignalsSent()
         self.diag.info("Observing " + str(self.__class__) + " :")
         for observer in observers:
             for signal in signals:
@@ -217,8 +228,9 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
                     self.diag.info("-> " + str(observer.__class__))
                     self.addObserver(observer)
                     break
+
     def getSignalsSent(self):
-        return [] # set up like this so every single derived class doesn't have to include it
+        return []  # set up like this so every single derived class doesn't have to include it
 
     def createDialogMessage(self, message, stockIcon):
         buffer = Gtk.TextBuffer()
@@ -245,30 +257,32 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         alignment.set_padding(5, 5, 0, 5)
         alignment.add(hbox)
         return alignment
-            
+
     def showErrorDialog(self, message):
-        self.showErrorWarningDialog(message, Gtk.STOCK_DIALOG_ERROR, "Error") 
+        self.showErrorWarningDialog(message, Gtk.STOCK_DIALOG_ERROR, "Error")
+
     def showWarningDialog(self, message):
-        self.showErrorWarningDialog(message, Gtk.STOCK_DIALOG_WARNING, "Warning") 
+        self.showErrorWarningDialog(message, Gtk.STOCK_DIALOG_WARNING, "Warning")
+
     def showErrorWarningDialog(self, message, stockIcon, alarmLevel):
         dialog = self.createAlarmDialog(self.getParentWindow(), message, stockIcon, alarmLevel)
         dialog.add_button(Gtk.STOCK_OK, Gtk.ResponseType.ACCEPT)
         dialog.set_default_response(Gtk.ResponseType.ACCEPT)
         dialog.connect("response", lambda d, r: self._cleanDialog(d))
         dialog.show_all()
-        
+
     def createAlarmDialog(self, parent, message, stockIcon, alarmLevel):
         dialogTitle = "TextTest " + alarmLevel
-        dialog = Gtk.Dialog(dialogTitle, parent, flags=Gtk.DialogFlags.MODAL) 
+        dialog = Gtk.Dialog(dialogTitle, parent, flags=Gtk.DialogFlags.MODAL)
         dialog.set_modal(True)
         # may need review MB 2018-12-05
         # there may be a flag achieving the behavior, as mentioned here http://docs.adacore.com/live/wave/gtkada/html/gtkada_ug/transition.html
         # dialog.set_has_separator(False)
-        
+
         contents = self.createDialogMessage(message, stockIcon)
         dialog.vbox.pack_start(contents, True, True, 0)
         return dialog
-    
+
     def showQueryDialog(self, parent, message, stockIcon, alarmLevel, respondMethod, respondData=None):
         dialog = self.createAlarmDialog(parent, message, stockIcon, alarmLevel)
         dialog.set_default_response(Gtk.ResponseType.NO)
@@ -278,18 +292,18 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
             dialog.connect("response", respondMethod, respondData)
         dialog.show_all()
         return dialog
-        
+
     def _cleanDialog(self, dialog, *args):
         entrycompletion.manager.collectCompletions()
-        dialog.hide() # Can't destroy it, we might still want to read stuff from it
-        
+        dialog.hide()  # Can't destroy it, we might still want to read stuff from it
+
     def respond(self, dialog, responseId, *args):
-        saidOK = responseId in [ Gtk.ResponseType.ACCEPT, Gtk.ResponseType.YES, Gtk.ResponseType.OK ]
+        saidOK = responseId in [Gtk.ResponseType.ACCEPT, Gtk.ResponseType.YES, Gtk.ResponseType.OK]
         try:
             self._respond(saidOK, dialog, *args)
         except plugins.TextTestError as e:
             self.showErrorDialog(str(e))
-            
+
     def _respond(self, saidOK, dialog, *args):
         if saidOK:
             self._runInteractive()
@@ -297,19 +311,19 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
             self.cancel()
         if dialog:
             self._cleanDialog(dialog, *args)
-        
+
     def getConfirmationMessage(self):
         return ""
 
     def runInteractive(self, *args):
-        if self.busy: # If we're busy with some other action, ignore this one ...
+        if self.busy:  # If we're busy with some other action, ignore this one ...
             return
-                
+
         try:
             confirmationMessage = self.getConfirmationMessage()
             if confirmationMessage:
                 self.showQueryDialog(self.getParentWindow(), confirmationMessage,
-                                     Gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respond)    
+                                     Gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respond)
             else:
                 # Each time we perform an action we collect and save the current registered entries
                 # Actions showing dialogs will handle this in the dialog code.
@@ -319,7 +333,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
             self.showErrorDialog(str(e))
         except Exception as e:
             self.showErrorDialog(plugins.getExceptionString())
-            
+
     def _runInteractive(self):
         try:
             BasicActionGUI.busy = True
@@ -327,14 +341,14 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         finally:
             self.endPerform()
             BasicActionGUI.busy = False
-    
+
     def messageBeforePerform(self):
         # Don't change this by default, most of these things don't take very long
         pass
 
     def messageAfterPerform(self):
         return "Performed '" + self.getTooltip() + "'."
-    
+
     def startPerform(self):
         message = self.messageBeforePerform()
         if message != None:
@@ -345,16 +359,17 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         message = self.messageAfterPerform()
         if message != None:
             self.notify("Status", message)
-        
+
     def endPerform(self):
         self.notify("ActionStop")
 
     def cancel(self):
         self.notify("Status", "Action cancelled.")
-    
-    
+
+
 class ActionGUI(BasicActionGUI):
     busy = False
+
     def __init__(self, allApps, *args):
         self.currTestSelection = []
         self.currFileSelection = []
@@ -363,24 +378,24 @@ class ActionGUI(BasicActionGUI):
         BasicActionGUI.__init__(self)
         for app in allApps:
             self.checkAllValid(app)
-            
+
     def checkAllValid(self, app):
-        for currApp in [ app ] + app.extras:
+        for currApp in [app] + app.extras:
             if currApp not in self.validApps:
                 self.checkValid(currApp)
-                        
+
     def checkValid(self, app):
         if self.isValidForApp(app):
             self.validApps.append(app)
         else:
             self.diag.info(str(self.__class__) + " invalid for " + repr(app))
-        
+
     def isValidForApp(self, dummyApp):
         return True
 
     def shouldShow(self):
         return len(self.validApps) > 0
-    
+
     def notifyNewTestSelection(self, *args):
         newActive = self.updateSelection(*args)
         self.setSensitivity(newActive)
@@ -401,12 +416,13 @@ class ActionGUI(BasicActionGUI):
             testClass = self.correctTestClass()
             if testClass:
                 self.currTestSelection = [test for test in tests if test.classId() == testClass]
-                
+
         self.currAppSelection = apps
         newActive = self.allAppsValid() and self.isActiveOnCurrent()
-        self.diag.info("New test selection for " + self.getTitle() + "=" + self.describeTests() + " : new active = " + repr(newActive))
+        self.diag.info("New test selection for " + self.getTitle() + "=" +
+                       self.describeTests() + " : new active = " + repr(newActive))
         return newActive
-        
+
     def notifyLifecycleChange(self, test, state, *args):
         newActive = self.isActiveOnCurrent(test, state)
         self.setSensitivity(newActive)
@@ -414,11 +430,12 @@ class ActionGUI(BasicActionGUI):
     def notifyNewFileSelection(self, files):
         newActive = self.updateFileSelection(files)
         self.setSensitivity(newActive)
-        
+
     def updateFileSelection(self, files):
         self.currFileSelection = files
         newActive = self.allAppsValid() and self.isActiveOnCurrent()
-        self.diag.info("New file selection for " + self.getTitle() + "=" + repr(files) + " : new active = " + repr(newActive))
+        self.diag.info("New file selection for " + self.getTitle() + "=" +
+                       repr(files) + " : new active = " + repr(newActive))
         return newActive
 
     def allAppsValid(self):
@@ -430,9 +447,9 @@ class ActionGUI(BasicActionGUI):
 
     def isActiveOnCurrent(self, *args):
         return self.shouldShow() and len(self.currTestSelection) > 0
-        
+
     def singleTestOnly(self):
-        return False        
+        return False
 
     def describeTests(self):
         if len(self.currTestSelection) == 1:
@@ -445,7 +462,7 @@ class ActionGUI(BasicActionGUI):
 
     def messageAfterPerform(self):
         return "Performed '" + self.getTooltip() + "' on " + self.describeTests() + "."
-    
+
     def createTextWidget(self, name, scroll=False):
         frame = Gtk.Frame()
         frame.set_shadow_type(Gtk.ShadowType.OUT)
@@ -458,19 +475,19 @@ class ActionGUI(BasicActionGUI):
             view = self.addScrollBars(view, Gtk.PolicyType.AUTOMATIC)
         frame.add(view)
         return frame, buffer
-    
+
     def tryResize(self, dialog):
         horfrac, verfrac = self.getSizeAsWindowFraction()
         if horfrac is not None and self.topWindow is not None:
             width, height = self.topWindow.get_size()
             dialog.resize(int(width * horfrac), int(height * verfrac))
-        
+
     def getSizeAsWindowFraction(self):
         return None, None
 
     def createButton(self):
         return self._createButton(self.gtkAction, self.getTooltip())
-    
+
     def _createButton(self, action, tooltip):
         button = Gtk.Button()
         # needs review MB 2018-12-05
@@ -484,7 +501,7 @@ class ActionGUI(BasicActionGUI):
         button.set_tooltip_text(tooltip)
         button.show()
         return button
-    
+
     def findTestsToReload(self):
         tests = []
         for test in self.currTestSelection:
@@ -494,7 +511,7 @@ class ActionGUI(BasicActionGUI):
                     if currTest.hasLocalConfig():
                         tests.append(currTest)
         return tests
-    
+
     def reloadConfigForSelected(self):
         for appOrTest in self.currAppSelection + self.findTestsToReload():
             self.notify("Status", "Rereading configuration for " + repr(appOrTest) + " ...")
@@ -508,17 +525,17 @@ class ActionResultDialogGUI(ActionGUI):
     def __init__(self, *args, **kw):
         self.dialog = None
         ActionGUI.__init__(self, *args, **kw)
-        
+
     def performOnCurrent(self):
         self.dialog = self.createDialog()
         self.addContents()
         self.createButtons()
         self.tryResize(self.dialog)
         self.dialog.show_all()
-        
-    def addContents(self): # pragma: no cover - documentation only
+
+    def addContents(self):  # pragma: no cover - documentation only
         pass
-    
+
     def createButtons(self):
         self.dialog.add_button(Gtk.STOCK_CLOSE, Gtk.ResponseType.ACCEPT)
         self.dialog.set_default_response(Gtk.ResponseType.ACCEPT)
@@ -528,14 +545,17 @@ class ActionResultDialogGUI(ActionGUI):
         if responseId != Gtk.ResponseType.NONE:
             self._cleanDialog(dialog)
 
+
 class ComboBoxListFinder:
     def __init__(self, combobox):
         self.model = combobox.get_model()
         self.textColumn = combobox.get_entry_text_column()
+
     def __call__(self):
         entries = []
         self.model.foreach(self.getText, entries)
         return entries
+
     def getText(self, model, dummyPath, iter, entries):
         text = model.get_value(iter, self.textColumn)
         entries.append(text)
@@ -563,9 +583,9 @@ class OptionGroupGUI(ActionGUI):
         # convenience shortcuts...
         self.addOption = self.optionGroup.addOption
         self.addSwitch = self.optionGroup.addSwitch
-        
+
     def updateOptions(self):
-        return False     
+        return False
 
     def updateForConfig(self, option):
         fromConfig = guiConfig.getCompositeValue("gui_entry_overrides", option.name)
@@ -591,6 +611,7 @@ class OptionGroupGUI(ActionGUI):
 
     def connectEntry(self, option, entryOrBuffer, entryWidget):
         entryWidget.connect("destroy", self.destroyedEntry, (option, entryOrBuffer))
+
         def setText(t):
             entryOrBuffer.set_text(str(t))
         setText(option.getValue())
@@ -598,7 +619,7 @@ class OptionGroupGUI(ActionGUI):
         option.setMethods(self.getGetTextMethod(entryOrBuffer), setText)
         if option.changeMethod:
             entryOrBuffer.connect("changed", option.changeMethod)
-        
+
     def getGetTextMethod(self, widget):
         if isinstance(widget, Gtk.SpinButton):
             # Would be nice to return widget.get_value_as_int but that returns the wrong answer from
@@ -653,7 +674,7 @@ class OptionGroupGUI(ActionGUI):
             self.setRadioButtonName(radioButton, option, optionGroup)
             if individualToolTips:
                 radioButton.set_tooltip_text(switch.description[index])
-                
+
             buttons.append(radioButton)
             if not mainRadioButton:
                 mainRadioButton = radioButton
@@ -695,7 +716,7 @@ class OptionGroupGUI(ActionGUI):
                 self.setChildSensitivity(child, sensitive, ignoreWidget)
 
     def setRadioButtonName(self, *args):
-        pass # Don't bother by default, it's easy to set stupid names...
+        pass  # Don't bother by default, it's easy to set stupid names...
 
     def createComboBox(self, switch, *args):
         combobox = Gtk.ComboBoxText()
@@ -715,7 +736,7 @@ class OptionGroupGUI(ActionGUI):
     def transferEnable(self, enabler, switch):
         if enabler.get_active():
             switch.updateMethod(True)
-            
+
     def extractSwitches(self, optionGroup):
         options, switches = [], []
         for option in list(optionGroup.options.values()):
@@ -724,7 +745,7 @@ class OptionGroupGUI(ActionGUI):
             else:
                 options.append(option)
         return options, switches
-    
+
     def findAutoEnableInfo(self, switches):
         info = {}
         for switch in switches:
@@ -749,7 +770,7 @@ class OptionGroupGUI(ActionGUI):
         checkButton = Gtk.CheckButton(switch.name)
         if switch.description:
             checkButton.set_tooltip_text(switch.description)
-        
+
         if int(switch.getValue()):
             checkButton.set_active(True)
         # Don't pass checkButton.set_active as that will screw up StoryText's interception of it
@@ -767,7 +788,7 @@ class OptionGroupGUI(ActionGUI):
         entry = combobox.get_child()
         combobox.set_row_separator_func(self.isRowSeparator)
         option.setPossibleValuesMethods(combobox.append_text, ComboBoxListFinder(combobox))
-        
+
         option.setClearMethod(combobox.get_model().clear)
         return combobox, entry
 
@@ -810,15 +831,15 @@ class OptionGroupGUI(ActionGUI):
         button = Gtk.Button("...")
         box.pack_start(button, False, False, 0)
         button.connect("clicked", self.showFileChooser, entry, option)
-        
+
     def showFileChooser(self, dummyWidget, entry, option):
         dialog = Gtk.FileChooserDialog("Select a file",
                                        self.getParentWindow(),
                                        Gtk.FileChooserAction.OPEN,
-                                       (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,                                        
+                                       (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
                                         Gtk.STOCK_OPEN, Gtk.ResponseType.OK))
         self.startFileChooser(dialog, entry, option)
-    
+
     def startFileChooser(self, dialog, entry, option):
         # Folders is a list of pairs (short name, absolute path),
         # where 'short name' means the name given in the config file, e.g.
@@ -837,16 +858,16 @@ class OptionGroupGUI(ActionGUI):
             dialog.add_shortcut_folder(folder)
         dialog.set_default_response(Gtk.ResponseType.OK)
         dialog.show()
-        
+
     def respondFileChooser(self, dialog, response, entry):
         if response == Gtk.ResponseType.OK:
             entry.set_text(dialog.get_filename().replace("\\", "/"))
-            entry.set_position(-1) # Sets position last, makes it possible to see the vital part of long paths 
+            entry.set_position(-1)  # Sets position last, makes it possible to see the vital part of long paths
         dialog.destroy()
-  
+
     def getConfigOptions(self, option):
         fromConfig = guiConfig.getCompositeValue("gui_entry_options", option.name)
-        if fromConfig is None: #Happens on initial startup with no apps...
+        if fromConfig is None:  # Happens on initial startup with no apps...
             return []
         return fromConfig
 
@@ -867,20 +888,20 @@ class OptionGroupGUI(ActionGUI):
     def addApplicationOptions(self, allApps, optionGroup, inputOptions={}):
         if len(allApps) > 0:
             for app in allApps:
-                app.addToOptionGroups(allApps, [ optionGroup ])
+                app.addToOptionGroups(allApps, [optionGroup])
         else:
             configObject = self.makeDefaultConfigObject(inputOptions)
-            configObject.addToOptionGroups(allApps, [ optionGroup ])
+            configObject.addToOptionGroups(allApps, [optionGroup])
 
     def makeDefaultConfigObject(self, inputOptions):
         return plugins.importAndCall("default", "getConfig", inputOptions)
 
 
-    
 class ActionTabGUI(OptionGroupGUI):
     def __init__(self, *args):
         OptionGroupGUI.__init__(self, *args)
-        self.diag.info("Creating action tab for " + self.getTabTitle() + ", sensitive " + repr(self.shouldShowCurrent()))
+        self.diag.info("Creating action tab for " + self.getTabTitle() +
+                       ", sensitive " + repr(self.shouldShowCurrent()))
         self.vbox = Gtk.VBox()
 
     def shouldShowCurrent(self, *args):
@@ -902,7 +923,7 @@ class ActionTabGUI(OptionGroupGUI):
 
     def displayInTab(self):
         return True
-    
+
     def notifyReset(self, *args):
         self.optionGroup.reset()
 
@@ -912,7 +933,7 @@ class ActionTabGUI(OptionGroupGUI):
             # Creating 0-row table gives a warning ...
             table = Gtk.Table(len(options), 2, homogeneous=False)
             table.set_row_spacings(1)
-            rowIndex = 0        
+            rowIndex = 0
             for option in options:
                 self.addValuesFromConfig(option)
 
@@ -920,7 +941,7 @@ class ActionTabGUI(OptionGroupGUI):
                 labelEventBox.get_children()[0].set_alignment(1.0, 0.5)
                 table.attach(labelEventBox, 0, 1, rowIndex, rowIndex + 1, xoptions=Gtk.AttachOptions.FILL, xpadding=1)
                 entryWidget, entryOrBuffer = self.createOptionWidget(option)
-                self.connectEntry(option, entryOrBuffer, entryWidget) 
+                self.connectEntry(option, entryOrBuffer, entryWidget)
                 if isinstance(entryOrBuffer, Gtk.Entry):
                     entryOrBuffer.connect("activate", self.runInteractive)
                 table.attach(entryWidget, 1, 2, rowIndex, rowIndex + 1)
@@ -932,7 +953,7 @@ class ActionTabGUI(OptionGroupGUI):
         for switch in switches:
             widget = self.createSwitchWidget(switch, optionGroup, autoEnableInfo)
             vbox.pack_start(widget, False, False, 0)
-            
+
     def createResetButton(self):
         button = Gtk.Button("Reset Tab")
         button.set_name("Reset " + self.getTabTitle() + " Tab")
@@ -940,7 +961,7 @@ class ActionTabGUI(OptionGroupGUI):
         button.set_tooltip_text("Reset all the settings in the current tab to their default values")
         button.show()
         return button
-    
+
     def createButtons(self, vbox):
         self.addCentralButton(vbox, self.createButton(), padding=8)
         self.addCentralButton(vbox, self.createResetButton(), padding=16)
@@ -956,17 +977,18 @@ class ActionTabGUI(OptionGroupGUI):
             self.createFileChooserDialog(box, entry, option)
         return (box, entry)
 
+
 class ActionDialogGUI(OptionGroupGUI):
     def runInteractive(self, *args):
-        if self.busy: # If we're busy with some other action, ignore this one ...
+        if self.busy:  # If we're busy with some other action, ignore this one ...
             return
-                
+
         self.updateOptions()
         try:
             self.showConfigurationDialog()
         except plugins.TextTestError as e:
             self.showErrorDialog(str(e))
-            
+
     def showConfigurationDialog(self):
         dialog = self.createDialog()
         alignment = self.createAlignment()
@@ -980,13 +1002,13 @@ class ActionDialogGUI(OptionGroupGUI):
         self.tryResize(dialog)
         dialog.show_all()
         return dialog
-        
+
     def needsScrollBars(self):
         return False
-        
+
     def getConfirmationDialogSettings(self):
         return Gtk.STOCK_DIALOG_WARNING, "Confirmation"
-    
+
     def _respond(self, saidOK=True, dialog=None, fileChooserOption=None):
         if saidOK:
             try:
@@ -1020,12 +1042,12 @@ class ActionDialogGUI(OptionGroupGUI):
 
     def _cleanDialog(self, dialog, fileChooserOption=None):
         if fileChooserOption:
-            fileChooserOption.resetDefault() # Must do this, because we can't rely on reading from invisible FileChoosers
+            fileChooserOption.resetDefault()  # Must do this, because we can't rely on reading from invisible FileChoosers
         OptionGroupGUI._cleanDialog(self, dialog)
-        
+
     def defaultRespond(self, *args):
         OptionGroupGUI._respond(self, *args)
-            
+
     def createAlignment(self):
         alignment = Gtk.Alignment.new(1.0, 1.0, 1.0, 1.0)
         alignment.set_padding(5, 5, 5, 5)
@@ -1048,12 +1070,12 @@ class ActionDialogGUI(OptionGroupGUI):
             fileChooser.connect("file-activated", self.simulateResponse, dialog)
             # Don't pass set_filename directly, will interfere with StoryText's attempts to intercept it
             fileChooserOption.setMethods(fileChooser.get_filename, lambda f: fileChooser.set_filename(f))
-        
+
         dialog.connect("response", self.respond, fileChooserOption)
 
     def simulateResponse(self, dummy, dialog):
         dialog.response(Gtk.ResponseType.ACCEPT)
-        
+
     def getOrderedOptions(self, optionGroup):
         return list(optionGroup.options.values())
 
@@ -1063,7 +1085,7 @@ class ActionDialogGUI(OptionGroupGUI):
         autoEnableInfo = self.findAutoEnableInfo(allOptions)
         for option in allOptions:
             self.addValuesFromConfig(option, includeOverrides)
-            
+
             if isinstance(option, plugins.Switch):
                 widget = self.createSwitchWidget(option, optionGroup, autoEnableInfo)
                 vbox.pack_start(widget, False, False, 0)
@@ -1095,7 +1117,7 @@ class ActionDialogGUI(OptionGroupGUI):
     def set_focus(self, vbox):
         for child in vbox.get_children():
             if isinstance(child, Gtk.Container) and not isinstance(child, Gtk.FileChooser):
-                for gchild in child.get_children():# This may cause indeterministic behavior if called on FileChoosers, see TTT-2485
+                for gchild in child.get_children():  # This may cause indeterministic behavior if called on FileChoosers, see TTT-2485
                     if isinstance(gchild, Gtk.Entry):
                         gchild.get_toplevel().connect("map", lambda x: gchild.grab_focus())
                         return
@@ -1114,9 +1136,9 @@ class ActionDialogGUI(OptionGroupGUI):
 
     def addLabel(self, vbox, label):
         hbox = Gtk.HBox()
-        hbox.pack_start(label, False, False, 0)        
+        hbox.pack_start(label, False, False, 0)
         vbox.pack_start(hbox, False, False, 2)
-                
+
     def createRadioButtonCollection(self, switch, optionGroup):
         if optionGroup is not self.optionGroup:
             # If we're not part of the main group, we've got a frame already, store horizontally in this case
@@ -1131,10 +1153,10 @@ class ActionDialogGUI(OptionGroupGUI):
             frameBox.pack_start(button, True, True, 0)
         frame.add(frameBox)
         return frame
-    
+
     def showFileChooserAsDialog(self):
         return False
-    
+
     def getFileChooserFlag(self, option):
         if option.selectFile:
             return Gtk.FileChooserAction.OPEN
@@ -1155,8 +1177,8 @@ class ActionDialogGUI(OptionGroupGUI):
         elif defaultFolder and os.path.isdir(os.path.abspath(defaultFolder)):
             startFolder = os.path.abspath(defaultFolder)
         else:
-            startFolder = os.getcwd() # Just to make sure we always have some dir ...
-            
+            startFolder = os.getcwd()  # Just to make sure we always have some dir ...
+
         # We want a filechooser dialog to let the user choose where, and
         # with which name, to save the selection.
         fileChooser.set_current_folder(startFolder)
@@ -1164,7 +1186,7 @@ class ActionDialogGUI(OptionGroupGUI):
             try:
                 fileChooser.add_shortcut_folder(folder)
             except GObject.GError:
-                pass # Get this if the folder is already added, e.g. if it's the home directory
+                pass  # Get this if the folder is already added, e.g. if it's the home directory
 
         if option.selectFile and self.set_filename_is_working():
             if option.getValue():
@@ -1173,10 +1195,10 @@ class ActionDialogGUI(OptionGroupGUI):
                 value = self.getDefaultFileChooserValue(startFolder)
                 if value:
                     fileChooser.set_filename(value)
-            
+
         fileChooser.set_local_only(True)
         return fileChooser
-        
+
     def set_filename_is_working(self):
         # A particularly nasty bug was introduced in GTK 2.20, and fixed in GTK 2.24
         # https://bugzilla.gnome.org/show_bug.cgi?id=643170
@@ -1184,22 +1206,22 @@ class ActionDialogGUI(OptionGroupGUI):
         # making the GUI think it is constantly busy and sending our throbber into an infinite loop
         # See bugs TTT-3469, TTT-3483
         # this block can probably removed MB 2018-12-04
-        #if Gtk.gtk_version < (2, 20) or Gtk.gtk_version >= (2, 24):
+        # if Gtk.gtk_version < (2, 20) or Gtk.gtk_version >= (2, 24):
         #    return True
-        
+
         fileChooserConfigFile = self.getFileChooserConfigFile()
         if not self.showHiddenFilesEnabled(fileChooserConfigFile):
             return True
-        
-        sys.stderr.write("WARNING: unable to select files in File Chooser, due to a GTK+ bug.\n" + 
+
+        sys.stderr.write("WARNING: unable to select files in File Chooser, due to a GTK+ bug.\n" +
                          "Either upgrade GTK+ to at least version 2.24, or set 'ShowHidden=false' in your configuration file at\n" +
                          fileChooserConfigFile + "\n")
         return False
-    
+
     def getFileChooserConfigFile(self):
         xdgConfigHome = os.getenv("XDG_CONFIG_HOME", os.path.expanduser("~/.config"))
         return os.path.join(xdgConfigHome, "gtk-2.0", "gtkfilechooser.ini")
-        
+
     def showHiddenFilesEnabled(self, configFile):
         if os.path.isfile(configFile):
             with open(configFile) as f:
@@ -1207,14 +1229,14 @@ class ActionDialogGUI(OptionGroupGUI):
                     if "ShowHidden" in line and "true" in line:
                         return True
         return False
-        
+
     def getDefaultFileChooserValue(self, startFolder):
-        appSuffices = [ "." + app.name for app in self.validApps ]
+        appSuffices = ["." + app.name for app in self.validApps]
         for f in sorted(os.listdir(startFolder)):
             path = os.path.join(startFolder, f)
             if not self.onlyDataFilesInFileChooser() or (os.path.isfile(path) and not any((suffix in f for suffix in appSuffices))):
                 return path
-            
+
     def onlyDataFilesInFileChooser(self):
         return False
 
@@ -1223,14 +1245,16 @@ class ActionDialogGUI(OptionGroupGUI):
             return allApps[0].getFilterFileDirectories(allApps, **kw)
         else:
             return []
-        
+
+
 class CloseWindowCancelException(plugins.TextTestException):
     pass
+
 
 class InteractiveActionConfig:
     def getColourDictionary(self):
         return GUIConfig.getDefaultColours()
-        
+
     def getDefaultAccelerators(self):
         return {}
 

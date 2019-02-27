@@ -43,17 +43,21 @@ populate the TableLite container object.
 .. [Yale Web Style Manual] http://info.med.yale.edu/caim/manual/contents.html
 """
 
-import string, re, time, os
-import collections, copy
+import string
+import re
+import time
+import os
+import collections
+import copy
 from .imgsize import imgsize
 
 __author__ = 'Robin Friedrich   friedrich@pythonpros.com'
 __version__ = '2.2.2'
 
 StringType = type('s')
-IntType    = type(3)
-ListType   = type([1])
-TupleType  = type((1,2))
+IntType = type(3)
+ListType = type([1])
+TupleType = type((1, 2))
 InstanceType = type(collections.UserList())
 CONTYPE = 'Content-Type: text/html\n\n'
 DOCTYPE = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">\n<HTML>\n'
@@ -99,14 +103,14 @@ class BasicDocument:
     linkcolor = None
     vlinkcolor = None
     alinkcolor = None
-    
+
     def __init__(self, *args, **kw):
         self.contents = list(args)
         for name, value in list(kw.items()):
             setattr(self, name, value)
 
     def __str__(self):
-        s = [ self.get_doc_type() ]
+        s = [self.get_doc_type()]
         s.append('\n<!-- This file generated using Python HTMLgen module. -->\n')
 
         # build the HEAD and BODY tags
@@ -135,21 +139,27 @@ class BasicDocument:
         """
         return '<HEAD>\n  <META NAME="GENERATOR" CONTENT="HTMLgen %s">\n\
         <TITLE>%s</TITLE> </HEAD>\n' % (__version__, self.title)
-    
+
     def html_body_tag(self):
         """Return BODY tag with attributes.
         """
         s = ['<BODY']
-        if self.bgcolor:    s.append(' BGCOLOR="%s"' % self.bgcolor)
-        if self.background: s.append(' BACKGROUND="%s"' % self.background)
-        if self.textcolor:  s.append(' TEXT="%s"' % self.textcolor)
-        if self.linkcolor:  s.append(' LINK="%s"' % self.linkcolor)
-        if self.vlinkcolor: s.append(' VLINK="%s"' % self.vlinkcolor)
-        if self.alinkcolor: s.append(' ALINK="%s"' % self.alinkcolor)
+        if self.bgcolor:
+            s.append(' BGCOLOR="%s"' % self.bgcolor)
+        if self.background:
+            s.append(' BACKGROUND="%s"' % self.background)
+        if self.textcolor:
+            s.append(' TEXT="%s"' % self.textcolor)
+        if self.linkcolor:
+            s.append(' LINK="%s"' % self.linkcolor)
+        if self.vlinkcolor:
+            s.append(' VLINK="%s"' % self.vlinkcolor)
+        if self.alinkcolor:
+            s.append(' ALINK="%s"' % self.alinkcolor)
         s.append('>\n')
         return ''.join(s)
 
-    def append_file(self, filename, marker_function = None):
+    def append_file(self, filename, marker_function=None):
         """Add the contents of a file to the document.
 
         filename -- the filename of the file to be read [string]
@@ -163,10 +173,10 @@ class BasicDocument:
         else:
             self.append(f.read())
         f.close()
-        
+
     def append(self, *items):
         """Add content to the Document object.
-        
+
         Arg *items* can be plain text or objects; multiple arguments supported.
         """
         for item in items:
@@ -174,7 +184,7 @@ class BasicDocument:
 
     def prepend(self, *items):
         """Add content to the beginning of the Document object.
-        
+
         Arg *items* can be plain text or objects; multiple arguments supported.
         """
         for item in items:
@@ -185,9 +195,9 @@ class BasicDocument:
         """
         return copy.deepcopy(self)
 
-    def write(self, filename = None):
+    def write(self, filename=None):
         """Emit the Document HTML to a file or standard output.
-        
+
         In Unix you can use environment variables in filenames.
         Will print to stdout if no argument.
         """
@@ -195,10 +205,12 @@ class BasicDocument:
             f = open(mpath(filename), 'w')
             f.write(str(self))
             f.close()
-            if PRINTECHO: print('wrote: "'+filename+'"')
+            if PRINTECHO:
+                print('wrote: "'+filename+'"')
         else:
             import sys
             sys.stdout.write(str(self))
+
 
 class FramesetDocument(BasicDocument):
     """A minimal document suitable for entering Framesets.
@@ -206,13 +218,13 @@ class FramesetDocument(BasicDocument):
     Arguments are for contents **NOT** a document resource file.
 
     Keyword Parameters
-    
+
         title -- string to be used as the document title.
         base  -- object of the Base class
         meta  -- object of the Meta class
         cgi   -- if non zero will issue a mime type of text/html
         script -- a single or list of Script objects to be included in the <HEAD>
-    
+
     No <body> markup. Instead add Frameset(s) with the constructor or
     append method.
     """
@@ -222,7 +234,7 @@ class FramesetDocument(BasicDocument):
     script = None
 
     def __str__(self):
-        s = [ self.get_doc_type() ]
+        s = [self.get_doc_type()]
         s.append('\n<!-- This file generated using Python HTMLgen module. -->\n')
 
         # build the HEAD tag
@@ -233,7 +245,7 @@ class FramesetDocument(BasicDocument):
         s.append((bodystring % tuple(self.contents)))
 
         # CLOSE the document
-        s.append('\n</HTML>')        
+        s.append('\n</HTML>')
         return ''.join(s)
 
 
@@ -253,16 +265,17 @@ class SimpleDocument(BasicDocument):
     onLoad = None
     onUnload = None
     script = None
-    
-    def __init__(self, resource = None, **kw):
+
+    def __init__(self, resource=None, **kw):
         self.contents = []
         # Read attributes from resource file into instance namespace
-        if resource: exec(compile(open(mpath(resource)).read(), mpath(resource), 'exec'), self.__dict__)
+        if resource:
+            exec(compile(open(mpath(resource)).read(), mpath(resource), 'exec'), self.__dict__)
         for name, value in list(kw.items()):
             setattr(self, name, value)
 
     def __str__(self):
-        s = [ self.get_doc_type() ]
+        s = [self.get_doc_type()]
         s.append('\n<!-- This file generated using Python HTMLgen module. -->\n')
 
         # build the HEAD and BODY tags
@@ -273,7 +286,7 @@ class SimpleDocument(BasicDocument):
         bodystring = '%s\n' * len(self.contents)
         s.append((bodystring % tuple(self.contents)))
 
-        s.append('\n</BODY> </HTML>\n') # CLOSE the document
+        s.append('\n</BODY> </HTML>\n')  # CLOSE the document
         return ''.join(s)
 
     def html_head(self):
@@ -281,14 +294,16 @@ class SimpleDocument(BasicDocument):
         """
         s = ['<HEAD>\n  <META NAME="GENERATOR" CONTENT="HTMLgen %s">\n\
         <TITLE>%s</TITLE>\n' % (__version__, self.title)]
-        if self.meta: s.append(str(self.meta))
-        if self.base: s.append(str(self.base))
+        if self.meta:
+            s.append(str(self.meta))
+        if self.base:
+            s.append(str(self.base))
         if self.stylesheet:
-            s.append('\n <LINK rel=stylesheet href="%s" type=text/css title="%s">\n' \
+            s.append('\n <LINK rel=stylesheet href="%s" type=text/css title="%s">\n'
                      % (self.stylesheet, self.stylesheet))
         if self.style:
             s.append('\n<STYLE>\n<!--\n%s\n-->\n</style>\n' % self.style)
-        if self.script: # for javascripts
+        if self.script:  # for javascripts
             if type(self.script) in (TupleType, ListType):
                 for script in self.script:
                     s.append(str(script))
@@ -301,14 +316,22 @@ class SimpleDocument(BasicDocument):
         """Return BODY tag with attributes.
         """
         s = ['<BODY']
-        if self.bgcolor:    s.append(' BGCOLOR="%s"' % self.bgcolor)
-        if self.background: s.append(' BACKGROUND="%s"' % self.background)
-        if self.textcolor:  s.append(' TEXT="%s"' % self.textcolor)
-        if self.linkcolor:  s.append(' LINK="%s"' % self.linkcolor)
-        if self.vlinkcolor: s.append(' VLINK="%s"' % self.vlinkcolor)
-        if self.alinkcolor: s.append(' ALINK="%s"' % self.alinkcolor)
-        if self.onLoad:     s.append(' onLoad="%s"' % self.onLoad)
-        if self.onUnload:   s.append(' onUnload="%s"' % self.onUnload)
+        if self.bgcolor:
+            s.append(' BGCOLOR="%s"' % self.bgcolor)
+        if self.background:
+            s.append(' BACKGROUND="%s"' % self.background)
+        if self.textcolor:
+            s.append(' TEXT="%s"' % self.textcolor)
+        if self.linkcolor:
+            s.append(' LINK="%s"' % self.linkcolor)
+        if self.vlinkcolor:
+            s.append(' VLINK="%s"' % self.vlinkcolor)
+        if self.alinkcolor:
+            s.append(' ALINK="%s"' % self.alinkcolor)
+        if self.onLoad:
+            s.append(' onLoad="%s"' % self.onLoad)
+        if self.onUnload:
+            s.append(' onUnload="%s"' % self.onUnload)
         s.append('>\n')
         return ''.join(s)
 
@@ -327,7 +350,7 @@ class SeriesDocument(SimpleDocument):
     example usage.
 
     Class instance attributes and keyword arguments
-    
+
         base -- object of the Base class
         meta -- object of the Meta class
         cgi  -- if non zero will issue a mime type of text/html
@@ -383,13 +406,13 @@ class SeriesDocument(SimpleDocument):
     next = ('../image/BTN_NextPage.gif', 71, 19)
     top = ('../image/BTN_ManualTop.gif', 74, 19)
     home = ('../image/BTN_HomePage.gif', 74, 19)
-    goprev = None # URLs for above navigation buttons
+    goprev = None  # URLs for above navigation buttons
     gonext = None
-    gotop  = None
+    gotop = None
     gohome = None
 
     def __str__(self):
-        s = [ self.get_doc_type() ]
+        s = [self.get_doc_type()]
         s.append('\n<!-- This file generated using Python HTMLgen module. -->\n')
         # build the HEAD and BODY tags
         s.append(self.html_head())
@@ -400,11 +423,11 @@ class SeriesDocument(SimpleDocument):
         # DOCUMENT CONTENT SECTION and FOOTER added on
         bodystring = '%s\n' * len(self.contents)
         s.append((bodystring % tuple(self.contents)))
-        
+
         s.append(self.footer())
-        s.append('\n</BODY> </HTML>\n') # CLOSE the document
+        s.append('\n</BODY> </HTML>\n')  # CLOSE the document
         return ''.join(s)
-    
+
     def header(self):
         """Generate the standard header markups.
         """
@@ -420,7 +443,7 @@ class SeriesDocument(SimpleDocument):
                 raise TypeError('banner must be either a tuple, instance, or string.')
         if self.place_nav_buttons:
             s.append(self.nav_buttons())
-        s.append(str(Heading(3,self.title)))
+        s.append(str(Heading(3, self.title)))
         if self.subtitle:
             s.append('<H2>%s</H2>\n' % self.subtitle)
         s.append('<HR>\n\n')
@@ -434,56 +457,57 @@ class SeriesDocument(SimpleDocument):
         buttons.
         """
         s = []
-        if self.goprev: # place an image button for previous page
+        if self.goprev:  # place an image button for previous page
             btn = Image(self.prev, border=0, alt='Previous')
             link = Href(self.goprev, str(btn))
             s.append(str(link) + ' \n')
-        else: # place a blank gif as spacer
+        else:  # place a blank gif as spacer
             #btn = Image(self.blank)
             s.append('<span style="width: 60px"></span> \n')
-        if self.gonext: # place an image button for next page
+        if self.gonext:  # place an image button for next page
             btn = Image(self.__next__, border=0, alt='Next')
             link = Href(self.gonext, str(btn))
             s.append(str(link) + ' \n')
-        else: # place a blank gif as spacer
+        else:  # place a blank gif as spacer
             btn = Image(self.blank)
             s.append(str(btn) + ' \n')
-        if self.gotop: # place an image button for top of manual page
+        if self.gotop:  # place an image button for top of manual page
             btn = Image(self.top, border=0, alt='Top of Manual')
             link = Href(self.gotop, str(btn))
             s.append(str(link) + ' \n')
-        else: # place a blank gif as spacer
+        else:  # place a blank gif as spacer
             btn = Image(self.blank)
             s.append(str(btn) + ' \n')
-        if self.gohome: # place an image button for site home page
+        if self.gohome:  # place an image button for site home page
             btn = Image(self.home, border=0, alt='Home Page')
             link = Href(self.gohome, str(btn))
             s.append(str(link) + ' \n')
-        else: # place a blank gif as spacer
+        else:  # place a blank gif as spacer
             btn = Image(self.blank)
             s.append(str(btn) + ' \n')
         return ''.join(s)
- 
+
     def footer(self):
         """Generate the standard footer markups.
         """
         # FOOTER SECTION - overload this if you don't like mine.
         t = time.localtime(time.time())
-        #self.datetime = time.strftime("%c %Z", t)    #not available in JPython
+        # self.datetime = time.strftime("%c %Z", t)    #not available in JPython
         self.datetime = time.asctime(t)
         #self.date = time.strftime("%A %B %d, %Y", t)
         x = self.datetime.split()
         self.date = x[0] + ' ' + x[1] + ' ' + x[2] + ', ' + x[4]
-        s =  ['\n<P><HR>\n']
+        s = ['\n<P><HR>\n']
         if self.place_nav_buttons:
             s.append(self.nav_buttons())
         s.append('<BR>' + str(Image(self.logo, align='bottom')))
-        s.append('\n<FONT SIZE="-1"><P>Copyright &#169 %s<BR>All Rights Reserved<BR>\n' \
-            % self.author)
-        s.append('\nComments to author: ' + str(MailTo(self.email)) )
-        s.append('<br>\nGenerated: %s <BR>' % self.date) # can use self.datetime here instead
+        s.append('\n<FONT SIZE="-1"><P>Copyright &#169 %s<BR>All Rights Reserved<BR>\n'
+                 % self.author)
+        s.append('\nComments to author: ' + str(MailTo(self.email)))
+        s.append('<br>\nGenerated: %s <BR>' % self.date)  # can use self.datetime here instead
         s.append('<hr>\n</FONT>')
         return ''.join(s)
+
 
 # Aliases for backward compatability with HTMLgen 1.2
 Document = SeriesDocument
@@ -517,6 +541,7 @@ class StringTemplate:
     used as the delimiters instead of { } braces. They must be of the same
     length; for example ['##+', '##'] is invalid.
     """
+
     def __init__(self, template, substitutions=None, **kw):
         self.delimiters = ['{', '}']
         self.__dict__.update(kw)
@@ -531,16 +556,16 @@ class StringTemplate:
 
     def set_template(self, template):
         self.source = template
-    
+
     def keys(self):
         return list(self.substitutions.keys())
 
     def __setitem__(self, name, value):
         self.substitutions[name] = value
-        
+
     def __getitem__(self, name):
         return self.substitutions[name]
-      
+
     def __str__(self):
         return self._sub(self.source)
 
@@ -560,16 +585,16 @@ class StringTemplate:
             output.append(source[i:i+a])
             # using the new get method for dicts in 1.5
             output.append(str(substitutions.get(
-                   source[i+a+dw:i+b-dw], source[i+a:i+b])))
+                source[i+a+dw:i+b-dw], source[i+a:i+b])))
             i = i + b
             matched = self.subpat.search(source[i:])
         else:
             output.append(source[i:])
         return ''.join(output)
-    
-    def write(self, filename = None):
+
+    def write(self, filename=None):
         """Emit the Document HTML to a file or standard output.
-        
+
         Will not overwrite file is it exists and is textually the same.
         In Unix you can use environment variables in filenames.
         Will print to stdout if no argument given.
@@ -582,17 +607,21 @@ class StringTemplate:
                     f = open(filename, 'w')
                     f.write(str(self))
                     f.close()
-                    if PRINTECHO: print('wrote: "'+filename+'"')
+                    if PRINTECHO:
+                        print('wrote: "'+filename+'"')
                 else:
-                    if PRINTECHO: print('file unchanged: "'+filename+'"')
+                    if PRINTECHO:
+                        print('file unchanged: "'+filename+'"')
             else:
                 f = open(filename, 'w')
                 f.write(str(self))
                 f.close()
-                if PRINTECHO: print('wrote: "'+filename+'"')
+                if PRINTECHO:
+                    print('wrote: "'+filename+'"')
         else:
             import sys
             sys.stdout.write(str(self))
+
 
 class TemplateDocument(StringTemplate):
     """Generate documents based on a template and a substitution mapping.
@@ -621,25 +650,27 @@ class TemplateDocument(StringTemplate):
     used as the delimiters instead of { } braces. They must be of the same
     length; for example ['##+', '##'] is invalid.
     """
+
     def set_template(self, template):
         f = open(mpath(template))
         self.source = f.read()
         f.close()
 
+
 class AutoStringTemplate(StringTemplate):
     marker_begin = '<!--{%s}Begin-->'
-    marker_end   = '<!--{%s}End-->'
+    marker_end = '<!--{%s}End-->'
     R = re.compile(r"<!--{(?P<key>[\w_]+)}Begin-->(?P<text>.*?)<!--{\1}End-->", re.S)
-    
+
     def set_template(self, template):
         """Set template string and normalize by extracting comment tokens.
         """
         self.source = template
         self.extract_template()
-        
+
     def extract_template(self, source=None):
         """Convert comment-marked regions to a regular {tokens}.
-        
+
         Updates the substitution dictionary with the text from the region.
         """
         source = source or self.source
@@ -675,11 +706,11 @@ class AutoStringTemplate(StringTemplate):
         while matched:
             a, b = matched.span()
             output.append(source[i:i+a])
-            #implant comments to mark the location of the tokens
+            # implant comments to mark the location of the tokens
             output.append(self.marker_begin % source[i+a+dw:i+b-dw])
             # using the new get method for dicts in 1.5
             output.append(str(substitutions.get(
-                   source[i+a+dw:i+b-dw], source[i+a:i+b])))
+                source[i+a+dw:i+b-dw], source[i+a:i+b])))
             output.append(self.marker_end % source[i+a+dw:i+b-dw])
             i = i + b
             matched = self.subpat.search(source[i:])
@@ -687,9 +718,10 @@ class AutoStringTemplate(StringTemplate):
             output.append(source[i:])
         return ''.join(output)(output, '')
 
+
 class AutoTemplateDocument(AutoStringTemplate):
     """Generate documents based on a template and a substitution mapping.
-    
+
     The primary difference between AutoTemplateDocument and TemplateDocument
     is that the Auto version can read through an HTML file previously
     generated with this class and identify the regions of text that were
@@ -700,7 +732,7 @@ class AutoTemplateDocument(AutoStringTemplate):
     Output from this class have their filled regions marked by comments:
         ...gets <!--{wz}Begin-->glued,<!--{wz}End--> in place...
     Which came from ...gets {wz} in place... in old style template syntax.
-    
+
     AutoTemplateDocument is a functional superset of TemplateDocument and should
     be compatible.
 
@@ -710,7 +742,7 @@ class AutoTemplateDocument(AutoStringTemplate):
        or
        T['month'] = ObjectY ; T['town'] = 'Scarborough'
        T.write('Maine.html')
-    
+
     A dictionary, or object that behaves like a dictionary, is assigned to the
     *substitutions* attribute which has symbols as keys to objects. Upon every
     occurance of these symbols surrounded by braces {} in the source template,
@@ -728,6 +760,7 @@ class AutoTemplateDocument(AutoStringTemplate):
     used as the delimiters instead of { } braces. They must be of the same
     length; for example ['##+', '##'] is invalid.
     """
+
     def set_template(self, template):
         f = open(mpath(template))
         self.source = f.read()
@@ -751,8 +784,8 @@ class Container:
         new = self.__class__()
         new.contents = self.contents + other.contents
         return new
-        
-    def append_file(self, filename, marker_function = None):
+
+    def append_file(self, filename, marker_function=None):
         """Add the contents of a file to the document.
 
         filename -- the filename of the file to be read [string]
@@ -766,10 +799,10 @@ class Container:
         else:
             self.append(f.read())
         f.close()
-        
+
     def append(self, *items):
         """Add content to the Document object.
-        
+
         Arg *items* can be plain text or objects; multiple arguments supported.
         """
         for item in items:
@@ -777,7 +810,7 @@ class Container:
 
     def prepend(self, *items):
         """Add content to the beginning of the Document object.
-        
+
         Arg *items* can be plain text or objects; multiple arguments supported.
         """
         li = len(items)
@@ -790,27 +823,29 @@ class Container:
         return copy.deepcopy(self)
 
 #===================
-        
+
+
 class Meta:
     """Set document Meta-information.
 
     The META element is used within the HEAD element to embed
     document meta-information not defined by other HTML elements.
-    
+
     Keywords supported
- 
+
         name  -- NAME element attribute (default: 'keywords')
         equiv  -- will map to the HTTP-EQUIV attribute
         content -- mandatory attribute (default: 'python,HTMLgen')
         url -- URL naturally
-    
+
     Example:
 
         Meta( name='keywords', content='eggs,spam,beans' )
     """
+
     def __init__(self, **kw):
         self.equiv = 'keywords'
-        self.name  = ''
+        self.name = ''
         self.content = 'python,HTMLgen'
         self.url = ''
         for item in list(kw.keys()):
@@ -818,14 +853,19 @@ class Meta:
 
     def __str__(self):
         s = ['<META']
-        if self.equiv: s.append(' HTTP-EQUIV="%s"' % self.equiv)
-        if self.name:  s.append(' NAME="%s"' % self.name)
-        if self.content: s.append(' CONTENT="%s"' % self.content)
-        if self.url: s.append(' URL="%s"' % self.url)
+        if self.equiv:
+            s.append(' HTTP-EQUIV="%s"' % self.equiv)
+        if self.name:
+            s.append(' NAME="%s"' % self.name)
+        if self.content:
+            s.append(' CONTENT="%s"' % self.content)
+        if self.url:
+            s.append(' URL="%s"' % self.url)
         s.append('>\n')
         return ''.join(s)
 
 ##### Client-side Imagemap Support #####
+
 
 class Map:
     """Used to name and describe a client-side image map.
@@ -834,7 +874,8 @@ class Map:
     Keyword arg is supported for *name*, which defines the map name
     to be used with the usemap attribute of an Image class instance.
     """
-    def __init__(self, areas = None, **kw):
+
+    def __init__(self, areas=None, **kw):
         self.areas = areas or []
         self.name = ''
         for item in list(kw.keys()):
@@ -863,6 +904,7 @@ class Href:
         onMouseOut -- the script-code which is executed when the mouse
                        moves off the link.
     """
+
     def __init__(self, url='', text='', **kw):
         self.target = None
         self.title = None
@@ -880,20 +922,27 @@ class Href:
 
     def __str__(self):
         s = ['<A HREF="%s"' % self.url]
-        if self.target: s.append(' TARGET="%s"' % self.target)
-        if self.title: s.append(' title="%s"' % self.title)
-        if self.onClick: s.append(' onClick="%s"' % self.onClick)
-        if self.onMouseOver: s.append(' onMouseOver="%s"' % self.onMouseOver)
-        if self.onMouseOut: s.append(' onMouseOut="%s"' % self.onMouseOut)
-        if self.style: s.append(' style="%s"' % self.style)
+        if self.target:
+            s.append(' TARGET="%s"' % self.target)
+        if self.title:
+            s.append(' title="%s"' % self.title)
+        if self.onClick:
+            s.append(' onClick="%s"' % self.onClick)
+        if self.onMouseOver:
+            s.append(' onMouseOver="%s"' % self.onMouseOver)
+        if self.onMouseOut:
+            s.append(' onMouseOut="%s"' % self.onMouseOut)
+        if self.style:
+            s.append(' style="%s"' % self.style)
         s.append('>%s</A>' % self.text)
         return ''.join(s)
 
     def append(self, content):
         self.text = self.text + str(content)
-        
 
-A = HREF = Href # alias
+
+A = HREF = Href  # alias
+
 
 class Name(Href):
     """Generate a named anchor.
@@ -901,10 +950,13 @@ class Name(Href):
     Arg *url* is a string or URL object,
     Arg *text* is optional string or object to be highlighted as the anchor.
     """
+
     def __str__(self):
         return '<A NAME="%s">%s</A>' % (self.url, self.text)
 
-NAME = Name # alias
+
+NAME = Name  # alias
+
 
 class MailTo:
     """A Mailto href
@@ -913,13 +965,15 @@ class MailTo:
     the text shown as the underlined hyperlink. Default is the email
     address. Optional third argument is a Subject: for the email.
     """
+
     def __init__(self, address='', text=None, subject=None):
         self.address = address
         self.text = text or address
         self.subject = subject
 
     def __str__(self):
-        if self.subject: self.address = "%s?subject=%s" % (self.address, self.subject)
+        if self.subject:
+            self.address = "%s?subject=%s" % (self.address, self.subject)
         return '<A HREF="mailto:%s">%s</A>' % (self.antispam(self.address), self.text)
 
     def antispam(self, address):
@@ -927,18 +981,22 @@ class MailTo:
         """
         from random import choice
         buffer = list(address)
-        for i in range(0, len(address), choice((2,3,4))):
+        for i in range(0, len(address), choice((2, 3, 4))):
             buffer[i] = '&#%d;' % ord(buffer[i])
         return ''.join(buffer)
 
-MAILTO = Mailto = MailTo # aliases
+
+MAILTO = Mailto = MailTo  # aliases
+
 
 class P:
     """Just echo a <P> tag."""
+
     def __str__(self):
         return '\n<P>\n'
 
 # List constructs
+
 
 class List(collections.UserList):
     """Will generate a bulleted list given a list argument.
@@ -953,7 +1011,7 @@ class List(collections.UserList):
     prior list entry. This can continue indefinitely through nested
     lists although there are only three different bullets provided by
     the browser (typically).
-    
+
     Optional keyword *indent* can be used to indicate whether you want
     the list to start left justified or indented. *indent=0* will make
     it left justified. The default is to indent.
@@ -961,7 +1019,7 @@ class List(collections.UserList):
     Optional keyword *type* can be set to either disk, circle, or
     square to specify what kind of symbol is used for each list item's
     bullet. (Netscape extension)
-    
+
     Since we inherit from the UserList class any normal list
     operations work on instances of this class.  Any list contents
     will do. Each of the items will be emitted in html if they are
@@ -971,13 +1029,14 @@ class List(collections.UserList):
 
     I_am_a_list = 1
     tagname = 'UL'
-    attrs = ('type','align','class','id','style')
+    attrs = ('type', 'align', 'class', 'id', 'style')
     flags = ('compact',)
     columns = 1
     bgcolor = ''
     pad = '    '
     indent = 1
-    def __init__(self, list = None, **kw):
+
+    def __init__(self, list=None, **kw):
         self.data = []
         self.lvl = 0
         if list:
@@ -991,8 +1050,8 @@ class List(collections.UserList):
     def __getslice__(self, i, j):
         newlist = copy.copy(self)
         newlist.data = self.data[i:j]
-        newlist.columns = 1 # don't forget that the copy will carry
-                            # the old attribute value. set to 1
+        newlist.columns = 1  # don't forget that the copy will carry
+        # the old attribute value. set to 1
         return newlist
 
     def multi_column_table(self):
@@ -1000,7 +1059,8 @@ class List(collections.UserList):
         """
         slices = self.column_slices(self.columns)
         table = TableLite(border=0, cellpadding=3)
-        if self.bgcolor: table.bgcolor = self.bgcolor
+        if self.bgcolor:
+            table.bgcolor = self.bgcolor
         for begin, end in slices:
             column = TD(self[begin:end], valign='top', html_escape='no')
             table.append(column)
@@ -1011,7 +1071,8 @@ class List(collections.UserList):
         """
         list_len = len(self.data)
         col_len, remainder = divmod(list_len, columns)
-        if remainder: col_len = col_len + 1
+        if remainder:
+            col_len = col_len + 1
         indexpairs = []
         if columns > 1:
             for column in range(columns):
@@ -1023,29 +1084,29 @@ class List(collections.UserList):
         else:
             indexpairs.append((0, list_len))
         return indexpairs
-        
+
     def __str__(self):
-        if self.columns > 1: # go to the new multicolumn feature
+        if self.columns > 1:  # go to the new multicolumn feature
             return str(self.multi_column_table())
         # same as before
         self.firstitem = 1
         self.s = []
         if self.indent:
             self.s.append(self.pad*self.lvl + self.start_element())
-        for item in self.data: #start processing main list
+        for item in self.data:  # start processing main list
             itemtype = type(item)
-            if itemtype == InstanceType: 
-                try: # in case it's a nested list object
+            if itemtype == InstanceType:
+                try:  # in case it's a nested list object
                     if item.I_am_a_list:
                         itemtype = ListType
                 except AttributeError:
                     pass
-            if itemtype == ListType: #process the sub list
+            if itemtype == ListType:  # process the sub list
                 self.sub_list(item)
             else:
                 self.s.append(self.render_list_item(item))
 
-        if self.indent: #close out this level of list
+        if self.indent:  # close out this level of list
             self.s.append(self.pad*self.lvl + self.end_element())
         self.lvl = 0
         return ''.join(self.s)
@@ -1056,7 +1117,7 @@ class List(collections.UserList):
         self.lvl = self.lvl + 1
         if type(list) == InstanceType:
             try:
-                if list.I_am_a_list: #render the List object
+                if list.I_am_a_list:  # render the List object
                     list.lvl = self.lvl
                     self.s.append(str(list))
             except AttributeError:
@@ -1066,18 +1127,18 @@ class List(collections.UserList):
             for item in list:
                 itemtype = type(item)
                 if itemtype == InstanceType:
-                    try: #could be another nested List child object
+                    try:  # could be another nested List child object
                         if item.I_am_a_list:
                             itemtype = ListType
                     except AttributeError:
                         pass
                 if itemtype == ListType:
-                    self.sub_list(item) #recurse for sub lists
-                else: # or just render it
+                    self.sub_list(item)  # recurse for sub lists
+                else:  # or just render it
                     self.s.append(self.render_list_item(item))
             # close out this list level
             self.s.append(self.pad*self.lvl + self.end_element())
-        self.lvl = self.lvl - 1 #decrement indentation level
+        self.lvl = self.lvl - 1  # decrement indentation level
 
     def render_list_item(self, item):
         """Renders the individual list items
@@ -1116,8 +1177,10 @@ class List(collections.UserList):
         """
         for item in items:
             self.data.append(item)
-    
-UL = BulletList = List  #Aliases
+
+
+UL = BulletList = List  # Aliases
+
 
 class OrderedList(List):
     """Will generate a numbered list given a list arg.
@@ -1131,9 +1194,11 @@ class OrderedList(List):
     in HTML if they are themselves objects.
     """
     tagname = 'OL'
-    attrs = ('type','class','id','style')
+    attrs = ('type', 'class', 'id', 'style')
+
 
 OL = NumberedList = OrderedList
+
 
 class DefinitionList(List):
     """Show a series of items and item definitions.
@@ -1152,14 +1217,17 @@ class DefinitionList(List):
             Unity
     """
     tagname = 'DL'
-    attrs = ('class','id','style')
+    attrs = ('class', 'id', 'style')
     flags = ('compact',)
+
     def render_list_item(self, item):
         """Overload method to perform DT/DD markup.
         """
         return '%s<DT><B>%s</B><DD>%s\n' % (self.pad*self.lvl, item[0], item[1])
 
+
 DL = DefinitionList
+
 
 class ImageBulletList(List):
     """Show a list of images with adjoining text(or object).
@@ -1171,11 +1239,13 @@ class ImageBulletList(List):
     tagname = 'UL'
     attrs = ()
     flags = ()
+
     def render_list_item(self, item):
         """Overload method to take first item from an item tuple and
         setting it next to the second item, using BR to separate list items.
         """
         return '%s%s %s<BR>\n' % (self.pad*self.lvl, item[0], item[1])
+
 
 class NonBulletList(List):
     """Generate a raw indented list without bullet symbols.
@@ -1185,6 +1255,7 @@ class NonBulletList(List):
     tagname = 'UL'
     attrs = ()
     flags = ()
+
     def render_list_item(self, item):
         """Overload method to take first item from an item tuple and
         setting it next to the second item, using BR to separate list items.
@@ -1195,12 +1266,12 @@ class NonBulletList(List):
 ####### FORM TAGS ########
 class Form:
     """Define a user filled form. Uses POST method.
-   
+
     *cgi* is the URL to the CGI processing program.  Input objects
     (any others as well) are appended to this container widget.
-    
+
     Keywords
-    
+
         name -- name of the form
         submit -- The Input object to be used as the submit button.
                   If none specified a Submit button will automatically
@@ -1211,7 +1282,8 @@ class Form:
         enctype -- specify an Encoding type.
         onSubmit -- script, which is executed, when the form is submitted
     """
-    def __init__(self, cgi = None, **kw):
+
+    def __init__(self, cgi=None, **kw):
         self.contents = []
         self.cgi = cgi
         self.submit = Input(type='submit', name='SubmitButton', value='Send')
@@ -1230,19 +1302,25 @@ class Form:
 
     def __str__(self):
         s = ['\n<FORM METHOD="POST"']
-        if self.cgi: s.append(' ACTION="%s"' % self.cgi)
-        if self.enctype: s.append(' ENCTYPE="%s"' % self.enctype)
-        if self.target: s.append(' TARGET="%s"' % self.target)
-        if self.name: s.append(' NAME="%s"' % self.name)
-        if self.onSubmit: s.append(' onSubmit="%s"' % self.onSubmit)
+        if self.cgi:
+            s.append(' ACTION="%s"' % self.cgi)
+        if self.enctype:
+            s.append(' ENCTYPE="%s"' % self.enctype)
+        if self.target:
+            s.append(' TARGET="%s"' % self.target)
+        if self.name:
+            s.append(' NAME="%s"' % self.name)
+        if self.onSubmit:
+            s.append(' onSubmit="%s"' % self.onSubmit)
         s.append('>\n')
         s = s + self.contents
         s.append(str(self.submit))
-        if self.reset: s.append(str(self.reset))
+        if self.reset:
+            s.append(str(self.reset))
         s.append('\n</FORM>\n')
         return ''.join(s)
-        
-        
+
+
 def overlay_values(obj, dict):
     """Adds each item from dict to the given object iff there already
     exists such a key. Raises KeyError if you try to update the value
@@ -1283,7 +1361,8 @@ class Input:
                     is selected, useful for the text-type
     """
     re_type = re.compile('text|password|checkbox|radio|image|button|file|submit|reset|hidden',
-                            re.IGNORECASE)
+                         re.IGNORECASE)
+
     def __init__(self, **kw):
         self.type = 'TEXT'
         self.name = 'Default_Name'
@@ -1310,36 +1389,51 @@ class Input:
 
     def __str__(self):
         s = []
-        if self.llabel: s.append(str(self.llabel))
+        if self.llabel:
+            s.append(str(self.llabel))
         s.append('\n<INPUT')
-        if self.type: s.append(' TYPE="%s"' % self.type)
-        if self.name: s.append(' NAME="%s"' % self.name)
-        if self.value is not None: s.append(' VALUE="%s"' % self.value)
-        if self.checked: s.append(' CHECKED')
-        if self.size: s.append(' SIZE=%s' % self.size)
-        if self.maxlength: s.append(' MAXLENGTH=%s' % self.maxlength)
-        if self.onBlur: s.append(' onBlur="%s"' % self.onBlur)
-        if self.onChange: s.append(' onChange="%s"' % self.onChange)
-        if self.onClick: s.append(' onClick="%s"' % self.onClick)
-        if self.onFocus: s.append(' onFocus="%s"' % self.onFocus)
-        if self.onSelect: s.append(' onSelect="%s"' % self.onSelect)
-        if self.border is not None: s.append(' BORDER="%s"' % self.border)
-        if self.align: s.append(' ALIGN="%s"' % self.align)
+        if self.type:
+            s.append(' TYPE="%s"' % self.type)
+        if self.name:
+            s.append(' NAME="%s"' % self.name)
+        if self.value is not None:
+            s.append(' VALUE="%s"' % self.value)
+        if self.checked:
+            s.append(' CHECKED')
+        if self.size:
+            s.append(' SIZE=%s' % self.size)
+        if self.maxlength:
+            s.append(' MAXLENGTH=%s' % self.maxlength)
+        if self.onBlur:
+            s.append(' onBlur="%s"' % self.onBlur)
+        if self.onChange:
+            s.append(' onChange="%s"' % self.onChange)
+        if self.onClick:
+            s.append(' onClick="%s"' % self.onClick)
+        if self.onFocus:
+            s.append(' onFocus="%s"' % self.onFocus)
+        if self.onSelect:
+            s.append(' onSelect="%s"' % self.onSelect)
+        if self.border is not None:
+            s.append(' BORDER="%s"' % self.border)
+        if self.align:
+            s.append(' ALIGN="%s"' % self.align)
         s.append('>')
-        if self.rlabel: s.append(str(self.rlabel))
+        if self.rlabel:
+            s.append(str(self.rlabel))
         return ''.join(s)
 
 
 class Select(collections.UserList):
     """Used to define a list widget or option widget.
-    
+
     Pass a list of strings to show a list with those values. Alternatively
     can pass a list of tuple pairs. Each pair contains the displayed string
     and it's associatated value mapping. If no value mapping is needed just
     use something that evaluates to None.
 
     Keyword Arguments:
-    
+
         name -- provides the datum name
         size -- the visual size. 1 means use an option popup widget. 
                                >=2 means use a list widget with that many lines.
@@ -1349,6 +1443,7 @@ class Select(collections.UserList):
         onChange -- script, which is executed, when the field value changed
         onFocus -- script, which is executed, when the field receives focus
     """
+
     def __init__(self, data=None, **kw):
         collections.UserList.__init__(self, data)
         self.name = ''
@@ -1366,11 +1461,16 @@ class Select(collections.UserList):
 
     def __str__(self):
         s = ['<SELECT NAME="%s"' % self.name]
-        if self.size: s.append(' SIZE=%s' % self.size)
-        if self.multiple: s.append(' MULTIPLE')
-        if self.onBlur: s.append(' onBlur="%s"' % self.onBlur)
-        if self.onChange: s.append(' onChange="%s"' % self.onChange)
-        if self.onFocus: s.append(' onFocus="%s"' % self.onFocus)
+        if self.size:
+            s.append(' SIZE=%s' % self.size)
+        if self.multiple:
+            s.append(' MULTIPLE')
+        if self.onBlur:
+            s.append(' onBlur="%s"' % self.onBlur)
+        if self.onChange:
+            s.append(' onChange="%s"' % self.onChange)
+        if self.onFocus:
+            s.append(' onFocus="%s"' % self.onFocus)
         s.append('>\n')
         if type(self.data[0]) is TupleType:
             for item, value in self.data:
@@ -1392,6 +1492,7 @@ class Select(collections.UserList):
         s.append('</SELECT>\n')
         return ''.join(s)
 
+
 class Textarea:
     """Used for an entry widget to type multi-line text (for forms).
 
@@ -1405,6 +1506,7 @@ class Textarea:
         onSelect -- script, which is executed, when part of the field 
                     is selected
     """
+
     def __init__(self, text='', **kw):
         self.text = text
         self.name = 'text_area'
@@ -1422,14 +1524,19 @@ class Textarea:
 
     def __str__(self):
         s = ['<TEXTAREA NAME="%s" ROWS=%s COLS=%s' % (self.name, self.rows, self.cols)]
-        if self.onBlur: s.append(' onBlur="%s"' % self.onBlur)
-        if self.onChange: s.append(' onChange="%s"' % self.onChange)
-        if self.onFocus: s.append(' onFocus="%s"' % self.onFocus)
-        if self.onSelect: s.append(' onSelect="%s"' % self.onSelect)
+        if self.onBlur:
+            s.append(' onBlur="%s"' % self.onBlur)
+        if self.onChange:
+            s.append(' onChange="%s"' % self.onChange)
+        if self.onFocus:
+            s.append(' onFocus="%s"' % self.onFocus)
+        if self.onSelect:
+            s.append(' onSelect="%s"' % self.onSelect)
         s.append('>')
         s.append(str(self.text))
         s.append('</TEXTAREA>')
         return ''.join(s)
+
 
 class Script:
     """Construct a Script
@@ -1444,6 +1551,7 @@ class Script:
         code -- script code, which is printed in comments, to hide it from non
                 java-script browsers
     """
+
     def __init__(self, **kw):
         # Specify the default values
         self.language = 'JavaScript'
@@ -1458,15 +1566,17 @@ class Script:
 
     def __str__(self):
         s = ['<SCRIPT LANGUAGE="%s" ' % self.language]
-        if self.src: s.append('SRC="%s" ' % self.src)
+        if self.src:
+            s.append('SRC="%s" ' % self.src)
         s.append('>')
-        if self.code: s.append('<!--\n%s\n//-->\n' % self.code)
+        if self.code:
+            s.append('<!--\n%s\n//-->\n' % self.code)
         s.append('</SCRIPT>')
         return ''.join(s)
-    
+
     def append(self, s):
         self.code = self.code + s
-  
+
 
 ####################
 
@@ -1509,8 +1619,9 @@ class Table:
         cell_align --    'left'|'right'|'center'  text alignment for all other cells
         cell_line_breaks -- 1|0  flag to determine if newline char in body text will be
                   converted to <br> symbols; 1 they will, 0 they won't. (1)
-        
+
     """
+
     def __init__(self, tabletitle='', **kw):
         """Arg1 is a string title for the table caption, optional keyword
         arguments follow.
@@ -1530,8 +1641,8 @@ class Table:
         self.cell_align = 'left'
         self.cell_line_breaks = 1
         self.colspan = None
-        self.body_color= None
-        self.heading_color=None
+        self.body_color = None
+        self.heading_color = None
         # Now overlay the keyword arguments from caller
         for k in list(kw.keys()):
             if k in self.__dict__:
@@ -1543,22 +1654,22 @@ class Table:
         """Generates the html for the entire table.
         """
         if self.tabletitle:
-           s = [str(Name(self.tabletitle)) + '\n<P>']
+            s = [str(Name(self.tabletitle)) + '\n<P>']
         else:
-           s = []
+            s = []
 
-        s.append('<TABLE border=%s cellpadding=%s cellspacing=%s width="%s">\n' % \
-                (self.border, self.cell_padding, self.cell_spacing, self.width))
+        s.append('<TABLE border=%s cellpadding=%s cellspacing=%s width="%s">\n' %
+                 (self.border, self.cell_padding, self.cell_spacing, self.width))
         if self.tabletitle:
-            s.append('<CAPTION align=%s><STRONG>%s</STRONG></CAPTION>\n' % \
-                    (self.caption_align, self.tabletitle))
+            s.append('<CAPTION align=%s><STRONG>%s</STRONG></CAPTION>\n' %
+                     (self.caption_align, self.tabletitle))
 
         for i in range(len(self.body)):
             for j in range(len(self.body[i])):
                 if type(self.body[i][j]) == StringType:
-                    #process cell contents to insert breaks for \n char.
+                    # process cell contents to insert breaks for \n char.
                     if self.cell_line_breaks:
-                        self.body[i][j] = string.replace(self.body[i][j], '\n','<br>')
+                        self.body[i][j] = string.replace(self.body[i][j], '\n', '<br>')
                     else:
                         self.body[i][j] = Text(self.body[i][j])
 
@@ -1581,49 +1692,49 @@ class Table:
             if type(self.heading[0]) == ListType:
                 for i in range(len(self.heading[0])):
                     middle = middle + '<TH ColSpan=%s%s>' % \
-                             (self.colspan[i], \
-                              self.get_body_color(self.heading_color,i)) \
-                              + str(self.heading[0][i]) +'</TH>'
+                        (self.colspan[i],
+                         self.get_body_color(self.heading_color, i)) \
+                        + str(self.heading[0][i]) + '</TH>'
                 s.append(prefix + middle + postfix)
                 for i in range(len(self.heading[1])):
-                    middle = middle + '<TH>' + str(self.heading[i]) +'</TH>'
+                    middle = middle + '<TH>' + str(self.heading[i]) + '</TH>'
                 for heading_row in self.heading[1:]:
                     for i in range(len(self.heading[1])):
-                        middle = middle + '<TH>' + heading_row[i] +'</TH>'
+                        middle = middle + '<TH>' + heading_row[i] + '</TH>'
                     s.append(prefix + middle + postfix)
             else:
                 for i in range(len(self.heading)):
                     middle = middle + '<TH ColSpan=%s%s>' % \
-                             (self.colspan[i], \
-                              self.get_body_color(self.heading_color,i)) \
-                              + str(self.heading[i]) +'</TH>'
+                        (self.colspan[i],
+                         self.get_body_color(self.heading_color, i)) \
+                        + str(self.heading[i]) + '</TH>'
                 s.append(prefix + middle + postfix)
         # construct the rows themselves
         stmp = '<TD Align=%s %s>'
         for row in self.body:
             s.append('<TR>')
             for i in range(len(row)):
-                if i == 0 :
+                if i == 0:
                     ss1 = self.column1_align
                 else:
                     ss1 = self.cell_align
-                s.append(stmp % (ss1, self.get_body_color(self.body_color,i)))
+                s.append(stmp % (ss1, self.get_body_color(self.body_color, i)))
                 s.append(str(row[i]))
                 s.append('</TD>\n')
             s.append('</TR>\n')
-        #close table
+        # close table
         s.append('</TABLE><P>\n')
         return ''.join(s)
-    
+
     def get_body_color(self, colors, i):
         """Return bgcolor argument for column number i
         """
-        if colors is not None: 
-            try: 
-                index = i % len(colors) 
-                return ' bgcolor="%s"' % colors[index] 
-            except: 
-                pass 
+        if colors is not None:
+            try:
+                index = i % len(colors)
+                return ' bgcolor="%s"' % colors[index]
+            except:
+                pass
         return ''
 
 
@@ -1638,15 +1749,16 @@ def _make_attr_inits(opts):
     for name in opts:
         a.append('%('+name+')s')
         d[name] = ''
-    return ''.join(a), d  
+    return ''.join(a), d
+
 
 class AbstractTagSingle:
     "Abstract base class for all tag markup classes not requiring a closure tag."
-    tagname = '' # to be provided by derived classes
+    tagname = ''  # to be provided by derived classes
     attrs = ()   # to be provided by derived classes
-    attr_template = '' # to be provided by derived classes
+    attr_template = ''  # to be provided by derived classes
     attr_dict = {}     # to be provided by derived classes
-    
+
     def __init__(self, *args, **kw):
         self.__dict__['attr_dict'] = copy.copy(self.__class__.attr_dict)
         self.args = args
@@ -1657,8 +1769,8 @@ class AbstractTagSingle:
     def __str__(self):
         """Generate an HTML formatted string for this object.
         """
-        return  '<%s' % self.tagname + self.attr_template % self.attr_dict + '>'
-        
+        return '<%s' % self.tagname + self.attr_template % self.attr_dict + '>'
+
     def __setattr__(self, name, value):
         """Intercept attribute assignments.
 
@@ -1671,6 +1783,7 @@ class AbstractTagSingle:
             self.attr_dict[name] = ' %s="%s"' % (name, value)
         self.__dict__[name] = value
 
+
 class Image(AbstractTagSingle):
     """Inlined Image
 
@@ -1679,9 +1792,9 @@ class Image(AbstractTagSingle):
     pixels. Where the filename is found to be a valid pathname to an
     existing graphic file that file will be read to determine its width and
     height properties. GIF, JPEG, and PNG files are understood.
-    
+
     Keyword Arguments
-    
+
         width  -- (int) Width in pixels
         height -- (int) Height in pixels
         border -- (int) Border width in pixels
@@ -1698,9 +1811,9 @@ class Image(AbstractTagSingle):
         style -- A CSS inline style specification.
     """
     tagname = 'IMG'
-    attrs = ('src', 'height', 'width', 'alt', 'border', 'align', 'class','id',
-             'hspace','vspace', 'lowsrc', 'name', 'style', 'usemap', 'ismap' )
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attrs = ('src', 'height', 'width', 'alt', 'border', 'align', 'class', 'id',
+             'hspace', 'vspace', 'lowsrc', 'name', 'style', 'usemap', 'ismap')
+    attr_template, attr_dict = _make_attr_inits(attrs)
 
     def __init__(self, *args, **kw):
         AbstractTagSingle.__init__(*(self,) + args, **kw)
@@ -1719,7 +1832,8 @@ class Image(AbstractTagSingle):
             self.filename = arg
         self.src = self.filename
         # if the file is there test it to get size
-        if not self.attr_dict['width'] and os.path.isfile(self.filename): # assume if the user has set the width property
+        # assume if the user has set the width property
+        if not self.attr_dict['width'] and os.path.isfile(self.filename):
             # she knows the image size already or wants to resize it.
             try:
                 self.width, self.height = imgsize(self.filename)
@@ -1751,21 +1865,24 @@ class Image(AbstractTagSingle):
                     pass
         return AbstractTagSingle.__str__(self)
 
-IMG = Image # alias
+
+IMG = Image  # alias
+
 
 class BR(AbstractTagSingle):
     """Break tag. Argument is an integer integer multiplier. BR(2)=='<BR><BR>'
     """
     tagname = 'BR'
     attrs = ('clear',)
-    attr_template , attr_dict = _make_attr_inits(attrs)
-    
+    attr_template, attr_dict = _make_attr_inits(attrs)
+
     def __str__(self):
         s = AbstractTagSingle.__str__(self)
         if self.args and type(self.args[0]) is IntType:
             return s*self.args[0]
         else:
             return s
+
 
 class Base(AbstractTagSingle):
     """Specify the base URL for all relative URLs in this document.
@@ -1778,14 +1895,16 @@ class Base(AbstractTagSingle):
     """
     tagname = 'BASE'
     attrs = ('href', 'target')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attr_template, attr_dict = _make_attr_inits(attrs)
+
 
 class BaseFont(AbstractTagSingle):
     """Specify the font size for subsequent text.
     """
     tagname = 'BASEFONT'
     attrs = ('color', 'name', 'size')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attr_template, attr_dict = _make_attr_inits(attrs)
+
 
 class Embed(AbstractTagSingle):
     """Embed an application in this document.
@@ -1794,26 +1913,27 @@ class Embed(AbstractTagSingle):
     attrs = ('align', 'border', 'height', 'hidden', 'hspace',
              'name', 'palette', 'pluginspage', 'src', 'type',
              'units', 'vspace', 'width')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attr_template, attr_dict = _make_attr_inits(attrs)
+
 
 class HR(AbstractTagSingle):
     """Break the current text flow and insert a horizontal rule.
     """
     tagname = 'HR'
-    attrs = ('align', 'class','id', 'color', 'noshade', 'size',
+    attrs = ('align', 'class', 'id', 'color', 'noshade', 'size',
              'style', 'width')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attr_template, attr_dict = _make_attr_inits(attrs)
 
 
 class AbstractTag:
     "Abstract base class for all tag markup classes requiring a closure tag."
-    tagname = '' # to be provided by derived classes
+    tagname = ''  # to be provided by derived classes
     attrs = ()   # to be provided by derived classes
-    attr_template = '' # to be provided by derived classes
+    attr_template = ''  # to be provided by derived classes
     attr_dict = {}      # to be provided by derived classes
     html_escape = 'ON'
     trailer = '\n'
-    
+
     def __init__(self, *contents, **kw):
         self.__dict__['contents'] = []
         self.__dict__['attr_dict'] = copy.copy(self.__class__.attr_dict)
@@ -1827,7 +1947,7 @@ class AbstractTag:
         """Generate an HTML formatted string for this object.
         """
         s = ['<%s' % self.tagname]  # tag opening
-        s.append(self.attr_template % self.attr_dict + '>') # options
+        s.append(self.attr_template % self.attr_dict + '>')  # options
         # crunch through the contents
         for item in self.contents:
             if type(item) is StringType and self.html_escape == 'ON':
@@ -1835,9 +1955,9 @@ class AbstractTag:
             else:
                 s.append(str(item))
         # close out the marked region
-        s.append( '</%s>' % self.tagname)
+        s.append('</%s>' % self.tagname)
         return ''.join(s) + self.trailer
-        
+
     def __setattr__(self, name, value):
         """Intercept attribute assignments.
 
@@ -1871,7 +1991,7 @@ class AbstractTag:
             return self
         else:
             raise TypeError('can only add lists to this object')
-            
+
     def append(self, *items):
         """Append one or more items to the end of the container.
         """
@@ -1918,14 +2038,15 @@ class AbstractTag:
                 be sent for wrapping (using its __call__ method). Default is Emphasis.
 
         Keywords
-        
+
             collapse -- When set to 1 removes the non-grouped matching text
                 from the output. Default 0.
 
         Returns the number of matching text groups.
         """
         collapse = 0
-        if 'collapse' in kw: collapse = kw['collapse']
+        if 'collapse' in kw:
+            collapse = kw['collapse']
         text = ' '.join(map(str, self.contents))
         newtext, count = markup_re(text, rex, marker, collapse)
         if count:
@@ -1947,27 +2068,29 @@ class Area(AbstractTagSingle):
     coordinates are not the same, then a segment is inferred to close
     the polygon. If no *href* keyword is given a *NOHREF* will be
     generated indicating that this region should generate no links.
-    
+
     Keyword Arguments
-    
+
         href --  Typically a reference to an image
         coords --  string holding a list of coordinates defining
         shape  -- 'rect'|'circle'|'polygon'
     """
     tagname = 'AREA'
-    attrs = ('alt','class','coords','href','id','name',
-	     'onmouseout','onmouseover','shape','target')
+    attrs = ('alt', 'class', 'coords', 'href', 'id', 'name',
+             'onmouseout', 'onmouseover', 'shape', 'target')
     attr_template, attr_dict = _make_attr_inits(attrs)
     attr_dict['href'] = ' nohref'
 
 ###### FRAME SUPPORT ######
 
+
 class Frameset(AbstractTag):
     """Define a Frameset to contain Frames or more Framesets"""
     tagname = 'FRAMESET'
-    attrs = ('border','bordercolor','cols','frameborder','framespacing','onblur',
-	     'onfocus','onload','onunload','rows')
+    attrs = ('border', 'bordercolor', 'cols', 'frameborder', 'framespacing', 'onblur',
+             'onfocus', 'onload', 'onunload', 'rows')
     attr_template, attr_dict = _make_attr_inits(attrs)
+
 
 class NoFrames(AbstractTag):
     """Issue a message on browsers that don't support frames"""
@@ -1977,17 +2100,20 @@ class NoFrames(AbstractTag):
 
     def __init__(self, *contents, **kw):
         AbstractTag.__init__(self)
-        for content in contents: self.append(content)
-        for name, value in list(kw.items()): self.__setattr__(name,value)
+        for content in contents:
+            self.append(content)
+        for name, value in list(kw.items()):
+            self.__setattr__(name, value)
         if len(contents) == 0:
-            self.append(Heading(2,'Frame ALERT!',align='center'),
-    			Para("""This document is designed to be viewed using Netscape's
+            self.append(Heading(2, 'Frame ALERT!', align='center'),
+                        Para("""This document is designed to be viewed using Netscape's
     			Frame features.  If you are seeing this message, you are using
     			a frame challenged browser."""),
-    			Para('A ',Strong('Frame-capable'),' browser can be retrieved from',
-    			     Href('http://home.netscape.com/','Netscape Communications'),
-    			     ' or ',
-    			     Href('http://www.microsoft.com/','Microsoft')))
+                        Para('A ', Strong('Frame-capable'), ' browser can be retrieved from',
+                             Href('http://home.netscape.com/', 'Netscape Communications'),
+                             ' or ',
+                             Href('http://www.microsoft.com/', 'Microsoft')))
+
 
 class Frame(AbstractTag):
     """Define the characteristics of an individual frame.
@@ -2004,12 +2130,11 @@ class Frame(AbstractTag):
         noresize -- is a flag which instructs the browser to disallow frame resizing. 
                set to non zero lock size ( noresize=1 ).
     """
-    
-    tagname = 'FRAME'
-    attrs = ('align','bordercolor','frameborder','marginheight','marginwidth','name',
-	     'noresize','scrolling','src')
-    attr_template, attr_dict = _make_attr_inits(attrs)
 
+    tagname = 'FRAME'
+    attrs = ('align', 'bordercolor', 'frameborder', 'marginheight', 'marginwidth', 'name',
+             'noresize', 'scrolling', 'src')
+    attr_template, attr_dict = _make_attr_inits(attrs)
 
 
 class Paragraph(AbstractTag):
@@ -2022,16 +2147,18 @@ class Paragraph(AbstractTag):
     just for inserting a para break.
 
     Example:
-    
+
         Paragraph('Some text to center', align='center')
     """
     tagname = 'P'
-    attrs = ('class','id', 'style', 'align')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attrs = ('class', 'id', 'style', 'align')
+    attr_template, attr_dict = _make_attr_inits(attrs)
 
-Para = Paragraph # Alias
+
+Para = Paragraph  # Alias
 
 # Headings
+
 
 class Heading(AbstractTag):
     """Heading markups for H1 - H6
@@ -2047,63 +2174,71 @@ class Heading(AbstractTag):
     h = Heading(2, 'Chapter 3', align='center')
     """
     tagname = ''
-    attrs = ('class','id', 'style', 'align')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attrs = ('class', 'id', 'style', 'align')
+    attr_template, attr_dict = _make_attr_inits(attrs)
+
     def __str__(self):
         if not self.tagname:
-            if self.contents[0] not in (1,2,3,4,5,6):
+            if self.contents[0] not in (1, 2, 3, 4, 5, 6):
                 raise AttributeError("First arg of Heading must be int from 1 to 6.")
             self.tagname = 'H%d' % self.contents[0]
             del self.contents[0]
         return AbstractTag.__str__(self)
 
-H = Head = Header = Heading # Aliases
+
+H = Head = Header = Heading  # Aliases
+
 
 class Caption(AbstractTag):
     """Define a caption for a table.
     """
     tagname = 'CAPTION'
-    attrs = ('class','id', 'style', 'align', 'valign')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attrs = ('class', 'id', 'style', 'align', 'valign')
+    attr_template, attr_dict = _make_attr_inits(attrs)
+
 
 class TH(AbstractTag):
     """Define a table header cell.
     """
     tagname = 'TH'
-    attrs = ('class','id', 'style', 'nowrap', 'align','valign','rowspan',
+    attrs = ('class', 'id', 'style', 'nowrap', 'align', 'valign', 'rowspan',
              'colspan', 'height', 'width', 'bgcolor', 'background',
              'bordercolor', 'bordercolordark', 'bordercolorlight')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attr_template, attr_dict = _make_attr_inits(attrs)
     trailer = ''
+
 
 class TR(AbstractTag):
     """Define a row of cells within a table.
     """
     tagname = 'TR'
-    attrs = ('class','id', 'style', 'align', 'bgcolor', 'bordercolor',
+    attrs = ('class', 'id', 'style', 'align', 'bgcolor', 'bordercolor',
              'bordercolordark', 'bordercolorlight', 'nowrap', 'valign')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attr_template, attr_dict = _make_attr_inits(attrs)
+
 
 class TD(AbstractTag):
     """Define a table data cell.
     """
     tagname = 'TD'
-    attrs = ('class','id', 'style', 'nowrap', 'align','valign', 'background',
+    attrs = ('class', 'id', 'style', 'nowrap', 'align', 'valign', 'background',
              'bordercolor', 'bordercolordark', 'bordercolorlight',
-             'rowspan','colspan','height', 'width','bgcolor', 'title')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+             'rowspan', 'colspan', 'height', 'width', 'bgcolor', 'title')
+    attr_template, attr_dict = _make_attr_inits(attrs)
     trailer = ''
+
 
 class TableLite(AbstractTag):
     """Container class for TH TD TR and Caption objects.
     """
     tagname = 'TABLE'
-    attrs = ('class','id', 'style', 'align', 'background', 'border',
+    attrs = ('class', 'id', 'style', 'align', 'background', 'border',
              'bordercolor', 'bordercolordark', 'bordercolorlight',
              'cols', 'frame', 'cellpadding', 'cellspacing',
              'height', 'hspace', 'width', 'bgcolor', 'nowrap',
              'rules', 'valign', 'vspace')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attr_template, attr_dict = _make_attr_inits(attrs)
+
 
 class Pre(AbstractTag):
     """Render the text verbatim honoring line breaks and spacing.
@@ -2113,80 +2248,91 @@ class Pre(AbstractTag):
     """
     tagname = 'PRE'
     attrs = ('width',)
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attr_template, attr_dict = _make_attr_inits(attrs)
     html_escape = 'OFF'
+
 
 class Strike(AbstractTag):
     """The text is struck trough with a horizontal line.
     """
     tagname = 'STRIKE'
-    attrs = ('class','id', 'style')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attrs = ('class', 'id', 'style')
+    attr_template, attr_dict = _make_attr_inits(attrs)
     trailer = ''
+
 
 class Blockquote(AbstractTag):
     """Indent text as a block quotation.
     """
     tagname = 'BLOCKQUOTE'
-    attrs = ('class','id', 'style')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attrs = ('class', 'id', 'style')
+    attr_template, attr_dict = _make_attr_inits(attrs)
+
 
 Indent = Blockquote
+
 
 class Big(AbstractTag):
     """Format text in a bigger font.
     """
     tagname = 'BIG'
-    attrs = ('class','id', 'style')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attrs = ('class', 'id', 'style')
+    attr_template, attr_dict = _make_attr_inits(attrs)
     trailer = ''
+
 
 class Font(AbstractTag):
     """Set the size or color of the text.
     """
     tagname = 'FONT'
     attrs = ('color', 'face', 'size')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attr_template, attr_dict = _make_attr_inits(attrs)
     trailer = ''
+
 
 class Address(AbstractTag):
     """A mailing address. Not a URL.
     """
     tagname = 'ADDRESS'
-    attrs = ('class','id', 'style')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attrs = ('class', 'id', 'style')
+    attr_template, attr_dict = _make_attr_inits(attrs)
     trailer = ''
+
 
 class Emphasis(AbstractTag):
     """Format with additional emphasis. (usually italics)
     """
     tagname = 'EM'
-    attrs = ('class','id', 'style')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attrs = ('class', 'id', 'style')
+    attr_template, attr_dict = _make_attr_inits(attrs)
     trailer = ''
+
 
 class Center(AbstractTag):
     """Center the text.
     """
     tagname = 'center'
     attrs = ()
-    attr_template , attr_dict = _make_attr_inits(attrs)
-    
+    attr_template, attr_dict = _make_attr_inits(attrs)
+
+
 class Cite(AbstractTag):
     """A citation.
     """
     tagname = 'CITE'
-    attrs = ('class','id', 'style')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attrs = ('class', 'id', 'style')
+    attr_template, attr_dict = _make_attr_inits(attrs)
     trailer = ''
+
 
 class KBD(AbstractTag):
     """Keyboard-like input.
     """
     tagname = 'KBD'
-    attrs = ('class','id', 'style')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attrs = ('class', 'id', 'style')
+    attr_template, attr_dict = _make_attr_inits(attrs)
     html_escape = 'OFF'
+
 
 class Sample(AbstractTag):
     """Sample text. Escaping of special characters is not performed.
@@ -2194,17 +2340,19 @@ class Sample(AbstractTag):
     To enable escaping set html_escape='ON'.
     """
     tagname = 'SAMP'
-    attrs = ('class','id', 'style')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attrs = ('class', 'id', 'style')
+    attr_template, attr_dict = _make_attr_inits(attrs)
     html_escape = 'OFF'
-    
+
+
 class Strong(AbstractTag):
     """Strongly emphasize the text.
     """
     tagname = 'STRONG'
-    attrs = ('class','id', 'style')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attrs = ('class', 'id', 'style')
+    attr_template, attr_dict = _make_attr_inits(attrs)
     trailer = ''
+
 
 class Code(AbstractTag):
     """Code sample. Escaping of special characters is not performed.
@@ -2212,87 +2360,96 @@ class Code(AbstractTag):
     To enable escaping set html_escape='ON'.
     """
     tagname = 'CODE'
-    attrs = ('class','id', 'style')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attrs = ('class', 'id', 'style')
+    attr_template, attr_dict = _make_attr_inits(attrs)
     html_escape = 'OFF'
+
 
 class Define(AbstractTag):
     """Format as definition text.
     """
     tagname = 'DFN'
-    attrs = ('class','id', 'style')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attrs = ('class', 'id', 'style')
+    attr_template, attr_dict = _make_attr_inits(attrs)
+
 
 class Var(AbstractTag):
     """Used for variable names.
     """
     tagname = 'VAR'
-    attrs = ('class','id', 'style')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attrs = ('class', 'id', 'style')
+    attr_template, attr_dict = _make_attr_inits(attrs)
     trailer = ''
+
 
 class Div(AbstractTag):
     """Specify a division within a document.
     """
     tagname = 'DIV'
-    attrs = ('class','id', 'style', 'align', 'lang', 'nowrap')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attrs = ('class', 'id', 'style', 'align', 'lang', 'nowrap')
+    attr_template, attr_dict = _make_attr_inits(attrs)
+
 
 class TT(AbstractTag):
     """Format teletype style.
     """
     tagname = 'TT'
-    attrs = ('class','id', 'style')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attrs = ('class', 'id', 'style')
+    attr_template, attr_dict = _make_attr_inits(attrs)
     trailer = ''
+
 
 class U(AbstractTag):
     """Underlined text.
     """
     tagname = 'U'
-    attrs = ('class','id', 'style')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attrs = ('class', 'id', 'style')
+    attr_template, attr_dict = _make_attr_inits(attrs)
     trailer = ''
+
 
 class Nobr(AbstractTag):
     """Specify non-breaking text.
     """
     tagname = 'NOBR'
     attrs = ()
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attr_template, attr_dict = _make_attr_inits(attrs)
     trailer = ''
-    
+
+
 class Small(AbstractTag):
     """Render in a smaller font.
     """
     tagname = 'SMALL'
-    attrs = ('class','id', 'style')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attrs = ('class', 'id', 'style')
+    attr_template, attr_dict = _make_attr_inits(attrs)
     trailer = ''
-    
+
+
 class Sub(AbstractTag):
     """Render as subscript.
     """
     tagname = 'SUB'
-    attrs = ('class','id', 'style')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attrs = ('class', 'id', 'style')
+    attr_template, attr_dict = _make_attr_inits(attrs)
     trailer = ''
+
 
 class Sup(AbstractTag):
     """Render as subscript.
     """
     tagname = 'SUP'
-    attrs = ('class','id', 'style')
-    attr_template , attr_dict = _make_attr_inits(attrs)
+    attrs = ('class', 'id', 'style')
+    attr_template, attr_dict = _make_attr_inits(attrs)
     trailer = ''
-    
+
+
 class Span(AbstractTag):
     """Generic tag to mark text for a style application.
     """
     tagname = 'SPAN'
-    attrs = ('class','id', 'style')
-    attr_template , attr_dict = _make_attr_inits(attrs)
-
+    attrs = ('class', 'id', 'style')
+    attr_template, attr_dict = _make_attr_inits(attrs)
 
 
 # Text Formatting Classes
@@ -2304,10 +2461,11 @@ class InitialCaps:
     altered by the size given in the optional third argument.
 
     For example:
-    
+
        InitialCaps('We the people', '+3', '+1')
     """
-    def __init__(self, text='', upsize = '+2', downsize = '+1'):
+
+    def __init__(self, text='', upsize='+2', downsize='+1'):
         self.hi = Font(size=upsize)
         self.lo = Font(size=downsize)
         self.text = text
@@ -2326,9 +2484,11 @@ class InitialCaps:
         self.text = text
         return self.__str__()
 
+
 class Text:
     """Class to encapsulate text. Escape special characters for HTML.
     """
+
     def __init__(self, text=''):
         if type(text) == StringType:
             text = escape(text)
@@ -2336,7 +2496,7 @@ class Text:
 
     def append(self, text=''):
         """Concatenate text characters onto the end.
-        
+
         Will escape special characters.
         """
         if type(text) == StringType:
@@ -2346,17 +2506,20 @@ class Text:
     def __str__(self):
         return self.text
 
+
 class RawText:
     """Class to encapsulate raw text. Does **NOT** escape special characters.
     """
+
     def __init__(self, text=''):
         self.text = text
-        
+
     def append(self, text):
         self.text = self.text + str(text)
 
     def __str__(self):
         return self.text
+
 
 # ALIASES
 PRE = Pre
@@ -2364,11 +2527,13 @@ Bold = STRONG = Strong
 Italic = EM = Emphasis
 Typewriter = TT
 
+
 class Comment:
     """Place a comment internal to the HTML document.
 
     Will not be visible from the browser.
     """
+
     def __init__(self, text=''):
         self.text = text
 
@@ -2381,6 +2546,7 @@ class Comment:
 
 ###### UTILITIES USED INTERNALLY ########
 
+
 def escape(text, replace=None):
     """Converts the special characters '<', '>', and '&'.
 
@@ -2389,11 +2555,12 @@ def escape(text, replace=None):
     1.5 we use the new string.replace() function for speed.
     """
     if not replace:
-        replace = lambda text, s1, s2: text.replace(s1, s2)
-    text = replace(text, '&', '&amp;') # must be done 1st
+        def replace(text, s1, s2): return text.replace(s1, s2)
+    text = replace(text, '&', '&amp;')  # must be done 1st
     text = replace(text, '<', '&lt;')
     text = replace(text, '>', '&gt;')
     return text
+
 
 def markup_re(text, rex=None, marker=None, collapse=0):
     """Markup the contained text with a given re pattern/object with
@@ -2414,32 +2581,36 @@ def markup_re(text, rex=None, marker=None, collapse=0):
 
     Returns tuple pair of the marked text and the number of matching text groups.
     """
-    if rex is None: rex = re.compile('\(([^)]*)\)')
-    if marker is None: marker = Emphasis()
-    if type(rex) == StringType: rex = re.compile(rex)
+    if rex is None:
+        rex = re.compile('\(([^)]*)\)')
+    if marker is None:
+        marker = Emphasis()
+    if type(rex) == StringType:
+        rex = re.compile(rex)
     endpoints = []
     output = []
     i = 0
     count = 0
     while 1:
-        # build up a list of tuples: ( 'u'|'m', begin, end ) 
+        # build up a list of tuples: ( 'u'|'m', begin, end )
         # 'u' indicates unmarked text and 'm' marked text
         # begin and end is the range of characters
         match = rex.search(text, i)
         if match:
-            if collapse: #skip chars outside group1
-                endpoints.append( ('u', i, match.start(0)) )
+            if collapse:  # skip chars outside group1
+                endpoints.append(('u', i, match.start(0)))
                 i = match.end(0)
-            else: #incl chars outside group1
-                endpoints.append( ('u', i, match.start(1)) )
+            else:  # incl chars outside group1
+                endpoints.append(('u', i, match.start(1)))
                 i = match.end(1)
-            endpoints.append( ('m', match.start(1), match.end(1)) ) #text2Bmarked
+            endpoints.append(('m', match.start(1), match.end(1)))  # text2Bmarked
             count = count + 1
         else:
-            endpoints.append( ('u', i, len(text) ) ) # tack on an ending slice
+            endpoints.append(('u', i, len(text)))  # tack on an ending slice
             break
 
-    if count == 0: return text, 0  # didn't find any matches
+    if count == 0:
+        return text, 0  # didn't find any matches
     for (style, begin, end) in endpoints:
         if style == 'm':
             output.append(marker(text[begin:end]))
@@ -2450,7 +2621,7 @@ def markup_re(text, rex=None, marker=None, collapse=0):
 
 class URL:
     """Represent a Universal Resource Locator.
-    
+
     Assumed to be of the form: **http://www.node.edu/directory/file.html**
     with *http* being an example protocol, *www.node.edu* being an example
     network node, *directory* being the directory path on that node, and
@@ -2459,14 +2630,16 @@ class URL:
     be altered individually after instantiation. The __str__ method
     simply reassembles the components into a full URL string.
     """
+
     def __init__(self, url):
         self.url = url
         self.parse(url)
+
     def parse(self, url):
         import urllib.parse
         self.unparse = urllib.parse.urlunparse
         self.proto, self.node, self.path, self.params, self.query, self.fragment = \
-                    urlparse(url)
+            urlparse(url)
         self.dir, self.file = self.split(self.path)
 
     def split(self, p):
@@ -2477,21 +2650,22 @@ class URL:
         i = string.rfind(p, '/') + 1
         head, tail = p[:i], p[i:]
         if head and head != '/'*len(head):
-                while head[-1] == '/':
-                        head = head[:-1]
+            while head[-1] == '/':
+                head = head[:-1]
         return head, tail
 
     def __str__(self):
-        return self.unparse( (self.proto,
-                              self.node,
-                              self.dir+self.file,
-                              self.params,
-                              self.query, self.fragment) )
+        return self.unparse((self.proto,
+                             self.node,
+                             self.dir+self.file,
+                             self.params,
+                             self.query, self.fragment))
 
     def copy(self):
         """No argument. Return a copy of this object.
         """
         return copy.deepcopy(self)
+
 
 def mpath(path):
     """Converts a POSIX path to an equivalent Macintosh path.
@@ -2503,33 +2677,34 @@ def mpath(path):
     notation if running on a POSIX platform.
     """
     import os
-    if os.name == 'mac' : #I'm on a Mac
-        if path[:3] == '../': #parent
+    if os.name == 'mac':  # I'm on a Mac
+        if path[:3] == '../':  # parent
             mp = '::'
             path = path[3:]
-        elif path[:2] == './': #relative
+        elif path[:2] == './':  # relative
             mp = ':'
             path = path[2:]
-        elif path[0] == '/': #absolute
+        elif path[0] == '/':  # absolute
             mp = ''
             path = path[1:]
-        else: # bare relative
+        else:  # bare relative
             mp = ''
         pl = path.split('/')
         mp = mp + ':'.join(pl)
         return mp
-    elif os.name == 'posix': # Expand Unix variables
-        if path[0] == '~' :
-            path = os.path.expanduser( path )
+    elif os.name == 'posix':  # Expand Unix variables
+        if path[0] == '~':
+            path = os.path.expanduser(path)
         if '$' in path:
-            path = os.path.expandvars( path )
+            path = os.path.expandvars(path)
         return path
-    else: # needs to take care of dos & nt someday
+    else:  # needs to take care of dos & nt someday
         return path
 
 #_realopen = open  #If I do a lot of mpath I can overload 'open'
-#def open(filename, mode = 'r', bufsize = -1):
+# def open(filename, mode = 'r', bufsize = -1):
 #    return _realopen( mpath(filename), mode, bufsize )
+
 
 def relpath(path1, path2):
     """Return the relative path from directory 'path1' to directory 'path2'
@@ -2549,11 +2724,11 @@ def relpath(path1, path2):
     path1 = path1[sliceoff:]
     path2 = path2[sliceoff:]
 
-    dirs1 = path1.split(os.sep) # list of directory components below
-                                        # the common path
+    dirs1 = path1.split(os.sep)  # list of directory components below
+    # the common path
     dirs1 = [x for x in dirs1 if x]  # filter out empty elements
-    rel = (os.pardir+os.sep)*len(dirs1) # construct the relative path to the
-                                        # common point
+    rel = (os.pardir+os.sep)*len(dirs1)  # construct the relative path to the
+    # common point
     return rel+path2
 
 
@@ -2568,7 +2743,8 @@ def compare_f2f(f1, f2):
             while 1:
                 b1 = fp1.read(BUFSIZE)
                 b2 = fp2.read(BUFSIZE)
-                if not b1 and not b2: return 0
+                if not b1 and not b2:
+                    return 0
                 c = cmp(b1, b2)
                 if c:
                     return c
@@ -2576,6 +2752,7 @@ def compare_f2f(f1, f2):
             fp2.close()
     finally:
         fp1.close()
+
 
 def compare_s2f(s, f2):
     """Helper to compare a string to a file, return 0 if they are equal."""
@@ -2591,8 +2768,10 @@ def compare_s2f(s, f2):
             except IndexError:
                 b1 = ''
             b2 = fp2.read(BUFSIZE)
-            if not b1 and not b2: return 0
+            if not b1 and not b2:
+                return 0
             c = cmp(b1, b2)
-            if c: return c
+            if c:
+                return c
     finally:
         fp2.close()

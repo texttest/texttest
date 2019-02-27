@@ -1,7 +1,11 @@
 #!/usr/bin/env python
 
 from . import plugins, testmodel
-import os, sys, signal, operator, logging
+import os
+import sys
+import signal
+import operator
+import logging
 from threading import Thread
 from collections import OrderedDict
 from time import sleep
@@ -11,6 +15,8 @@ import time
 from functools import reduce, cmp_to_key
 
 # Class to allocate unique names to tests for script identification and cross process communication
+
+
 class UniqueNameFinder(plugins.Responder):
     def __init__(self, optionMap, *args):
         plugins.Responder.__init__(self, optionMap)
@@ -36,6 +42,7 @@ class UniqueNameFinder(plugins.Responder):
         oldName = os.path.basename(origRelPath)
         self.removeName(oldName)
         self.notifyAdd(test)
+
     def findParentIdentifiers(self, oldTest, newTest):
         oldParentId = " at top level"
         if oldTest.parent:
@@ -48,6 +55,7 @@ class UniqueNameFinder(plugins.Responder):
             oldParentId += oldNextLevel
             newParentId += newNextLevel
         return oldParentId, newParentId
+
     def storeUnique(self, oldTest, newTest):
         oldParentId, newParentId = self.findParentIdentifiers(oldTest, newTest)
         if oldParentId != newParentId:
@@ -62,16 +70,19 @@ class UniqueNameFinder(plugins.Responder):
         else:
             # Overwrite the old with the new if they can't be distinguished
             self.storeBothWays(newTest.name + newParentId, newTest)
+
     def getVersionName(self, test):
         version = test.app.getFullVersion()
         if len(version):
             return version
         else:
             return "<default>"
+
     def storeBothWays(self, name, test):
         self.diag.info("Setting unique name for test " + test.name + " to " + name)
         self.name2test[name] = test
         test.setUniqueName(name)
+
 
 class Activator(plugins.Responder, plugins.Observable):
     def __init__(self, optionMap, allApps):
@@ -127,7 +138,8 @@ class Activator(plugins.Responder, plugins.Observable):
 
         if len(rejectionInfo) > 0:
             self.writeErrors(rejectionInfo)
-        self.performNotify("AllReadAndNotified") # triggers the ActionRunner to start if needed, do this in the same thread!
+        # triggers the ActionRunner to start if needed, do this in the same thread!
+        self.performNotify("AllReadAndNotified")
         return goodSuites
 
     def writeErrors(self, rejectionInfo):
@@ -143,6 +155,7 @@ class Activator(plugins.Responder, plugins.Observable):
                 for app in appGroup:
                     if app in rejectionInfo:
                         sys.stderr.write(app.rejectionMessage(rejectionInfo.get(app)))
+
 
 class TextTest(plugins.Responder, plugins.Observable):
     def __init__(self):
@@ -200,14 +213,15 @@ class TextTest(plugins.Responder, plugins.Observable):
         raisedError = False
         selectedAppDict = self.inputOptions.findSelectedAppNames()
         for dir in searchDirs:
-            ignoreNames = [ app.name for app in appList ]
+            ignoreNames = [app.name for app in appList]
             subRaisedError, apps = self.findAppsUnder(dir, selectedAppDict, ignoreNames)
             appList += apps
             raisedError |= subRaisedError
 
         if not raisedError:
             for missingAppName in self.findMissingApps(appList, list(selectedAppDict.keys())):
-                sys.stderr.write("Could not read application '" + missingAppName + "'. No file named config." + missingAppName + " was found under " + " or ".join(self.inputOptions.rootDirectories) + ".\n")
+                sys.stderr.write("Could not read application '" + missingAppName + "'. No file named config." +
+                                 missingAppName + " was found under " + " or ".join(self.inputOptions.rootDirectories) + ".\n")
                 raisedError = True
 
         appList.sort(key=lambda app: app.name)
@@ -227,7 +241,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         dircache = testmodel.DirectoryCache(dirName)
         for f in dircache.findAllFiles("config"):
             if not os.path.isfile(f):
-                continue # ignore broken links and directories
+                continue  # ignore broken links and directories
             components = os.path.basename(f).split('.')
             if len(components) != 2:
                 continue
@@ -243,7 +257,7 @@ class TextTest(plugins.Responder, plugins.Observable):
                 versionList = selectedAppDict[appName]
             extraVersionsDuplicating = []
             for versionStr in versionList:
-                appVersions = list(filter(len, versionStr.split("."))) # remove empty versions
+                appVersions = list(filter(len, versionStr.split(".")))  # remove empty versions
                 app, currExtra = self.addApplication(appName, dircache, appVersions, versionList)
                 if app:
                     appList.append(app)
@@ -258,7 +272,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         try:
             return testmodel.Application(appName, dircache, versions, self.inputOptions)
         except (testmodel.BadConfigError, plugins.TextTestError) as e:
-            sys.stderr.write("Unable to load application from file 'config." + appName +  "' - " + str(e) + ".\n")
+            sys.stderr.write("Unable to load application from file 'config." + appName + "' - " + str(e) + ".\n")
 
     def addApplication(self, appName, dircache, appVersions, allVersions=[]):
         app = self.createApplication(appName, dircache, appVersions)
@@ -287,7 +301,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         if len(allApps) > 0:
             return allApps
         else:
-            return [ plugins.importAndCall("default", "getConfig", self.inputOptions) ]
+            return [plugins.importAndCall("default", "getConfig", self.inputOptions)]
 
     def createResponders(self, allApps):
         responderClasses = self.getBuiltinResponderClasses()
@@ -295,13 +309,14 @@ class TextTest(plugins.Responder, plugins.Observable):
             for respClass in configObject.getResponderClasses(allApps):
                 if not respClass in responderClasses:
                     self.diag.info("Adding responder " + repr(respClass))
-                    responderClasses.insert(-2, respClass) # keep Activator and AllCompleteResponder at the end
+                    responderClasses.insert(-2, respClass)  # keep Activator and AllCompleteResponder at the end
         self.removeBaseClasses(responderClasses)
         self.diag.info("Filtering away base classes, using " + repr(responderClasses))
         self.observers = [x(self.inputOptions, allApps) for x in responderClasses]
 
     def getBuiltinResponderClasses(self):
-        return [ UniqueNameFinder, Activator, testmodel.AllCompleteResponder ]
+        return [UniqueNameFinder, Activator, testmodel.AllCompleteResponder]
+
     def removeBaseClasses(self, classes):
         # Different apps can produce different versions of the same responder/thread runner
         # We should make sure we only include the most specific ones, in the furthest forward position their relatives achieved...
@@ -328,7 +343,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         raisedError = False
         for app in allApps:
             warningMessages = []
-            appGroup = [ app ] + app.extras
+            appGroup = [app] + app.extras
             for partApp in appGroup:
                 try:
                     testSuite = self.createInitialTestSuite(partApp)
@@ -372,7 +387,7 @@ class TextTest(plugins.Responder, plugins.Observable):
             sys.stderr.write(str(e) + "\n")
             sys.exit(1)
         except KeyboardInterrupt:
-            pass # already written about this
+            pass  # already written about this
 
     def _run(self):
         appFindingWroteError, allApps = self.findApps()
@@ -394,7 +409,7 @@ class TextTest(plugins.Responder, plugins.Observable):
             try:
                 self.createAndRunSuites(allApps)
             finally:
-                self.notifyExit() # include the dud ones, possibly
+                self.notifyExit()  # include the dud ones, possibly
 
     def inputOptionsValid(self, allApps):
         validOptions = self.findAllValidOptions(allApps)
@@ -430,7 +445,7 @@ class TextTest(plugins.Responder, plugins.Observable):
             # haven't fixed their own observers
             if isinstance(object, plugins.Observable) and len(object.observers) == 0:
                 self.diag.info("All responders now observing " + str(object.__class__))
-                object.setObservers([ self ] + self.observers)
+                object.setObservers([self] + self.observers)
             suites = self.getSuitesToAdd(object, emptySuites, allApps)
             self.diag.info("Adding suites " + repr(suites) + " for " + str(object.__class__))
             object.addSuites(suites)
@@ -469,11 +484,11 @@ class TextTest(plugins.Responder, plugins.Observable):
     def createEmptySuite(self, newApp):
         emptySuite = self.createInitialTestSuite(newApp)
         self.appSuites[newApp] = emptySuite
-        self.addSuites([ emptySuite ], [ newApp ])
+        self.addSuites([emptySuite], [newApp])
         return emptySuite
 
     def createInitialTestSuite(self, app):
-        return app.createInitialTestSuite([ self ] + self.observers)
+        return app.createInitialTestSuite([self] + self.observers)
 
     def makeDirectoryCache(self, appName):
         configFile = "config." + appName
@@ -541,7 +556,7 @@ class TextTest(plugins.Responder, plugins.Observable):
             sleep(0.5)
             currThreads = self.aliveThreads(currThreads)
             if len(currThreads) < threadCount:
-                self.diag.info("Thread(s) terminated, remaining are " + repr([ t.name for t in currThreads ]))
+                self.diag.info("Thread(s) terminated, remaining are " + repr([t.name for t in currThreads]))
             threadCount = len(currThreads)
 
     def aliveThreads(self, threads):
@@ -550,7 +565,7 @@ class TextTest(plugins.Responder, plugins.Observable):
     def getSignals(self):
         if hasattr(signal, "SIGUSR1"):
             # Signals used on UNIX to signify running out of CPU time, wallclock time etc.
-            return [ signal.SIGINT, signal.SIGTERM, signal.SIGUSR1, signal.SIGUSR2, signal.SIGXCPU ]
+            return [signal.SIGINT, signal.SIGTERM, signal.SIGUSR1, signal.SIGUSR2, signal.SIGXCPU]
         else:
             # Windows, which doesn't do signals
             return []
@@ -572,10 +587,10 @@ class TextTest(plugins.Responder, plugins.Observable):
         signalText = self.getSignalText(sig)
         self.writeTermMessage(signalText)
         self.notify("Quit", sig)
-        if len(self.appSuites) > 0: # If the above succeeds in quitting they will be reset
+        if len(self.appSuites) > 0:  # If the above succeeds in quitting they will be reset
             self.notify("KillProcesses", sig)
         if os.name == "nt":
-            time.sleep(20) # Time to clean up, process is killed when we exit
+            time.sleep(20)  # Time to clean up, process is killed when we exit
         else:
             return signalText
 
@@ -589,7 +604,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         if signalText:
             message += " (" + signalText + ")"
         print(message)
-        sys.stdout.flush() # Try not to lose log file information...
+        sys.stdout.flush()  # Try not to lose log file information...
 
     def getSignalText(self, sig):
         if hasattr(signal, "SIGUSR1"):
@@ -599,4 +614,4 @@ class TextTest(plugins.Responder, plugins.Observable):
                 return "CPULIMIT"
             elif sig == signal.SIGUSR2:
                 return "RUNLIMIT2"
-        return "" # mostly for historical reasons to be compatible with the default handler
+        return ""  # mostly for historical reasons to be compatible with the default handler

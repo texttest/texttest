@@ -1,5 +1,7 @@
 #!/usr/bin/env python
-import sys, difflib
+import sys
+import difflib
+
 
 def _getNumberAt(l, pos):
     start = pos
@@ -28,6 +30,7 @@ def _getNumberAt(l, pos):
         end += 1
     return l[start:end], l[end:]
 
+
 def _fpequalAtPos(l1, l2, tolerance, relTolerance, pos):
     number1, l1 = _getNumberAt(l1, pos)
     number2, l2 = _getNumberAt(l2, pos)
@@ -46,6 +49,7 @@ def _fpequalAtPos(l1, l2, tolerance, relTolerance, pos):
         pass
     return equal, l1, l2
 
+
 def _fpequal(l1, l2, tolerance, relTolerance):
     pos = 0
     while pos < min(len(l1), len(l2)):
@@ -60,6 +64,7 @@ def _fpequal(l1, l2, tolerance, relTolerance):
         return True
     else:
         return _fpequalAtPos(l1, l2, tolerance, relTolerance, pos)[0]
+
 
 def fpfilter(fromlines, tolines, outlines, tolerance, relTolerance=None):
     s = difflib.SequenceMatcher(None, fromlines, tolines)

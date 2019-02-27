@@ -1,17 +1,19 @@
 
-import datetime, time, os
+import datetime
+import time
+import os
 from . import vcs_independent
 
 
 class BzrInterface(vcs_independent.VersionControlInterface):
     def __init__(self, controlDir):
-        warningStates = [ "Modified", "Removed", "Added", "Renamed" ]
-        errorStates = [ "Unknown", "Conflicts", "Kind changed" ]
+        warningStates = ["Modified", "Removed", "Added", "Renamed"]
+        errorStates = ["Unknown", "Conflicts", "Kind changed"]
         vcs_independent.VersionControlInterface.__init__(self, controlDir, "Bazaar", warningStates, errorStates, "-1")
-        self.defaultArgs["rm"] = [ "--force" ]
+        self.defaultArgs["rm"] = ["--force"]
 
     def isVersionControlled(self, dirname):
-        args = self.getCmdArgs("status") + [ dirname ]
+        args = self.getCmdArgs("status") + [dirname]
         returncode, output, err = self.getProcessResults(args)
         # Unless the result is "unknown:" followed by the relpath of the dirname, it's version controlled, at least a bit...
         if returncode and err:
@@ -23,7 +25,7 @@ class BzrInterface(vcs_independent.VersionControlInterface):
             return True
         pathname = os.path.normpath(lines[1].strip())
         return not dirname.endswith(pathname)
-                
+
     def getDateFromLog(self, output):
         for line in output.splitlines():
             if line.startswith("timestamp:"):
@@ -31,7 +33,7 @@ class BzrInterface(vcs_independent.VersionControlInterface):
                 return datetime.datetime(*(self.parseDateTime(dateStr)[0:6]))
 
     def getGraphicalDiffArgs(self, diffProgram):
-        return [ "bzr", "diff", "--using=" + diffProgram ]
+        return ["bzr", "diff", "--using=" + diffProgram]
 
     def parseDateTime(self, input):
         return time.strptime(input, "%Y-%m-%d %H:%M:%S")
@@ -43,10 +45,10 @@ class BzrInterface(vcs_independent.VersionControlInterface):
         return "Unchanged"
 
     def getCombinedRevisionOptions(self, r1, r2):
-        return [ "-r", r1 + ".." + r2 ]
+        return ["-r", r1 + ".." + r2]
 
     def removePath(self, path):
-        retCode = self.callProgram("rm", [ path ]) # Always removes
+        retCode = self.callProgram("rm", [path])  # Always removes
         return retCode == 0
 
     # Hack for bug in Bazaar, which can't handle symbolic links to the branch...
@@ -54,10 +56,11 @@ class BzrInterface(vcs_independent.VersionControlInterface):
         if cmdName == "add":
             basicArgs = self.getCmdArgs(cmdName, extraArgs)
             for fileName in self.getFileNamesForCmd(cmdName, fileArg, recursive):
-                self.callProgramWithHandler(fileName, basicArgs + [ os.path.realpath(fileName) ], **kwargs)
+                self.callProgramWithHandler(fileName, basicArgs + [os.path.realpath(fileName)], **kwargs)
         else:
-            vcs_independent.VersionControlInterface.callProgramOnFiles(self, cmdName, fileArg, recursive, extraArgs, **kwargs)
-        
+            vcs_independent.VersionControlInterface.callProgramOnFiles(
+                self, cmdName, fileArg, recursive, extraArgs, **kwargs)
+
 
 vcs_independent.vcsClass = BzrInterface
 InteractiveActionConfig = vcs_independent.InteractiveActionConfig

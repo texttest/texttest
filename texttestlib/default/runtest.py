@@ -1,7 +1,12 @@
 
 """ Action for running a test locally or on a remote machine """
 
-import os, logging, subprocess, sys, signal, pipes
+import os
+import logging
+import subprocess
+import sys
+import signal
+import pipes
 from texttestlib import plugins
 from texttestlib.jobprocess import killSubProcessAndChildren
 from time import sleep
@@ -9,11 +14,13 @@ from threading import Lock, Timer
 
 plugins.addCategory("killed", "killed", "were terminated before completion")
 
+
 class Running(plugins.TestState):
     defaultBriefText = "RUN"
-    def __init__(self, execMachines, freeText = "", briefText = "", lifecycleChange="start"):
+
+    def __init__(self, execMachines, freeText="", briefText="", lifecycleChange="start"):
         plugins.TestState.__init__(self, "running", freeText, briefText, started=1,
-                                   executionHosts = execMachines, lifecycleChange=lifecycleChange)
+                                   executionHosts=execMachines, lifecycleChange=lifecycleChange)
 
     def makeModifiedState(self, newRunStatus, newDetails, lifecycleChange):
         currRunStatus = self.briefText.split()[0]
@@ -26,7 +33,7 @@ class Running(plugins.TestState):
 
 class Killed(plugins.TestState):
     def __init__(self, briefText, freeText, prevState):
-        plugins.TestState.__init__(self, "killed", briefText=briefText, freeText=freeText, \
+        plugins.TestState.__init__(self, "killed", briefText=briefText, freeText=freeText,
                                    started=1, completed=1, executionHosts=prevState.executionHosts)
         # Cache running information, it can be useful to have this available...
         self.prevState = prevState
@@ -42,13 +49,13 @@ class RunTest(plugins.Action):
         self.killedTests = []
         self.killSignal = None
         self.lock = Lock()
-        
+
     def __repr__(self):
         return "Running"
-    
+
     def __call__(self, test):
         return self.runTest(test)
-    
+
     def changeToRunningState(self, test):
         execMachines = test.state.executionHosts
         self.diag.info("Changing " + repr(test) + " to state Running on " + repr(execMachines))
@@ -56,11 +63,11 @@ class RunTest(plugins.Action):
         freeText = "Running on " + ",".join(execMachines)
         newState = Running(execMachines, briefText=briefText, freeText=freeText)
         test.changeState(newState)
-    
+
     def getBriefText(self, execMachinesArg):
         # Default to not bothering to print the machine name: all is local anyway
         return ""
-    
+
     def startTimer(self, timer):
         self.currentTimer = timer
         self.currentTimer.start()
@@ -68,28 +75,29 @@ class RunTest(plugins.Action):
     def runMultiTimer(self, timeout, method, args):
         # Break the timer up into 5 sub-timers
         # The point is to prevent timing out too early if the process gets suspended
-        subTimerCount = 5 # whatever
+        subTimerCount = 5  # whatever
         subTimerTimeout = float(timeout) / subTimerCount
         timer = Timer(subTimerTimeout, method, args)
         for _ in range(subTimerCount - 1):
-            timer = Timer(subTimerTimeout, self.startTimer, [ timer ])
+            timer = Timer(subTimerTimeout, self.startTimer, [timer])
         self.startTimer(timer)
-    
+
     def runTest(self, test):
         # If previous test (or test run) timed out, don't leave killSignal set, other tests can still run here
         if self.killSignal == "timeout":
             self.killSignal = None
             if test in self.killedTests:
                 self.killedTests.remove(test)
-        
+
         self.describe(test)
         machine = test.app.getRunMachine()
         killTimeout = test.getConfigValue("kill_timeout")
         for postfix in self.getTestRunPostfixes(test):
             if postfix:
-                test.notify("TestProcessComplete") # Checks for support processes like virtual displays, restarts if needed
+                # Checks for support processes like virtual displays, restarts if needed
+                test.notify("TestProcessComplete")
 
-            process = self.getTestProcess(test, machine, postfix)    
+            process = self.getTestProcess(test, machine, postfix)
             self.registerProcess(test, process)
             if not postfix:
                 # Don't claim to be running until we are, i.e. the process has started
@@ -104,15 +112,15 @@ class RunTest(plugins.Action):
                 self.wait(process)
             self.checkAndClear(test, postfix)
             if self.killSignal is not None:
-                break # Don't start other processes
-            
+                break  # Don't start other processes
+
     def getTestRunPostfixes(self, test):
-        postfixes = [ "" ]
+        postfixes = [""]
         for postfix in test.getConfigValue("extra_test_process_postfix"):
             if any((test.getFileName(stem + postfix) for stem in test.defFileStems())):
                 postfixes.append(postfix)
         return postfixes
-    
+
     def registerProcess(self, test, process):
         self.lock.acquire()
         self.currentProcess = process
@@ -125,20 +133,20 @@ class RunTest(plugins.Action):
         file.write(str(code) + "\n")
         file.close()
 
-    def checkAndClear(self, test, postfix):        
+    def checkAndClear(self, test, postfix):
         returncode = self.currentProcess.returncode
         self.diag.info("Process terminated with return code " + repr(returncode))
         if os.name == "posix" and test not in self.killedTests and returncode < 0:
             # Process externally killed, but we haven't been notified. Wait for a while to see if we get kill notification
             self.waitForKill()
-            
+
         self.lock.acquire()
         self.currentProcess = None
         if test in self.killedTests:
             self.changeToKilledState(test)
-        elif returncode: # Don't bother to store return code when tests are killed, it isn't interesting
+        elif returncode:  # Don't bother to store return code when tests are killed, it isn't interesting
             self.storeReturnCode(test, returncode, postfix)
-        
+
         self.lock.release()
 
     def waitForKill(self):
@@ -176,7 +184,7 @@ class RunTest(plugins.Action):
     def getKillInfoOtherSignal(self, test):
         briefText = self.getSignalName(self.killSignal)
         return briefText, "terminated by signal " + briefText
-        
+
     def getExplicitKillInfo(self):
         timeStr = plugins.localtime("%H:%M")
         return "KILLED", "killed explicitly at " + timeStr
@@ -188,7 +196,7 @@ class RunTest(plugins.Action):
         if self.currentProcess is not None:
             self.killProcess(test)
         self.lock.release()
-        
+
     def killProcess(self, test):
         machine = test.app.getRunMachine()
         if machine != "localhost" and test.getConfigValue("remote_shell_program") == "ssh":
@@ -199,17 +207,17 @@ class RunTest(plugins.Action):
     def killRemoteProcess(self, test, machine):
         tmpDir = self.getTmpDirectory(test)
         remoteScript = os.path.join(tmpDir, "kill_test.sh")
-        test.app.runCommandOn(machine, [ "sh", plugins.quote(remoteScript) ])
-        
+        test.app.runCommandOn(machine, ["sh", plugins.quote(remoteScript)])
+
     def wait(self, process):
         try:
             plugins.retryOnInterrupt(process.wait)
-        except OSError: # pragma: no cover - workaround for Python bugs only
-            pass # safest, as there are python bugs in this area
+        except OSError:  # pragma: no cover - workaround for Python bugs only
+            pass  # safest, as there are python bugs in this area
 
     def getRunDescription(self, test):
         commandArgs = self.getLocalExecuteCmdArgs(test, makeDirs=False)
-        text =  "Command Line   : " + plugins.commandLineString(commandArgs) + "\n"
+        text = "Command Line   : " + plugins.commandLineString(commandArgs) + "\n"
         text += "\nEnvironment variables :\n"
         for var, value in self.getEnvironmentChanges(test):
             text += var + "=" + value + "\n"
@@ -226,26 +234,26 @@ class RunTest(plugins.Action):
                 if "$" + var in copyVars or "${" + var + "}" in copyVars:
                     value = test.makeTmpFileName(os.path.basename(value), forComparison=False)
                 changes.append((var, value))
-        
+
         return sorted(changes)
-        
+
     def getTestRunEnvironment(self, test, postfix):
         testEnv = test.getRunEnvironment()
         if postfix and "USECASE_RECORD_SCRIPT" in testEnv:
             # Redirect usecase variables if needed
             self.fixUseCaseVariables(testEnv, postfix)
         return testEnv
-    
+
     def fixUseCaseVariables(self, testEnv, postfix):
-        for varName in [ "USECASE_RECORD_SCRIPT", "USECASE_REPLAY_SCRIPT" ]:
+        for varName in ["USECASE_RECORD_SCRIPT", "USECASE_REPLAY_SCRIPT"]:
             if varName in testEnv:
                 testEnv[varName] = self.rreplace(testEnv.get(varName), "usecase", "usecase" + postfix)
-    
+
     def rreplace(self, s, old, new):
         # Swiped from http://stackoverflow.com/questions/2556108/how-to-replace-the-last-occurence-of-an-expression-in-a-string
         parts = s.rsplit(old, 1)
         return new.join(parts)
-    
+
     def getTestProcess(self, test, machine, postfix=""):
         commandArgs = self.getExecuteCmdArgs(test, machine, postfix)
         self.diag.info("Running test with args : " + repr(commandArgs))
@@ -255,41 +263,42 @@ class RunTest(plugins.Action):
         inputStem = test.app.getStdinName(namingScheme) + postfix
         testEnv = self.getTestRunEnvironment(test, postfix)
         try:
-            return subprocess.Popen(commandArgs, preexec_fn=self.getPreExecFunction(), \
-                                    stdin=open(self.getInputFile(test, inputStem)), cwd=test.getDirectory(temporary=1, local=1), \
-                                    stdout=self.makeFile(test, stdoutStem), stderr=self.makeFile(test, stderrStem), \
+            return subprocess.Popen(commandArgs, preexec_fn=self.getPreExecFunction(),
+                                    stdin=open(self.getInputFile(test, inputStem)), cwd=test.getDirectory(temporary=1, local=1),
+                                    stdout=self.makeFile(test, stdoutStem), stderr=self.makeFile(test, stderrStem),
                                     env=testEnv, startupinfo=self.getProcessStartUpInfo(test))
         except OSError:
-            message = "OS-related error starting the test command - probably cannot find the program " + repr(commandArgs[0])
+            message = "OS-related error starting the test command - probably cannot find the program " + \
+                repr(commandArgs[0])
             raise plugins.TextTestError(message)
 
     def getProcessStartUpInfo(self, test):
         # Used for hiding the windows if we're on Windows!
         if os.name == "nt" and test.getConfigValue("virtual_display_hide_windows") == "true" and \
-            not test.app.isRecording() and not test.app.isActionReplay():
+                not test.app.isRecording() and not test.app.isActionReplay():
             return plugins.getHideStartUpInfo()
-        
+
     def getPreExecFunction(self):
-        if os.name == "posix": # pragma: no cover - only run in the subprocess!
+        if os.name == "posix":  # pragma: no cover - only run in the subprocess!
             return self.ignoreJobControlSignals
 
-    def ignoreJobControlSignals(self): # pragma: no cover - only run in the subprocess!
-        for signum in [ signal.SIGQUIT, signal.SIGUSR1, signal.SIGUSR2, signal.SIGXCPU ]:
+    def ignoreJobControlSignals(self):  # pragma: no cover - only run in the subprocess!
+        for signum in [signal.SIGQUIT, signal.SIGUSR1, signal.SIGUSR2, signal.SIGXCPU]:
             signal.signal(signum, signal.SIG_IGN)
 
     def getInterpreterArgs(self, test, interpreter):
         args = plugins.splitcmd(interpreter)
-        if len(args) > 0 and args[0] == "ttpython": # interpreted to mean "whatever python TextTest runs with"
-            return [ sys.executable, "-u" ] + args[1:]
+        if len(args) > 0 and args[0] == "ttpython":  # interpreted to mean "whatever python TextTest runs with"
+            return [sys.executable, "-u"] + args[1:]
         else:
             return args
-        
+
     def quoteLocalArg(self, arg):
         return arg if "$" in arg else pipes.quote(arg)
 
     def getRemoteExecuteCmdArgs(self, test, runMachine, localArgs, postfix):
         scriptFileName = test.makeTmpFileName("run_test" + postfix + ".sh", forComparison=0)
-        openType = "w" if os.name == "posix" else "wb" # the 'b' is necessary so we don't get \r\n written when we just want \n
+        openType = "w" if os.name == "posix" else "wb"  # the 'b' is necessary so we don't get \r\n written when we just want \n
         scriptFile = open(scriptFileName, openType)
         scriptFile.write("#!/bin/sh\n\n")
 
@@ -311,21 +320,21 @@ class RunTest(plugins.Action):
             cmdString = cmdString.replace(test.app.writeDirectory, remoteTmp)
         scriptFile.write("exec " + cmdString + "\n")
         scriptFile.close()
-        os.chmod(scriptFileName, 0o775) # make executable
+        os.chmod(scriptFileName, 0o775)  # make executable
         remoteTmp = test.app.getRemoteTestTmpDir(test)[1]
         if remoteTmp:
             test.app.copyFileRemotely(scriptFileName, "localhost", remoteTmp, runMachine)
             remoteScript = os.path.join(remoteTmp, os.path.basename(scriptFileName))
-            return test.app.getCommandArgsOn(runMachine, [ plugins.quote(remoteScript) ])
+            return test.app.getCommandArgsOn(runMachine, [plugins.quote(remoteScript)])
         else:
-            return test.app.getCommandArgsOn(runMachine, [ plugins.quote(scriptFileName) ])
+            return test.app.getCommandArgsOn(runMachine, [plugins.quote(scriptFileName)])
 
     def getEnvironmentArgs(self, test, remoteTmp, postfix):
         vars = self.getEnvironmentChanges(test, postfix)
         args = []
         localTmpDir = test.app.writeDirectory
-        builtinVars = [ "TEXTTEST_CHECKOUT", "TEXTTEST_CHECKOUT_NAME", "TEXTTEST_ROOT", "TEXTTEST_LOG_DIR", 
-                        "TEXTTEST_SANDBOX", "TEXTTEST_SANDBOX_ROOT", "STORYTEXT_HOME_LOCAL" ]
+        builtinVars = ["TEXTTEST_CHECKOUT", "TEXTTEST_CHECKOUT_NAME", "TEXTTEST_ROOT", "TEXTTEST_LOG_DIR",
+                       "TEXTTEST_SANDBOX", "TEXTTEST_SANDBOX_ROOT", "STORYTEXT_HOME_LOCAL"]
         for var, value in vars:
             if var in builtinVars:
                 continue
@@ -343,7 +352,7 @@ class RunTest(plugins.Action):
             remoteValue = plugins.quote(remoteValue)
             args.append((var, remoteValue))
         return args
-    
+
     def getTmpDirectory(self, test):
         remoteTmp = test.app.getRemoteTestTmpDir(test)[1]
         if remoteTmp:
@@ -360,7 +369,7 @@ class RunTest(plugins.Action):
             perfFile = os.path.join(frameworkDir, "unixperf")
         else:
             perfFile = test.makeTmpFileName("unixperf", forFramework=1)
-        return [ "time", "-p", "-o", perfFile ]
+        return ["time", "-p", "-o", perfFile]
 
     def getLocalExecuteCmdArgs(self, test, postfix="", makeDirs=True):
         args = []
@@ -382,7 +391,7 @@ class RunTest(plugins.Action):
         if postfix:
             args += test.getCommandLineOptions(stem="options" + postfix)
         return args
-        
+
     def getExecuteCmdArgs(self, test, runMachine, postfix):
         args = self.getLocalExecuteCmdArgs(test, postfix)
         if runMachine == "localhost":

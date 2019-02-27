@@ -2,21 +2,26 @@
 
 
 import os
-import logging, shutil
+import logging
+import shutil
 from texttestlib.default import fpdiff
 from texttestlib import plugins
 from optparse import OptionParser
 from io import StringIO
+
 
 class Filtering(plugins.TestState):
     def __init__(self, name, **kw):
         plugins.TestState.__init__(self, name, briefText="", **kw)
 
 # Generic base class for filtering standard and temporary files
+
+
 class FilterAction(plugins.Action):
     def __init__(self, useFilteringStates=False):
         self.diag = logging.getLogger("Filter Actions")
         self.useFilteringStates = useFilteringStates
+
     def __call__(self, test):
         if self.useFilteringStates:
             self.changeToFilteringState(test)
@@ -30,7 +35,7 @@ class FilterAction(plugins.Action):
     def getStem(self, fileName):
         return os.path.basename(fileName).split(".")[0]
 
-    def changeToFilteringState(self, *args): # pragma: no cover - documentation only
+    def changeToFilteringState(self, *args):  # pragma: no cover - documentation only
         pass
 
     def performAllFilterings(self, test, stem, fileName, newFileName):
@@ -38,7 +43,8 @@ class FilterAction(plugins.Action):
         filters = self.makeAllFilters(test, stem, test.app)
         for fileFilter in filters:
             writeFileName = newFileName + "." + fileFilter.postfix
-            self.diag.info("Applying " + fileFilter.__class__.__name__ + " to make\n" + writeFileName + " from\n " + currFileName)
+            self.diag.info("Applying " + fileFilter.__class__.__name__ +
+                           " to make\n" + writeFileName + " from\n " + currFileName)
             if os.path.isfile(writeFileName):
                 self.diag.info("Removing previous file at " + writeFileName)
                 os.remove(writeFileName)
@@ -76,17 +82,17 @@ class FilterAction(plugins.Action):
     def makeAllFilters(self, test, stem, app):
         filters = self._makeAllFilters(test, stem, app)
         if len(filters) == 0 and self.changedOs(app):
-            return  [ RunDependentTextFilter([], "") ]
+            return [RunDependentTextFilter([], "")]
         else:
             return filters
 
     def _makeAllFilters(self, test, stem, app):
         filters = []
         configObj = test
-        if test.app is not app: # happens when testing filtering in the static GUI
+        if test.app is not app:  # happens when testing filtering in the static GUI
             configObj = app
 
-        for filterClass in [ RunDependentTextFilter, UnorderedTextFilter ]:
+        for filterClass in [RunDependentTextFilter, UnorderedTextFilter]:
             texts = configObj.getCompositeConfigValue(filterClass.configKey, stem)
             if texts:
                 filters.append(filterClass(texts, test.getRelPath()))
@@ -98,7 +104,7 @@ class FilterAction(plugins.Action):
         return homeOs != "any" and os.name != homeOs
 
     def constantPostfix(self, files, postfix):
-        return [ (file, postfix) for file in files ]
+        return [(file, postfix) for file in files]
 
 
 class FilterOriginal(FilterAction):
@@ -151,7 +157,7 @@ class FilterOriginalForScript(FilterOriginal):
 class FilterErrorText(FilterAction):
     def _makeAllFilters(self, test, stem, app):
         texts = app.getConfigValue("suppress_stderr_text")
-        return [ RunDependentTextFilter(texts) ]
+        return [RunDependentTextFilter(texts)]
 
 
 class FilterProgressRecompute(FilterOnTempFile):
@@ -170,8 +176,10 @@ class FilterResultRecompute(FilterOnTempFile):
                 result.append((fileComp.tmpFile, "cmp"))
         return result
 
+
 class FloatingPointFilter:
     postfix = "fpdiff"
+
     def __init__(self, origFileName, tolerance, relative):
         self.origFileName = origFileName
         self.tolerance, self.relative = None, None
@@ -189,10 +197,11 @@ class FloatingPointFilter:
 class RunDependentTextFilter(plugins.Observable):
     configKey = "run_dependent_text"
     postfix = "normal"
+
     def __init__(self, filterTexts, testId=""):
         plugins.Observable.__init__(self)
         self.diag = logging.getLogger("Run Dependent Text")
-        self.lineFilters = [ LineFilter(text, testId, self.diag) for text in filterTexts ]
+        self.lineFilters = [LineFilter(text, testId, self.diag) for text in filterTexts]
 
     def findRelevantFilters(self, file):
         relevantFilters, sectionFilters = [], []
@@ -214,7 +223,7 @@ class RunDependentTextFilter(plugins.Observable):
                         orderedRelevantFilters.append((lineFilter, lastLine))
             return orderedRelevantFilters
         else:
-            return [ (f, None) for f in relevantFilters ]
+            return [(f, None) for f in relevantFilters]
 
     def getLastLine(self, filters, lineFilter):
         for f, lastLine in reversed(filters):
@@ -231,7 +240,7 @@ class RunDependentTextFilter(plugins.Observable):
                     relevantFilters.append((sectionFilter, lineNumber))
             for sectionFilter in sectionFilters:
                 if sectionFilter not in matchedFirst and \
-                    sectionFilter.trigger.matches(line, lineNumber) and not sectionFilter.untrigger.matches(line, lineNumber):
+                        sectionFilter.trigger.matches(line, lineNumber) and not sectionFilter.untrigger.matches(line, lineNumber):
                     matchedFirst.append(sectionFilter)
         for sectionFilter in sectionFilters:
             sectionFilter.trigger.reset()
@@ -290,6 +299,7 @@ class RunDependentTextFilter(plugins.Observable):
 class UnorderedTextFilter(RunDependentTextFilter):
     configKey = "unordered_text"
     postfix = "sorted"
+
     def filterFile(self, file, newFile):
         unorderedLines = {}
         RunDependentTextFilter.filterFile(self, file, newFile, unorderedLines)
@@ -310,14 +320,19 @@ class UnorderedTextFilter(RunDependentTextFilter):
 class LineNumberTrigger:
     def __init__(self, lineNumber):
         self.lineNumber = lineNumber
+
     def __repr__(self):
         return "Line number trigger for line " + str(self.lineNumber)
+
     def matches(self, lineArg, lineNumber):
         return lineNumber == self.lineNumber
+
     def replace(self, lineArg, newText):
         return newText
+
     def reset(self):
         pass
+
 
 class MatchNumberTrigger(plugins.TextTrigger):
     def __init__(self, text, matchNumber):
@@ -337,21 +352,25 @@ class MatchNumberTrigger(plugins.TextTrigger):
     def reset(self):
         self.matchCounter = 0
 
+
 def getWriteDirRegexp(testId):
     for char in "+^":
         testId = testId.replace(char, "\\" + char)
     # Some stuff, a date, and the testId (ignore the appId as we don't know when or where)
     # Doesn't handle paths with spaces, which seems hard, but does hardcode the default location of $HOME on Windows...
-    posixVersion = '([A-Za-z]:/Documents and Settings)?[^ "=]*/[^ "=]*[0-3][0-9][A-Za-z][a-z][a-z][0-9]{6}[^ "=]*/' + testId.replace("\\", "/")
+    posixVersion = '([A-Za-z]:/Documents and Settings)?[^ "=]*/[^ "=]*[0-3][0-9][A-Za-z][a-z][a-z][0-9]{6}[^ "=]*/' + testId.replace(
+        "\\", "/")
     return posixVersion.replace("/", "[/\\\\]")
 
+
 class LineFilter:
-    dividers = [ "{->}", "{[->]}", "{[->}", "{->]}" ]
+    dividers = ["{->}", "{[->]}", "{[->}", "{->]}"]
     # All syntax that affects how a match is found
-    matcherStrings = [ "{LINE ", "{INTERNAL ", "{MATCH " ]
+    matcherStrings = ["{LINE ", "{INTERNAL ", "{MATCH "]
     # All syntax that affects what is done when a match is found
-    matchModifierStrings = [ "{WORD ", "{REPLACE ", "{LINES ", "{PREVLINES " ]
-    internalExpressions = { "writedir" : getWriteDirRegexp }
+    matchModifierStrings = ["{WORD ", "{REPLACE ", "{LINES ", "{PREVLINES "]
+    internalExpressions = {"writedir": getWriteDirRegexp}
+
     def __init__(self, text, testId, diag):
         self.originalText = text
         self.testId = testId
@@ -438,7 +457,7 @@ class LineFilter:
             return LineNumberTrigger(int(parameter))
         elif matcherString == "{INTERNAL " and parameter in self.internalExpressions:
             return self.makeRegexTrigger(parameter)
-        elif matcherString ==  "{MATCH ":
+        elif matcherString == "{MATCH ":
             return MatchNumberTrigger(text, int(parameter))
         else:
             return plugins.TextTrigger(text)
@@ -497,7 +516,7 @@ class LineFilter:
                         words[realNumber] = self.replaceText
                     else:
                         del words[realNumber]
-            if realNumber == -1 or realNumber >= len(words) - 1: # Trim trailing spaces for words at end or beyond
+            if realNumber == -1 or realNumber >= len(words) - 1:  # Trim trailing spaces for words at end or beyond
                 postfix = "\n"
             return " ".join(words).rstrip() + postfix
         elif trigger and self.replaceText != None:

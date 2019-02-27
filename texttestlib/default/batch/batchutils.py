@@ -1,5 +1,8 @@
-import datetime, time, os
+import datetime
+import time
+import os
 from texttestlib import plugins
+
 
 class BatchVersionFilter:
     def __init__(self, batchSession):
@@ -8,7 +11,8 @@ class BatchVersionFilter:
     def verifyVersions(self, app):
         badVersion = self.findUnacceptableVersion(app)
         if badVersion is not None:
-            raise plugins.TextTestWarning("unregistered version '" + badVersion + "' for " + self.batchSession + " session.")
+            raise plugins.TextTestWarning("unregistered version '" + badVersion +
+                                          "' for " + self.batchSession + " session.")
 
     def findUnacceptableVersion(self, app):
         if app.getCompositeConfigValue("batch_use_version_filtering", self.batchSession) != "true":
@@ -37,6 +41,7 @@ def getBatchRunName(optionMap):
         name += "." + jenkinsBuildNumber
     return name
 
+
 def parseFileName(fileName, diag):
     versionStr = fileName[5:-5]
     components = versionStr.split("_")
@@ -51,6 +56,7 @@ def parseFileName(fileName, diag):
         except ValueError:
             pass
     return None, None, None
+
 
 def getEnvironmentFromRunFiles(runNameDirs, tag):
     env = {}

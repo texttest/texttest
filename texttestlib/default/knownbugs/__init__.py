@@ -1,6 +1,12 @@
 #!/usr/bin/env python
 
-import os, string, shutil, sys, logging, glob, re
+import os
+import string
+import shutil
+import sys
+import logging
+import glob
+import re
 from texttestlib import plugins
 from configparser import ConfigParser, NoOptionError
 from copy import copy
@@ -11,22 +17,26 @@ plugins.addCategory("badPredict", "internal errors", "had internal errors")
 plugins.addCategory("crash", "CRASHED")
 
 # For backwards compatibility...
+
+
 class FailedPrediction(plugins.TestState):
     def getExitCode(self):
         return int(self.category != "bug")
-    
+
     def getTypeBreakdown(self):
         status = "failure" if self.getExitCode() else "success"
         return status, self.briefText
 
+
 class Bug:
     rerunLine = "(NOTE: Test was run %d times in total and each time encountered this issue."
     prevResultLine = "Results of previous runs can be found in framework_tmp/backup.previous.* under the sandbox directory.)"
+
     def __init__(self, priority, rerunCount, rerunOnly):
-        self.priority = priority        
+        self.priority = priority
         self.rerunCount = rerunCount
         self.rerunOnly = rerunOnly
-                   
+
     def findCategory(self, internalError):
         if internalError or self.rerunCount:
             return "badPredict"
@@ -41,7 +51,7 @@ class Bug:
             return "\n" + self.rerunLine % (self.rerunCount + 1) + "\n" + self.prevResultLine + "\n\n"
         else:
             return ""
-        
+
 
 class BugSystemBug(Bug):
     def __init__(self, bugSystem, bugId, priorityStr, *args):
@@ -52,7 +62,7 @@ class BugSystemBug(Bug):
 
     def __repr__(self):
         return self.bugId
-        
+
     def findInfo(self, test):
         location = test.getCompositeConfigValue("bug_system_location", self.bugSystem)
         username = test.getCompositeConfigValue("bug_system_username", self.bugSystem)
@@ -66,7 +76,8 @@ class BugSystemBug(Bug):
     def findBugInfo(self, bugId, location, username, password):
         namespace = {}
         exec("from ." + self.bugSystem + " import findBugInfo as _findBugInfo", globals(), namespace)
-        return namespace["_findBugInfo"](self.bugId, location, username, password) #@UndefinedVariable
+        return namespace["_findBugInfo"](self.bugId, location, username, password)  # @UndefinedVariable
+
 
 class UnreportedBug(Bug):
     def __init__(self, fullText, briefText, internalError, priorityStr, *args):
@@ -75,7 +86,7 @@ class UnreportedBug(Bug):
         self.internalError = internalError
         prio = self.getPriority(priorityStr)
         Bug.__init__(self, prio, *args)
-        
+
     def __repr__(self):
         return self.briefText
 
@@ -89,7 +100,7 @@ class UnreportedBug(Bug):
             return 10
         else:
             return 30
-        
+
     def findInfo(self, *args):
         return self.findCategory(self.internalError), self.briefText, self.getRerunText() + self.fullText
 
@@ -106,7 +117,7 @@ class BugTrigger:
         self.customTrigger = getOption("custom_trigger", "")
         self.bugInfo = self.createBugInfo(getOption)
         self.diag = logging.getLogger("Check For Bugs")
-        
+
     def __repr__(self):
         return repr(self.textTrigger)
 
@@ -129,9 +140,9 @@ class BugTrigger:
 
     def matchesText(self, line):
         return self.textTrigger.matches(line)
-    
+
     def exactMatch(self, lines, **kw):
-        updatedLines = [line for i,line in enumerate(lines) if i < len(lines) -1] if lines[-1] == '' else lines
+        updatedLines = [line for i, line in enumerate(lines) if i < len(lines) - 1] if lines[-1] == '' else lines
         if len(updatedLines) == len(self.textTrigger.triggers):
             for index, line in enumerate(updatedLines, start=1):
                 # We must check that every line match because MultilineTextTrigger.matches method
@@ -156,16 +167,16 @@ class BugTrigger:
             return False
         if line is not None and not self.textTrigger.matches(line):
             return False
-        
+
         if self.customTrigger and not self.customTriggerMatches(execHosts, tmpDir):
             return False
-        
+
         if self.hostsMatch(execHosts):
             return True
         else:
             self.diag.info("No match " + repr(execHosts) + " with " + repr(self.triggerHosts))
             return False
-        
+
     def findBugInfo(self, test, fileStem, absenceBug):
         category, briefText, fullText = self.bugInfo.findInfo(test)
         whatText = "FAILING to find text" if absenceBug else "text found"
@@ -174,9 +185,10 @@ class BugTrigger:
             matchText = "'''\n" + matchText + "\n'''"
         else:
             matchText = "'" + matchText + "'"
-        fullText += "\n(This bug was triggered by " + whatText + " in " + self.getFileText(fileStem) + " matching " + matchText + ")"
+        fullText += "\n(This bug was triggered by " + whatText + " in " + \
+            self.getFileText(fileStem) + " matching " + matchText + ")"
         return category, briefText, fullText
-    
+
     def getFileText(self, fileStem):
         if fileStem == "free_text":
             return "the full difference report"
@@ -184,7 +196,7 @@ class BugTrigger:
             return "the brief text/details"
         else:
             return "file " + repr(fileStem)
-    
+
     def hostsMatch(self, execHosts):
         if len(self.triggerHosts) == 0:
             return True
@@ -221,7 +233,8 @@ class FileBugData:
             self.diag.info("File doesn't exist, checking only for absence bugs")
             return self.findAbsenceBugs(self.absentList, execHosts=execHosts, isChanged=isChanged, multipleDiffs=multipleDiffs, tmpDir=None)
         if not os.path.exists(fileName):
-            raise plugins.TextTestError("The file '"+ fileName + "' does not exist. Maybe it has been removed by an external process. ")
+            raise plugins.TextTestError("The file '" + fileName +
+                                        "' does not exist. Maybe it has been removed by an external process. ")
 
         self.diag.info("Looking for bugs in " + fileName)
         dirname = os.path.dirname(fileName)
@@ -263,6 +276,7 @@ class ParseMethod:
     def __init__(self, parser, section):
         self.parser = parser
         self.section = section
+
     def __call__(self, option, default=""):
         try:
             return self.parser.get(self.section, option)
@@ -276,24 +290,24 @@ class BugMap(OrderedDict):
             if bugData.checkUnchanged:
                 return True
         return False
-    
+
     def readFromFile(self, fileName):
         parser = self.makeParser(fileName)
         if parser:
             self.readFromParser(parser)
-            
+
     def readFromFileObject(self, f):
         parser = self.makeParserFromFileObject(f)
         if parser:
             self.readFromParser(parser)
-            
+
     def makeParserFromFileObject(self, f):
         parser = ConfigParser()
         # Default behaviour transforms to lower case: we want case-sensitive
         parser.optionxform = str
         parser.readfp(f)
         return parser
-        
+
     @staticmethod
     def makeParser(fileName):
         parser = ConfigParser()
@@ -304,12 +318,13 @@ class BugMap(OrderedDict):
             return parser
         except Exception as e:
             plugins.printWarning("Bug file at " + fileName + " could not be parsed, ignoring\n" + str(e))
-    
+
     def readFromParser(self, parser):
         for section in reversed(sorted(parser.sections())):
             getOption = ParseMethod(parser, section)
             fileStem = getOption("search_file")
             self.setdefault(fileStem, FileBugData()).addBugTrigger(getOption)
+
 
 class CheckForCrashes(plugins.Action):
     def __init__(self):
@@ -324,10 +339,10 @@ class CheckForCrashes(plugins.Action):
             stackTraceFile = comparison.tmpFile
             self.diag.info("Parsing " + stackTraceFile)
             summary, errorInfo = self.parseStackTrace(test, stackTraceFile)
-            
+
             newState = copy(test.state)
             newState.removeComparison("stacktrace")
-        
+
             crashState = FailedPrediction("crash", errorInfo, summary)
             newState.setFailedPrediction(crashState)
             test.changeState(newState)
@@ -347,7 +362,7 @@ class CheckForCrashes(plugins.Action):
 class CheckForBugs(plugins.Action):
     def __init__(self):
         self.diag = logging.getLogger("Check For Bugs")
-        
+
     def callDuringAbandon(self, test):
         # want to be able to mark UNRUNNABLE tests as known bugs too...
         return test.state.lifecycleChange != "complete"
@@ -365,18 +380,18 @@ class CheckForBugs(plugins.Action):
             # Current thread, must be done immediately or we might exit...
             test.performNotify("Rerun")
             # for test synchronisation, mainly
-            test.notify("RerunTriggered") 
-            
+            test.notify("RerunTriggered")
+
         if test.state.category == "killed" and os.path.exists(test.makeBackupFileName(1)):
             newState = test.restoreLatestBackup()
             if newState:
                 self.fixBackupMessage(newState)
                 test.changeState(newState)
-            
+
     def checkTest(self, test, state):
         activeBugs = self.readBugs(test)
         return self.checkTestWithBugs(test, state, activeBugs)
-    
+
     def checkTestWithBugs(self, test, state, activeBugs):
         if not activeBugs.checkUnchanged() and not state.hasFailed():
             self.diag.info(repr(test) + " succeeded, not looking for bugs")
@@ -394,7 +409,7 @@ class CheckForBugs(plugins.Action):
                 return self.getNewState(state, bugState), bugTrigger.bugInfo.rerunCount
         else:
             return None, 0
-            
+
     def findAllBugs(self, test, state, activeBugs):
         multipleDiffs = self.hasMultipleDifferences(test, state)
         bugs, bugStems = [], []
@@ -402,7 +417,7 @@ class CheckForBugs(plugins.Action):
             newBugs = self.findBugsInFile(test, state, stem, fileBugData, multipleDiffs)
             if newBugs:
                 bugs += newBugs
-                bugStems += [ stem ] * len(newBugs)
+                bugStems += [stem] * len(newBugs)
         return bugs, bugStems
 
     def findBug(self, test, state, activeBugs):
@@ -423,7 +438,7 @@ class CheckForBugs(plugins.Action):
             else:
                 unblockedBugs.append(bug)
         return unblockedBugs
-        
+
     def findBugsInFile(self, test, state, stem, fileBugData, multipleDiffs):
         self.diag.info("Looking for bugs in file " + stem)
         if stem == "free_text":
@@ -462,7 +477,7 @@ class CheckForBugs(plugins.Action):
             if comp.stem in perfStems:
                 diffCount -= 1
         return diffCount > 1
-    
+
     def readBugs(self, test):
         bugMap = BugMap()
         # Mostly for backwards compatibility, reverse the list so that more specific bugs
@@ -471,7 +486,7 @@ class CheckForBugs(plugins.Action):
             self.diag.info("Reading bugs from file " + bugFile)
             bugMap.readFromFile(bugFile)
         return bugMap
-    
+
     def fixBackupMessage(self, newState):
         newFreeText = ""
         backupRegex = re.compile(Bug.rerunLine.replace("%d", "[0-9]*").replace("(", "\\("))
@@ -484,16 +499,19 @@ class CheckForBugs(plugins.Action):
             else:
                 newFreeText += line + "\n"
         newState.freeText = newFreeText
-            
+
 
 # For migrating from knownbugs files which are from TextTest 3.7 and older
 class MigrateFiles(plugins.Action):
     def setUpSuite(self, suite):
         self.migrate(suite)
+
     def __call__(self, test):
         self.migrate(test)
+
     def __repr__(self):
         return "Migrating knownbugs file in"
+
     def migrate(self, test):
         for bugFileName in test.findAllStdFiles("knownbugs"):
             parser = ConfigParser()
@@ -510,6 +528,7 @@ class MigrateFiles(plugins.Action):
                 self.updateFile(bugFileName, parser)
             else:
                 self.describe(test, " (already migrated)")
+
     def updateFile(self, bugFileName, parser):
         newBugFileName = bugFileName + ".new"
         newBugFile = open(newBugFileName, "w")
@@ -518,6 +537,7 @@ class MigrateFiles(plugins.Action):
         print("Old File:\n" + open(bugFileName).read())
         print("New File:\n" + open(newBugFileName).read())
         shutil.move(newBugFileName, bugFileName)
+
     def writeNew(self, parser, newBugFile):
         sectionNo = 0
         for fileStem in parser.sections():
@@ -525,6 +545,7 @@ class MigrateFiles(plugins.Action):
                 bugId = parser.get(fileStem, bugText)
                 sectionNo += 1
                 self.writeSection(newBugFile, sectionNo, fileStem, bugText, bugId)
+
     def writeSection(self, newBugFile, sectionNo, fileStem, bugText, bugId):
         newBugFile.write("[Migrated section " + str(sectionNo) + "]\n")
         newBugFile.write("search_string:" + bugText + "\n")
@@ -538,6 +559,7 @@ class MigrateFiles(plugins.Action):
             newBugFile.write("brief_description:unreported bug\n")
             newBugFile.write("internal_error:0\n")
         newBugFile.write("\n")
+
     def findBugSystem(self, bugId):
         for letter in bugId:
             if not letter in string.digits:

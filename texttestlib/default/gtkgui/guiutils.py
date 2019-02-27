@@ -4,22 +4,30 @@ Generic module broken out from guiplugins. Contains utility code that can be
 called from anywhere in the gtkgui package
 """
 from gi.repository import Gdk
-import os, sys, operator, subprocess, locale
+import os
+import sys
+import operator
+import subprocess
+import locale
 from texttestlib import plugins
 from copy import copy
 from functools import reduce
 
 # Gtk.accelerator_valid appears utterly broken on Windows
+
+
 def windowsAcceleratorValid(key, mod):
     name = Gtk.accelerator_name(key, mod)
     return len(name) > 0 and name != "VoidSymbol"
+
 
 try:
     from gi.repository import Gtk
     if os.name == "nt":
         Gtk.accelerator_valid = windowsAcceleratorValid
 except ImportError:
-    pass # We might want to document the config entries, silly to fail on lack of GTK...
+    pass  # We might want to document the config entries, silly to fail on lack of GTK...
+
 
 def createApplicationEvent(name, category, **kw):
     try:
@@ -29,20 +37,23 @@ def createApplicationEvent(name, category, **kw):
     except ImportError:
         pass
 
+
 guiConfig = None
+
 
 class Utf8Converter:
     langVars = ('LC_ALL', 'LC_CTYPE', 'LANG', 'LANGUAGE')
+
     def __init__(self):
         self.encodings = self.getEncodings()
 
     def getEncodings(self):
-        encodings = [ 'utf-8' ]
+        encodings = ['utf-8']
         localeEncoding = locale.getdefaultlocale()[1]
         if localeEncoding and not localeEncoding in encodings:
             encodings.insert(0, localeEncoding)
         return encodings
-    
+
     def convert(self, text, extraEncodingLookup=None):
         unicodeInfo = self.decodeText(text, extraEncodingLookup)
         return unicodeInfo.encode('utf-8', 'replace')
@@ -59,7 +70,7 @@ class Utf8Converter:
                         localename = localename.split(':')[0]
                     extraEncoding = locale._parse_localename(localename)[1]
                     if extraEncoding and extraEncoding not in self.encodings and extraEncoding.lower() not in self.encodings:
-                        return [ extraEncoding ]
+                        return [extraEncoding]
         return []
 
     def decodeText(self, text, extraEncodingLookup):
@@ -72,11 +83,13 @@ class Utf8Converter:
 
         return str(text, encodingsToTry[0], errors="replace")
 
+
 def getImageDir():
     retro = guiConfig.getValue("retro_icons")
     currImageDir = plugins.installationDir("images")
     retroDir = os.path.join(currImageDir, "retro")
     return (retroDir, True) if retro != 0 else (currImageDir, False)
+
 
 class RefreshTips:
     def __init__(self, name, refreshCell, refreshColumn, refreshIndex):
@@ -85,7 +98,7 @@ class RefreshTips:
         self.refreshColumn = refreshColumn
         self.refreshCell = refreshCell
 
-    def hasRefreshIcon(self, view, path): # pragma: no cover - StoryText cannot test tooltips (future?)
+    def hasRefreshIcon(self, view, path):  # pragma: no cover - StoryText cannot test tooltips (future?)
         model = view.get_model()
         if isinstance(model, Gtk.TreeModelFilter):
             childPath = model.convert_path_to_child_path(path)
@@ -93,19 +106,19 @@ class RefreshTips:
         else:
             return model[path][self.refreshIndex]
 
-    def getTooltip(self, view, widget_x, widget_y, dummy, tooltip): # pragma: no cover - StoryText cannot test tooltips (future?)
+    def getTooltip(self, view, widget_x, widget_y, dummy, tooltip):  # pragma: no cover - StoryText cannot test tooltips (future?)
         x, y = view.convert_widget_to_tree_coords(widget_x, widget_y)
         pathInfo = view.get_path_at_pos(x, y)
         if pathInfo is None:
             return False
-        
+
         path, column, cell_x, _ = pathInfo
         if column is not self.refreshColumn or not self.hasRefreshIcon(view, path):
             return False
 
         cell_pos = column.cell_get_position(self.refreshCell)[0]
         if cell_x > cell_pos:
-            tooltip.set_text("Indicates that this " + self.name + "'s approved result has changed since the status was calculated. " + \
+            tooltip.set_text("Indicates that this " + self.name + "'s approved result has changed since the status was calculated. " +
                              "It's therefore recommended to recompute the status.")
             return True
         else:
@@ -130,7 +143,7 @@ class GUIConfig:
         self.shownCategories = list(map(self.getConfigName, self.configDir.get("show_test_category")))
         self.hiddenCategories = list(map(self.getConfigName, self.configDir.get("hide_test_category")))
         self.colourDict = self.makeColourDictionary()
-        
+
     def getAllPersonalConfigFiles(self):
         allPersonalFiles = []
         # Always include app-independent version
@@ -142,15 +155,15 @@ class GUIConfig:
                 if not fileName in allPersonalFiles:
                     allPersonalFiles.append(fileName)
         return allPersonalFiles
-    
+
     def addSuites(self, suites):
-        fullNames = [ app.fullName() for app in self.apps ]
+        fullNames = [app.fullName() for app in self.apps]
         for suite in suites:
             if suite.app.fullName() not in fullNames:
                 self.apps.append(suite.app)
 
     def makeColourDictionary(self):
-        d={}
+        d = {}
         if self.configDir.get("test_colours") is None:
             return d
         for key, value in list(self.configDir.get("test_colours").items()):
@@ -158,21 +171,29 @@ class GUIConfig:
         return d
 
     def setConfigDefaults(self, colourDict, accelerators):
-        self.setConfigDefault("static_collapse_suites", 0, "Whether or not the static GUI will show everything collapsed")
+        self.setConfigDefault("static_collapse_suites", 0,
+                              "Whether or not the static GUI will show everything collapsed")
         self.setConfigDefault("test_colours", colourDict, "Colours to use for each test state")
         self.setConfigDefault("file_colours", copy(colourDict), "Colours to use for each file state")
-        self.setConfigDefault("window_size", self.getWindowSizeSettings(), "To set the initial size of the dynamic/static GUI.")
+        self.setConfigDefault("window_size", self.getWindowSizeSettings(),
+                              "To set the initial size of the dynamic/static GUI.")
         self.setConfigDefault("hide_gui_element", self.getDefaultHideWidgets(), "List of widgets to hide by default")
-        self.setConfigDefault("hide_test_category", ["cancelled"], "Categories of tests which should not appear in the dynamic GUI test view")
-        self.setConfigDefault("show_test_category", ["failed"], "Categories of tests which should appear in the dynamic GUI test view")
-        self.setConfigDefault("query_kill_processes", { "default" : [], "static" : [ "Dynamic GUI" ] }, "Ask about whether to kill these processes when exiting texttest.")
-        self.setConfigDefault("gui_accelerators", accelerators, "Custom action accelerators.")        
-        self.setConfigDefault("gui_entry_completion_matching", 1, "Which matching type to use for entry completion. 0 means turn entry completions off, 1 means match the start of possible completions, 2 means match any part of possible completions")
-        self.setConfigDefault("gui_entry_completion_inline", 0, "Automatically inline common completion prefix in entry.")
-        self.setConfigDefault("gui_entry_completions", { "default" : [] }, "Add these completions to the entry completion lists initially")
+        self.setConfigDefault("hide_test_category", [
+                              "cancelled"], "Categories of tests which should not appear in the dynamic GUI test view")
+        self.setConfigDefault("show_test_category", ["failed"],
+                              "Categories of tests which should appear in the dynamic GUI test view")
+        self.setConfigDefault("query_kill_processes", {"default": [], "static": [
+                              "Dynamic GUI"]}, "Ask about whether to kill these processes when exiting texttest.")
+        self.setConfigDefault("gui_accelerators", accelerators, "Custom action accelerators.")
+        self.setConfigDefault("gui_entry_completion_matching", 1,
+                              "Which matching type to use for entry completion. 0 means turn entry completions off, 1 means match the start of possible completions, 2 means match any part of possible completions")
+        self.setConfigDefault("gui_entry_completion_inline", 0,
+                              "Automatically inline common completion prefix in entry.")
+        self.setConfigDefault("gui_entry_completions", {"default": []},
+                              "Add these completions to the entry completion lists initially")
         self.setConfigDefault("sort_test_suites_recursively", 1, "Sort subsuites when sorting test suites")
         self.setConfigDefault("retro_icons", 0, "Use the old TextTest icons in the dynamic and static GUIs")
-        
+
     def setConfigDefault(self, key, value, docString):
         self.configDir[key] = value
         self.configDocs[key] = docString
@@ -184,17 +205,17 @@ class GUIConfig:
         return app.getCompositeConfigValue(*args, **kwargs)
 
     def _getFromApps(self, method, *args, **kwargs):
-        callables = [ plugins.Callable(method, app, *args) for app in self.apps ]
+        callables = [plugins.Callable(method, app, *args) for app in self.apps]
         aggregator = plugins.ResponseAggregator(callables)
         try:
             return aggregator(**kwargs)
         except plugins.AggregationError as e:
             app = self.apps[e.index]
-            plugins.printWarning("GUI configuration '" + "::".join(args) +\
-                                 "' differs between applications, ignoring that from " + repr(app) + "\n" + \
+            plugins.printWarning("GUI configuration '" + "::".join(args) +
+                                 "' differs between applications, ignoring that from " + repr(app) + "\n" +
                                  "Value was " + repr(e.value2) + ", change from " + repr(e.value1), stdout=True)
             return e.value1
-    
+
     def getModeName(self):
         if self.dynamic:
             return "dynamic"
@@ -210,7 +231,7 @@ class GUIConfig:
                 return self.getModeName()
         else:
             return formattedName
-        
+
     def getValue(self, entryName, modeDependent=False):
         nameToUse = self.getConfigName(entryName, modeDependent)
         guiValue = self.configDir.get(nameToUse)
@@ -218,6 +239,7 @@ class GUIConfig:
             return guiValue
         else:
             return self._getFromApps(self._simpleValue, nameToUse)
+
     def getCompositeValue(self, sectionName, entryName, modeDependent=False, defaultKey="default"):
         nameToUse = self.getConfigName(entryName, modeDependent)
         value = self.configDir.getComposite(sectionName, nameToUse, defaultKey=defaultKey)
@@ -227,7 +249,7 @@ class GUIConfig:
             return self.getCompositeValue(sectionName, entryName)
         else:
             return value
-        
+
     def getWindowOption(self, name):
         return self.getCompositeValue("window_size", name, modeDependent=True)
 
@@ -242,7 +264,7 @@ class GUIConfig:
             proportion = float(self.getWindowOption(dimensionName + "_screen"))
             diag.info("Setting window " + dimensionName + " to " + repr(int(100.0 * proportion)) + "% of screen.")
             return int(fullSize * proportion)
-    
+
     def showCategoryByDefault(self, category, parentShown=False):
         if self.dynamic:
             nameToUse = self.getConfigName(category)
@@ -253,7 +275,8 @@ class GUIConfig:
             else:
                 return parentShown
         else:
-            return False    
+            return False
+
     def getTestColour(self, category, fallback=None):
         if self.dynamic:
             nameToUse = self.getConfigName(category)
@@ -313,15 +336,15 @@ class SubGUI(plugins.Observable):
     def __init__(self):
         plugins.Observable.__init__(self)
         self.widget = None
-    
-    def createView(self): # pragma: no cover - implemented in all subclasses
+
+    def createView(self):  # pragma: no cover - implemented in all subclasses
         pass
 
     def shouldShow(self):
-        return True # should this be shown/created at all this run
+        return True  # should this be shown/created at all this run
 
     def shouldShowCurrent(self, *args):
-        return True # should this be shown or hidden in the current context?
+        return True  # should this be shown or hidden in the current context?
 
     def getTabTitle(self):
         return ""
@@ -346,6 +369,8 @@ class SubGUI(plugins.Observable):
         createApplicationEvent(name, "files", **kw)
 
 # base class for managing containers
+
+
 class ContainerGUI(SubGUI):
     def __init__(self, subguis):
         SubGUI.__init__(self)

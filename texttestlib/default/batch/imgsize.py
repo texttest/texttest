@@ -18,10 +18,11 @@ try:
 except ImportError:
     pass
 
+
 def imgsize(path):
     """Returns the (width, height) in pixels of the given image file.
     Understands GIF, JPEG, and PNG formats.
     """
-    pict = Image.open(path)  #Too easy.  Thanks Fredrik!
+    pict = Image.open(path)  # Too easy.  Thanks Fredrik!
     width, height = pict.size
     return width, height

@@ -1,4 +1,8 @@
-import sys, datetime, shutil, time, os
+import sys
+import datetime
+import shutil
+import time
+import os
 from collections import OrderedDict
 from gi.repository import Gtk
 from texttestlib import plugins
@@ -37,14 +41,14 @@ from . import vcs_independent
 class CVSInterface(vcs_independent.VersionControlInterface):
     def __init__(self, cvsDir):
         # Googled up.
-        cvsWarningStates = [ "Locally Modified", "Locally Removed", "Locally Added" ]
-        cvsErrorStates = [ "File had conflicts on merge", "Needs Checkout", "Unresolved Conflicts", "Needs Patch",
-                           "Needs Merge", "Entry Invalid", "Unknown", "PROHIBITED" ]
+        cvsWarningStates = ["Locally Modified", "Locally Removed", "Locally Added"]
+        cvsErrorStates = ["File had conflicts on merge", "Needs Checkout", "Unresolved Conflicts", "Needs Patch",
+                          "Needs Merge", "Entry Invalid", "Unknown", "PROHIBITED"]
         vcs_independent.VersionControlInterface.__init__(self, cvsDir, "CVS", cvsWarningStates, cvsErrorStates, "HEAD")
-        self.defaultArgs["log"] = [ "-N" ]
-        self.defaultArgs["diff"] = [ "-N" ]
-        self.defaultArgs["rm"] = [ "-f" ]
-        self.defaultArgs["update"] = [ "-dP" ]
+        self.defaultArgs["log"] = ["-N"]
+        self.defaultArgs["diff"] = ["-N"]
+        self.defaultArgs["rm"] = ["-f"]
+        self.defaultArgs["update"] = ["-dP"]
         self.programArgs, self.errorMessage = self.setProgramArgs(cvsDir)
 
     def getProgramArgs(self):
@@ -56,12 +60,12 @@ class CVSInterface(vcs_independent.VersionControlInterface):
     def setProgramArgs(self, cvsDir):
         cvsRoot = os.getenv("CVSROOT")
         if cvsRoot:
-            return [ "cvs", "-q" ], ""
+            return ["cvs", "-q"], ""
         else:
             rootFile = os.path.join(cvsDir, "Root")
             if os.path.isfile(rootFile):
                 cvsRoot = self.getCvsRootFromFile(rootFile)
-                return [ "cvs", "-q", "-d", cvsRoot ], ""
+                return ["cvs", "-q", "-d", cvsRoot], ""
             else:
                 return [], "Could not determine $CVSROOT: environment variable not set and no file present at:\n" + rootFile
 
@@ -95,7 +99,7 @@ class CVSInterface(vcs_independent.VersionControlInterface):
 
     # Move in source control also. In CVS this implies a remove and then an add
     def _movePath(self, oldPath, newPath):
-        self.checkInstalled() # throws if it isn't, avoid moving paths around
+        self.checkInstalled()  # throws if it isn't, avoid moving paths around
         self.copyPath(oldPath, newPath)
         self.removePath(oldPath)
         self.callProgramOnFiles("add", newPath, recursive=True)
@@ -111,11 +115,11 @@ class CVSInterface(vcs_independent.VersionControlInterface):
 
     def removePath(self, path):
         if os.path.isdir(path):
-            retCode = self.callProgram("rm", [ path ])
+            retCode = self.callProgram("rm", [path])
         else:
             # removing a file affects the directory it lives in, whereas removing a directory shouldn't
             # affect the parent...
-            retCode = self.callProgram("rm", [ path ], cwd=os.path.dirname(path))
+            retCode = self.callProgram("rm", [path], cwd=os.path.dirname(path))
         if retCode > 0:
             # Wasn't in version control, probably
             return plugins.removePath(path)
@@ -142,21 +146,23 @@ class CVSInterface(vcs_independent.VersionControlInterface):
         if cmdName == "add":
             basicArgs = self.getCmdArgs(cmdName, extraArgs)
             for fileName in self.getFileNames(fileArg, recursive, includeDirs=True):
-                self.callProgramWithHandler(fileName, basicArgs + [ fileName ], cwd=os.path.dirname(fileName), **kwargs)
+                self.callProgramWithHandler(fileName, basicArgs + [fileName], cwd=os.path.dirname(fileName), **kwargs)
         else:
-            vcs_independent.VersionControlInterface.callProgramOnFiles(self, cmdName, fileArg, recursive, extraArgs, **kwargs)
-
-
+            vcs_independent.VersionControlInterface.callProgramOnFiles(
+                self, cmdName, fileArg, recursive, extraArgs, **kwargs)
 
 
 class CVSLogLatest(vcs_independent.LogGUI):
     def __init__(self, *args):
         vcs_independent.LogGUI.__init__(self, *args)
         self.cmdName = "log"
+
     def getExtraArgs(self):
-        return [ "-rHEAD" ]
+        return ["-rHEAD"]
+
     def _getTitle(self):
         return "Log Latest"
+
     def getResultDialogMessage(self):
         cmdArgs = vcs_independent.vcs.getCmdArgs(self.cmdName, self.getExtraArgs())
         message = "Showing latest log entries for the CVS controlled files.\nCVS command used: " + " ".join(cmdArgs)
@@ -229,24 +235,27 @@ class CVSLogLatest(vcs_independent.LogGUI):
             window.add(textView)
             notebook.append_page(window, Gtk.Label(label=label))
         notebook.show_all()
-        if len(notebook.get_children()) > 0: # Resize to a nice-looking dialog window ...
+        if len(notebook.get_children()) > 0:  # Resize to a nice-looking dialog window ...
             parentSize = self.topWindow.get_size()
             self.dialog.resize(int(parentSize[0] / 1.5), int(parentSize[0] / 2))
         self.vbox.pack_start(notebook, True, True, 0)
         self.dialog.vbox.pack_start(self.vbox, True, True, 0)
 
+
 vcs_independent.vcsClass = CVSInterface
+
 
 class RenameTest(vcs_independent.RenameTest):
     def handleExistingDirectory(self, dir):
-        if os.listdir(dir) == [ "CVS" ]:
+        if os.listdir(dir) == ["CVS"]:
             # There is only a CVS control dir, i.e. it's probably been removed in CVS.
             # Revert it in CVS and continue
             shutil.rmtree(dir)
             dirname, local = os.path.split(dir)
-            vcs_independent.vcs.callProgram("update", [ local ], cwd=dirname)
+            vcs_independent.vcs.callProgram("update", [local], cwd=dirname)
         else:
             vcs_independent.RenameTest.handleExistingDirectory(self, dir)
+
 
 class FilteredDiffGUI(vcs_independent.FilteredDiffGUI):
     def __init__(self, *args):
@@ -255,11 +264,12 @@ class FilteredDiffGUI(vcs_independent.FilteredDiffGUI):
 
     def getTmpFileArgs(self, fileName, revision):
         revArgs = vcs_independent.vcs.getSingleRevisionOptions(revision) if revision else []
-        return [ "-p" ] + revArgs + [ fileName ]
+        return ["-p"] + revArgs + [fileName]
 
     def commandHadError(self, retcode, stderr, stdout):
         # Diff returns an error code for differences, not just for errors
         return retcode or (len(stderr) > 0 and len(stdout) == 0)
+
 
 class FilteredDiffGUIRecursive(FilteredDiffGUI):
     recursive = True
@@ -267,12 +277,14 @@ class FilteredDiffGUIRecursive(FilteredDiffGUI):
 #
 # Configuration for the Interactive Actions
 #
+
+
 class InteractiveActionConfig(vcs_independent.InteractiveActionConfig):
     def diffClasses(self):
-        return [ vcs_independent.DiffGUI, vcs_independent.DiffGUIRecursive, FilteredDiffGUI, FilteredDiffGUIRecursive ]
+        return [vcs_independent.DiffGUI, vcs_independent.DiffGUIRecursive, FilteredDiffGUI, FilteredDiffGUIRecursive]
 
     def getInteractiveActionClasses(self, dynamic):
-        return vcs_independent.InteractiveActionConfig.getInteractiveActionClasses(self, dynamic) + [ CVSLogLatest ]
+        return vcs_independent.InteractiveActionConfig.getInteractiveActionClasses(self, dynamic) + [CVSLogLatest]
 
     def getRenameTestClass(self):
         return RenameTest

@@ -1,5 +1,7 @@
 
-import os, sys
+import os
+import sys
+
 
 def findLoggerNames(fileName, keyText="Logger"):
     result = []
@@ -7,16 +9,18 @@ def findLoggerNames(fileName, keyText="Logger"):
         if keyText in line:
             words = line.split('"')
             for i, word in enumerate(words):
-                if word not in result and i % 2 == 1: # Only take odd ones, between the quotes!
+                if word not in result and i % 2 == 1:  # Only take odd ones, between the quotes!
                     result.append(word)
     result.sort()
     return result
+
 
 def findLoggerNamesUnder(location, **kwargs):
     result = set()
     for root, _, files in os.walk(location):
         for file in files:
-            if file.endswith(".py") and file != "logconfiggen.py" and file != os.path.basename(sys.argv[0]): # Don't allow generation from ourselves...
+            # Don't allow generation from ourselves...
+            if file.endswith(".py") and file != "logconfiggen.py" and file != os.path.basename(sys.argv[0]):
                 fileName = os.path.join(root, file)
                 result.update(findLoggerNames(fileName, **kwargs))
     return sorted(result)
@@ -27,7 +31,7 @@ class PythonLoggingGenerator:
         self.file = open(fileName, "w")
         self.postfix = "." + postfix
         self.prefix = prefix
-        self.handlers = { "stdout" : "stdout" }
+        self.handlers = {"stdout": "stdout"}
 
     def write(self, line):
         self.file.write(line + "\n")
@@ -75,7 +79,7 @@ class PythonLoggingGenerator:
             self.write("level=" + level + "\n")
         else:
             self.write("#level=" + level + "\n")
-            
+
         if handler == loggerName:
             self.handlers[fileStem] = handler
             self.write("[handler_" + handler + "]")
@@ -132,5 +136,3 @@ keys=root,%s
 [formatters]
 keys=timed,debug
 """ % (loggerStr, handlerStr))
-    
-

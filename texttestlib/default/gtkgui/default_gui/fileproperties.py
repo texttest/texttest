@@ -1,14 +1,18 @@
 from gi.repository import Gtk, Gdk
-import os, time, stat
+import os
+import time
+import stat
 from texttestlib import plugins
 from .. import guiplugins
 from collections import OrderedDict
 
 # pwd and grp doesn't exist on windows ...
 try:
-    import pwd, grp
+    import pwd
+    import grp
 except ImportError:
     pass
+
 
 class FileProperties:
     def __init__(self, path):
@@ -17,7 +21,7 @@ class FileProperties:
         self.dir = os.path.dirname(self.abspath)
         self.status = os.lstat(self.abspath)
         self.now = int(time.time())
-        self.recent = self.now - (6 * 30 * 24 * 60 * 60) #6 months ago
+        self.recent = self.now - (6 * 30 * 24 * 60 * 60)  # 6 months ago
 
     def inqType(self):
         mode = self.status[stat.ST_MODE]
@@ -32,8 +36,8 @@ class FileProperties:
         permissions = ""
         for who in "USR", "GRP", "OTH":
             for what in "R", "W", "X":
-                #lookup attribute at runtime using getattr
-                if self.status[stat.ST_MODE] & getattr(stat,"S_I" + what + who):
+                # lookup attribute at runtime using getattr
+                if self.status[stat.ST_MODE] & getattr(stat, "S_I" + what + who):
                     permissions = permissions + what.lower()
                 else:
                     permissions = permissions + "-"
@@ -46,14 +50,14 @@ class FileProperties:
         try:
             uid = self.status[stat.ST_UID]
             return str(pwd.getpwuid(uid)[0])
-        except Exception: # KeyError, AttributeError (on Windows) possible
+        except Exception:  # KeyError, AttributeError (on Windows) possible
             return "?"
 
     def inqGroup(self):
         try:
             gid = self.status[stat.ST_GID]
             return str(grp.getgrgid(gid)[0])
-        except Exception: # KeyError, AttributeError (on Windows) possible
+        except Exception:  # KeyError, AttributeError (on Windows) possible
             return "?"
 
     def inqSize(self):
@@ -78,24 +82,29 @@ class FileProperties:
                 self.inqLinks(), self.inqOwner(),
                 self.inqGroup(), self.inqSize(),
                 self.inqModificationTime(), self.filename)
-    
+
 
 class ShowFileProperties(guiplugins.ActionResultDialogGUI):
     def __init__(self, allApps, dynamic, *args):
         self.dynamic = dynamic
         guiplugins.ActionResultDialogGUI.__init__(self, allApps)
-        
+
     def _getStockId(self):
         return "properties"
+
     def isActiveOnCurrent(self, *args):
         return ((not self.dynamic) or len(self.currTestSelection) == 1) and \
-               len(self.currFileSelection) > 0
+            len(self.currFileSelection) > 0
+
     def _getTitle(self):
         return "_File Properties"
+
     def getTooltip(self):
         return "Show properties of selected files"
+
     def describeTests(self):
         return str(len(self.currFileSelection)) + " files"
+
     def getAllProperties(self):
         errors, properties = [], []
         for file, comp in self.currFileSelection:
@@ -109,6 +118,7 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
             raise plugins.TextTestError("Failed to get file properties:\n" + "\n".join(errors))
 
         return properties
+
     def processFile(self, file, properties, errors):
         if file:
             try:
@@ -118,7 +128,7 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
                 errors.append(str(e))
 
     # xalign = 1.0 means right aligned, 0.0 means left aligned
-    def justify(self, text, xalign = 0.0):
+    def justify(self, text, xalign=0.0):
         alignment = Gtk.Alignment.new(xalign, 0.0, 0.0, 0.0)
         label = Gtk.Label(label=text)
         alignment.add(label)
@@ -163,6 +173,7 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
             vbox.pack_start(border, False, False, 0)
         return vbox
 
+
 class CopyPathToClipboard(guiplugins.ActionGUI):
     def _getTitle(self):
         return "Copy Path To Clipboard"
@@ -178,8 +189,9 @@ class CopyPathToClipboard(guiplugins.ActionGUI):
         if comp and hasattr(comp, "tmpFile"):
             fileName = comp.tmpFile
         # Copy to both, for good measure, avoid problems with e.g. Exceed configuration
-        for clipboard in [ Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD), Gtk.Clipboard.get(Gdk.SELECTION_PRIMARY) ]:
+        for clipboard in [Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD), Gtk.Clipboard.get(Gdk.SELECTION_PRIMARY)]:
             clipboard.set_text(fileName, -1)
 
+
 def getInteractiveActionClasses():
-    return [ ShowFileProperties, CopyPathToClipboard ]
+    return [ShowFileProperties, CopyPathToClipboard]

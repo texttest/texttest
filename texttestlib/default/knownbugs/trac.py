@@ -2,7 +2,10 @@
 
 # Interface to trac version >= 0.11. Not tested on earlier versions.
 
-import urllib.request, urllib.error, urllib.parse
+import urllib.request
+import urllib.error
+import urllib.parse
+
 
 def findBugInfo(bugId, location, *args):
     if location and location[-1] != '/':
@@ -26,16 +29,17 @@ def findBugInfo(bugId, location, *args):
     for k, v in zip(keys, values):
         info[k.strip()] = v.strip()
     bugText = "******************************************************\n" + \
-           "Ticket #%s (%s %s: %s)\n" % (bugId, info['status'], info['type'], info['resolution']) + \
-           "%s\n%sticket/%s\n" % (info['summary'], location, bugId) + \
-           "Reported By: %s Owned by: %s\n" % (info['reporter'], info['owner']) + \
-           "Priority: %s Milestone: %s\n" % (info['priority'], info['milestone']) + \
-           "Component: %s Version: %s\n" % (info['component'], info['version']) + \
-           "Description:\n" + info['description'] + "\n" + \
-           "******************************************************"
+        "Ticket #%s (%s %s: %s)\n" % (bugId, info['status'], info['type'], info['resolution']) + \
+        "%s\n%sticket/%s\n" % (info['summary'], location, bugId) + \
+        "Reported By: %s Owned by: %s\n" % (info['reporter'], info['owner']) + \
+        "Priority: %s Milestone: %s\n" % (info['priority'], info['milestone']) + \
+        "Component: %s Version: %s\n" % (info['component'], info['version']) + \
+        "Description:\n" + info['description'] + "\n" + \
+        "******************************************************"
     return info['status'], bugText, info['status'] == "closed", bugId
 
-if __name__ == "__main__": # pragma: no cover - test code
+
+if __name__ == "__main__":  # pragma: no cover - test code
     import sys
     for item in findBugInfo(sys.argv[1], sys.argv[2]):
         print(item)

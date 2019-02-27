@@ -3,7 +3,8 @@
 Utilities for both master and slave code
 """
 
-import os, socket
+import os
+import socket
 from texttestlib import plugins
 from locale import getpreferredencoding
 
@@ -12,9 +13,10 @@ rerunPostfix = ".RERUN_TEST"
 sendFilePostfix = ".SEND_FILES"
 getFilePostfix = ".GET_FILES"
 
+
 def getIPAddress(apps):
     if useLocalQueueSystem(apps):
-        return "127.0.0.1" # always works if everything is local
+        return "127.0.0.1"  # always works if everything is local
 
     # Seems to be no good portable way to get the IP address in a portable way
     # See e.g. http://stackoverflow.com/questions/166506/finding-local-ip-addresses-using-pythons-stdlib
@@ -25,21 +27,26 @@ def getIPAddress(apps):
     except socket.error:
         # Relies on being online, but seems there is no other way...
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(('8.8.8.8', 0)) # Google's DNS server. Should always be there :)
+        s.connect(('8.8.8.8', 0))  # Google's DNS server. Should always be there :)
         return s.getsockname()[0]
+
 
 def queueSystemName(app):
     return app.getConfigValue("queue_system_module")
 
+
 def useLocalQueueSystem(apps):
     return all((queueSystemName(app) == "local" for app in apps))
 
+
 def socketSerialise(test):
-    return test.app.name + test.app.versionSuffix() + ":" + test.getRelPath()        
+    return test.app.name + test.app.versionSuffix() + ":" + test.getRelPath()
+
 
 def socketParse(testString):
     # Test name might contain ":"
     return testString.strip().split(":", 1)
+
 
 def makeIdentifierLine(identifier, sendFiles=False, getFiles=False, noReuse=False, rerun=False):
     if sendFiles:
@@ -52,11 +59,12 @@ def makeIdentifierLine(identifier, sendFiles=False, getFiles=False, noReuse=Fals
         identifier += rerunPostfix
     return identifier
 
+
 def parseIdentifier(line):
     rerun = line.endswith(rerunPostfix)
     if rerun:
         line = line.replace(rerunPostfix, "")
-            
+
     tryReuse = not line.endswith(noReusePostfix)
     if not tryReuse:
         line = line.replace(noReusePostfix, "")
@@ -64,16 +72,18 @@ def parseIdentifier(line):
     sendFiles = line.endswith(sendFilePostfix)
     if sendFiles:
         line = line.replace(sendFilePostfix, "")
-        
+
     getFiles = line.endswith(getFilePostfix)
     if getFiles:
         line = line.replace(getFilePostfix, "")
 
     return line, sendFiles, getFiles, tryReuse, rerun
 
+
 dirText = "DIRECTORY_CONTENTS"
 fileText = "FILE_CONTENTS"
 endPrefix = "END_"
+
 
 def directorySerialise(dirName, ignoreLinks=False):
     text = ""
@@ -90,6 +100,7 @@ def directorySerialise(dirName, ignoreLinks=False):
                 text += endPrefix + fileText + "\n"
     text += endPrefix + dirText
     return text
+
 
 def directoryUnserialise(rootDir, f):
     currFile = None

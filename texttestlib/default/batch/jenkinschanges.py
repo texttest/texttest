@@ -12,14 +12,18 @@ from pprint import pprint
 from xml.parsers.expat import ExpatError
 from locale import getpreferredencoding
 
+
 class AbortedException(RuntimeError):
     pass
+
 
 class JobStillRunningException(RuntimeError):
     pass
 
+
 class FingerprintNotReadyException(RuntimeError):
     pass
+
 
 def getBuildsDir(jobRoot, jobName):
     projectDir = os.path.join(jobRoot, jobName)
@@ -35,15 +39,17 @@ def getBuildsDir(jobRoot, jobName):
         except OSError:
             return
 
+
 class BuildDocument:
     versionRegex = re.compile("[0-9]+(\\.[0-9]+)+")
     versionRegexRpm = re.compile("[0-9]+(\\.[0-9]+)+.*.rpm")
+
     @classmethod
     def create(cls, buildsDir, buildName):
         xmlFile = os.path.join(buildsDir, buildName, "build.xml")
         if os.path.isfile(xmlFile):
             # Error handling due to parsing problems caused last power loss
-            try :
+            try:
                 return cls(xmlFile)
             except:
                 print("WARNING: Error while parsing XML file:" + xmlFile)
@@ -121,7 +127,7 @@ class FingerprintVerifier:
 
     def md5sum(self, filename):
         md5 = hashlib.md5()
-        with open(filename,'rb') as f:
+        with open(filename, 'rb') as f:
             for chunk in iter(lambda: f.read(128*md5.block_size), b''):
                 md5.update(chunk)
         return md5.hexdigest()
@@ -285,18 +291,18 @@ class ChangeSetFinder:
     def parseAuthor(self, author):
         if isinstance(author, bytes):
             author = str(author, locale.getpreferredencoding())
-            
+
         withoutEmail = author.split("<")[0].strip().split("@")[0]
         if "." in withoutEmail:
-            return " ".join([ part.capitalize() for part in withoutEmail.split(".") ])
+            return " ".join([part.capitalize() for part in withoutEmail.split(".")])
         else:
             try:
-               withoutEmail = withoutEmail.encode("ascii", "xmlcharrefreplace")
+                withoutEmail = withoutEmail.encode("ascii", "xmlcharrefreplace")
             except UnicodeDecodeError as exception:
-                print("FAILED to encode name '" + withoutEmail + "' (repr: " + repr(withoutEmail) + ", " \
-                      + str(type(withoutEmail)) + ", default encoding: '" \
-                      + sys.getdefaultencoding() + "', default locale: " \
-                      + str(locale.getdefaultlocale()) + ") due to:\n", \
+                print("FAILED to encode name '" + withoutEmail + "' (repr: " + repr(withoutEmail) + ", "
+                      + str(type(withoutEmail)) + ", default encoding: '"
+                      + sys.getdefaultencoding() + "', default locale: "
+                      + str(locale.getdefaultlocale()) + ") due to:\n",
                       exception, "\nIgnoring this entry")
                 return None
             return str(withoutEmail, locale.getpreferredencoding())
@@ -358,7 +364,8 @@ class ProjectData:
                         modules.append(subNode.childNodes[0].nodeValue)
             elif node.nodeName == "build":
                 rpmName = self.getRpmName(node)
-        providedScope = any((node.childNodes[0].nodeValue == "provided" for node in document.getElementsByTagName("scope")))
+        providedScope = any((node.childNodes[0].nodeValue ==
+                             "provided" for node in document.getElementsByTagName("scope")))
         groupPrefix = groupId + ":" if groupId else ""
         artefacts.append((groupPrefix + artifactId, providedScope))
         if rpmName:
@@ -386,7 +393,8 @@ class ProjectData:
             for subDir in document.getElementsByTagName("subdir"):
                 return subDir.childNodes[0].nodeValue
         except ExpatError as exception:
-            print("WARNING: Corrupt config file:\n ", os.path.abspath(configFile), "\n Collection of Jenkins data will be incomplete.")
+            print("WARNING: Corrupt config file:\n ", os.path.abspath(
+                configFile), "\n Collection of Jenkins data will be incomplete.")
         return ""
 
     def getProjects(self, artefact):
@@ -426,12 +434,13 @@ class ChangeFinder:
             # If it was aborted, say this
             return [(str(e), "", [])]
 
-        if self.hasSourceCodeChange(build2): # If we're polling things from SCM, we should include the changes there
+        if self.hasSourceCodeChange(build2):  # If we're polling things from SCM, we should include the changes there
             projectChanges.append((self.jobName, build2))
 
         # Extract the changeset information from them
         changesFromProjects = self.changeSetFinder.getChangeSetData(projectChanges)
-        changesFromMarking = [ self.getMarkChangeText(artefact, projectName, build1, build2) for artefact, projectName in markedChanges ]
+        changesFromMarking = [self.getMarkChangeText(artefact, projectName, build1, build2)
+                              for artefact, projectName in markedChanges]
         return changesFromMarking + changesFromProjects
 
     def getChangesRecursively(self, jobName, build1, build2):
@@ -476,9 +485,9 @@ class ChangeFinder:
             buildsDir = getBuildsDir(self.jobRoot, project)
             if buildsDir is None:
                 continue
-            allBuilds = sorted([ build for build in os.listdir(buildsDir) if build.isdigit()], key=lambda b: -int(b))
-            oldHashes = [ oldHash for _, oldHash, _, _ in diffs ]
-            newHashes = [ hash for _, _, hash, _ in diffs ]
+            allBuilds = sorted([build for build in os.listdir(buildsDir) if build.isdigit()], key=lambda b: -int(b))
+            oldHashes = [oldHash for _, oldHash, _, _ in diffs]
+            newHashes = [hash for _, _, hash, _ in diffs]
             scopeProvided = any((s for _, _, _, s in diffs))
             activeBuild = None
             for build in allBuilds:
@@ -526,6 +535,7 @@ def getChanges(build1, build2, *args):
     finder = ChangeFinder(*args)
     return finder.findChanges(build1, build2)
 
+
 def getTimestamp(build):
     if hasattr(os, "readlink"):
         jobRoot = os.path.join(os.getenv("JENKINS_HOME"), "jobs")
@@ -535,11 +545,13 @@ def getTimestamp(build):
             if os.path.islink(buildLink):
                 return os.readlink(buildLink)
 
+
 def parseEnvAsList(varName):
     if varName in os.environ:
         return os.getenv(varName).split(",")
     else:
         return []
+
 
 def parseEnvAsDict(varName):
     ret = {}
@@ -548,8 +560,9 @@ def parseEnvAsDict(varName):
         ret[var] = value
     return ret
 
+
 if __name__ == "__main__":
-    localFile = os.path.abspath(__file__) # <root>/texttestlib/default/batch/jenkinschanges.py
+    localFile = os.path.abspath(__file__)  # <root>/texttestlib/default/batch/jenkinschanges.py
     rootDir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(localFile))))
     sys.path.insert(0, rootDir)
     buildName = sys.argv[1]

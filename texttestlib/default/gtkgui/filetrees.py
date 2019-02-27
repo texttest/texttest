@@ -4,17 +4,23 @@ Module to handle the various file-trees in the GUI
 """
 from gi.repository import Gtk, GObject
 from . import guiutils
-import os, sys, operator, logging, string
+import os
+import sys
+import operator
+import logging
+import string
 from texttestlib import plugins
 from collections import OrderedDict
 from copy import copy
 from functools import reduce
 
+
 class FileViewGUI(guiutils.SubGUI):
     inheritedText = "(Inherited from parent suites)"
-    def __init__(self, dynamic, title = "", popupGUI = None):
+
+    def __init__(self, dynamic, title="", popupGUI=None):
         guiutils.SubGUI.__init__(self)
-        self.model = Gtk.TreeStore(GObject.TYPE_STRING, GObject.TYPE_STRING, GObject.TYPE_STRING,\
+        self.model = Gtk.TreeStore(GObject.TYPE_STRING, GObject.TYPE_STRING, GObject.TYPE_STRING,
                                    GObject.TYPE_PYOBJECT, GObject.TYPE_STRING, GObject.TYPE_STRING)
         self.popupGUI = popupGUI
         self.dynamic = dynamic
@@ -35,11 +41,11 @@ class FileViewGUI(guiutils.SubGUI):
         self.model.clear()
         self.addFilesToModel(state)
         view = self.selection.get_tree_view()
-        if view: # Might already be taking down the GUI
+        if view:  # Might already be taking down the GUI
             view.expand_all()
         if preserveSelection:
             self.reselect(selectionStore)
-        
+
     def storeSelection(self):
         selectionStore = []
         self.selection.selected_foreach(self.storeIter, selectionStore)
@@ -78,14 +84,14 @@ class FileViewGUI(guiutils.SubGUI):
 
     def getState(self):
         pass
-            
+
     def createView(self):
         self.model.clear()
         state = self.getState()
         self.addFilesToModel(state)
         view = Gtk.TreeView(self.model)
         view.set_name(self.getWidgetName())
-        view.set_enable_search(False) # Shouldn't get big enough to need this
+        view.set_enable_search(False)  # Shouldn't get big enough to need this
         self.selection = view.get_selection()
         self.selection.set_mode(Gtk.SelectionMode.MULTIPLE)
         self.selection.set_select_function(self.canSelect, self.dynamic)
@@ -102,7 +108,7 @@ class FileViewGUI(guiutils.SubGUI):
         view.expand_all()
         self.monitorEvents()
         view.connect("row_activated", self.fileActivated)
-        
+
         if self.popupGUI:
             view.connect("button_press_event", self.buttonPressed)
             self.popupGUI.createView()
@@ -110,7 +116,7 @@ class FileViewGUI(guiutils.SubGUI):
         view.show()
         return self.addScrollBars(view, hpolicy=Gtk.PolicyType.NEVER)
         # only used in test view
-        
+
     def buttonPressed(self, *args):
         self.selectionChanged(self.selection)
         self.popupGUI.showMenu(*args)
@@ -152,17 +158,17 @@ class FileViewGUI(guiutils.SubGUI):
 
     def addFileToModel(self, iter, fileName, colour, associatedObject=None, details=""):
         baseName = os.path.basename(fileName)
-        row = [ baseName, colour, fileName, associatedObject, details, "" ]
+        row = [baseName, colour, fileName, associatedObject, details, ""]
         return self.model.insert_before(iter, None, row)
 
     def addDataFilesUnderIter(self, iter, files, colour, root, **kwargs):
-        dirIters = { root : iter }
+        dirIters = {root: iter}
         parentIter = iter
         for file in files:
             parent = os.path.split(file)[0]
             parentIter = dirIters.get(parent)
             if parentIter is None:
-                subDirIters = self.addDataFilesUnderIter(iter, [ parent ], colour, root)
+                subDirIters = self.addDataFilesUnderIter(iter, [parent], colour, root)
                 parentIter = subDirIters.get(parent)
             newiter = self.addFileToModel(parentIter, file, colour, **kwargs)
             if os.path.isdir(file):
@@ -175,6 +181,7 @@ class FileViewGUI(guiutils.SubGUI):
 
     def selectionChanged(self, selection):
         filelist = []
+
         def fileSelected(dummyModel, dummyPath, iter):
             # Do not include the top level which are just headers that don't currently correspond to files
             if self.model.iter_parent(iter) is not None:
@@ -220,19 +227,19 @@ class ApplicationFileGUI(FileViewGUI):
         self.extras = reduce(operator.add, (app.extras for app in allApps), [])
         self.storytextDirs = {}
         self.testScripts = {}
-    
+
     def shouldShow(self):
         return not self.dynamic
-    
+
     def getTabTitle(self):
         return "Config"
-    
+
     def getViewFileSignal(self):
         return "ViewApplicationFile"
-    
+
     def getWidgetName(self):
         return "Application File Tree"
-    
+
     def notifyShortcut(self, *args):
         self.notifyReloadConfig()
 
@@ -248,9 +255,9 @@ class ApplicationFileGUI(FileViewGUI):
 
     def getScriptArgs(self, suite):
         scriptArgs = set()
-        scriptCmds = [ suite.getConfigValue("executable", expandVars=False) ] + \
+        scriptCmds = [suite.getConfigValue("executable", expandVars=False)] + \
             list(suite.getConfigValue("interpreters", expandVars=False).values())
-            
+
         for scriptCmd in scriptCmds:
             for rawScriptArg in scriptCmd.split():
                 if "TEXTTEST_ROOT" in rawScriptArg:
@@ -266,14 +273,14 @@ class ApplicationFileGUI(FileViewGUI):
                 self.storytextDirs[suite.app] = currUsecaseHome
                 if not suite.parent:
                     self.notify("UsecaseHome", suite, currUsecaseHome)
-                
+
             self.testScripts.setdefault(suite.app.name, set()).update(self.getScriptArgs(suite))
             if suite.app not in self.allApps and suite.app not in self.extras:
                 self.allApps.append(suite.app)
                 self.recreateModel(self.getState(), preserveSelection=False)
 
     def getAllFiles(self, storytextDir, app):
-        paths = [ storytextDir ]
+        paths = [storytextDir]
         filesToIgnore = app.getCompositeConfigValue("test_data_ignore", os.path.basename(storytextDir))
         for root, dirs, files in os.walk(storytextDir):
             for name in sorted(files) + sorted(dirs):
@@ -289,23 +296,24 @@ class ApplicationFileGUI(FileViewGUI):
         importedFiles = {}
         allTitles = self.getApplicationTitles()
         for index, app in enumerate(self.allApps):
-            headerRow = [ "Files for " + allTitles[index], "white", app.getDirectory(), None, "", "" ]
+            headerRow = ["Files for " + allTitles[index], "white", app.getDirectory(), None, "", ""]
             confiter = self.model.insert_before(None, None, headerRow)
             for file in self.getConfigFiles(app):
-                self.addFileToModel(confiter, file, colour, [ app ])
+                self.addFileToModel(confiter, file, colour, [app])
                 for importedFile in self.getImportedFiles(file, app):
                     importedFiles[importedFile] = importedFile
             storytextDir = self.storytextDirs.get(app)
             if storytextDir:
                 files = self.getAllFiles(storytextDir, app)
-                self.addDataFilesUnderIter(confiter, files, colour, 
+                self.addDataFilesUnderIter(confiter, files, colour,
                                            app.getDirectory(), associatedObject=self.allApps)
             testScripts = self.testScripts.get(app.name)
             if testScripts:
-                headerRow = [ "Scripts for " + allTitles[index], "white", app.getDirectory(), None, "", "" ]
+                headerRow = ["Scripts for " + allTitles[index], "white", app.getDirectory(), None, "", ""]
                 scriptiter = self.model.insert_before(None, None, headerRow)
-                self.addDataFilesUnderIter(scriptiter, sorted(testScripts), colour, app.getDirectory(), associatedObject=self.allApps)
-            
+                self.addDataFilesUnderIter(scriptiter, sorted(testScripts), colour,
+                                           app.getDirectory(), associatedObject=self.allApps)
+
         # Handle recursive imports here ...
 
         if len(importedFiles) > 0:
@@ -319,17 +327,17 @@ class ApplicationFileGUI(FileViewGUI):
         personalDir = plugins.getPersonalConfigDir()
         personalFiles = self.getPersonalFiles(personalDir)
         if len(personalFiles) > 0:
-            headerRow = [ "Personal Files", "white", personalDir, None, "", "" ]
+            headerRow = ["Personal Files", "white", personalDir, None, "", ""]
             persiter = self.model.insert_before(None, None, headerRow)
             self.addDataFilesUnderIter(persiter, personalFiles, colour, personalDir, associatedObject=self.allApps)
 
     def getApplicationTitles(self):
-        basicTitles = [ repr(app) for app in self.allApps ]
+        basicTitles = [repr(app) for app in self.allApps]
         if self.areUnique(basicTitles):
             return basicTitles
         else:
-            return [ repr(app) + " (" + app.name + " under " +
-                     os.path.basename(app.getDirectory()) + ")" for app in self.allApps ]
+            return [repr(app) + " (" + app.name + " under " +
+                    os.path.basename(app.getDirectory()) + ")" for app in self.allApps]
 
     def areUnique(self, names):
         for index, name in enumerate(names):
@@ -339,7 +347,7 @@ class ApplicationFileGUI(FileViewGUI):
         return True
 
     def getConfigFiles(self, app):
-        dircaches = app.getAllDirCaches("config", [ app.dircache ])
+        dircaches = app.getAllDirCaches("config", [app.dircache])
         return app.getAllFileNames(dircaches, "config", allVersions=True)
 
     def getPersonalFiles(self, personalDir):
@@ -347,14 +355,14 @@ class ApplicationFileGUI(FileViewGUI):
             return []
         allFiles = []
         for root, dirs, files in os.walk(personalDir):
-            for pruneDir in [ "tmp" ] + plugins.controlDirNames:
+            for pruneDir in ["tmp"] + plugins.controlDirNames:
                 if pruneDir in dirs:
                     dirs.remove(pruneDir)
             for file in files + dirs:
                 allFiles.append(os.path.join(root, file))
         return sorted(allFiles)
-    
-    def getImportedFiles(self, file, app = None):
+
+    def getImportedFiles(self, file, app=None):
         imports = []
         if os.path.isfile(file):
             importLines = [l for l in open(file, "r").readlines() if l.startswith("import_config_file")]
@@ -365,7 +373,7 @@ class ApplicationFileGUI(FileViewGUI):
                         file = app.configPath(file)
                     if os.path.isfile(file):
                         imports.append(file)
-                except Exception: # App. file not found ...
+                except Exception:  # App. file not found ...
                     continue
         return imports
 
@@ -385,7 +393,7 @@ class TestFileGUI(FileViewGUI):
 
     def getTabTitle(self):
         return "Test"
-    
+
     def getWidgetName(self):
         return "File Tree"
 
@@ -395,7 +403,7 @@ class TestFileGUI(FileViewGUI):
     def notifyNameChange(self, test, origRelPath):
         if test is not self.currentTest:
             return
-            
+
         def updatePath(model, dummyPath, iter):
             origFile = model.get_value(iter, 2)
             if origFile:
@@ -403,7 +411,7 @@ class TestFileGUI(FileViewGUI):
                 model.set_value(iter, 2, newFile)
 
         self.model.foreach(updatePath)
-        self.setName( [ test ], 1)
+        self.setName([test], 1)
 
     def notifyFileChange(self, test):
         if test is self.currentTest:
@@ -425,12 +433,12 @@ class TestFileGUI(FileViewGUI):
                     self.model.set_value(iter, 5, newIcon)
 
         self.model.foreach(setRecalculateIcon)
-                        
+
     def forceVisible(self, rowCount):
         return rowCount == 1
 
     def notifyNewTestSelection(self, tests, dummyApps, rowCount, *args):
-        if len(tests) == 0 or (not self.dynamic and rowCount > 1): # multiple tests in static GUI result in removal
+        if len(tests) == 0 or (not self.dynamic and rowCount > 1):  # multiple tests in static GUI result in removal
             self.currentTest = None
             self.setName(tests, rowCount)
             self.model.clear()
@@ -453,9 +461,9 @@ class TestFileGUI(FileViewGUI):
                 self.selection.select_iter(iter)
             else:
                 self.selection.unselect_iter(iter)
-                
+
         self.model.foreach(trySelect)
-        
+
     def notifyViewerStarted(self):
         self.applicationEvent("the viewer process to start", timeDelay=1)
 
@@ -480,7 +488,7 @@ class TestFileGUI(FileViewGUI):
             return self.currentTest.name.replace("_", "__")
         else:
             return "No test selected"
-        
+
     def getColour(self, name):
         return guiutils.guiConfig.getCompositeValue("file_colours", name)
 
@@ -526,7 +534,7 @@ class TestFileGUI(FileViewGUI):
                 splitlist.setdefault(comp.getParent().getDisplayFileName(), []).append(comp)
             else:
                 filelist.append(file)
-            
+
         for file in sorted(filelist):
             newiter = self.addApprovedFileUnderIter(state, iter, file, fileCompMap)
             splitcomps = splitlist.get(file, [])
@@ -534,7 +542,7 @@ class TestFileGUI(FileViewGUI):
             for splitcomp in sorted(splitcomps, key=state.allResults.index):
                 self.addApprovedFileUnderIter(state, newiter, splitcomp.getDisplayFileName(), fileCompMap)
 
-    def addApprovedFileUnderIter(self, state, iter, file, compMap = {}):
+    def addApprovedFileUnderIter(self, state, iter, file, compMap={}):
         comparison = compMap.get(file)
         colour = self.getComparisonColour(state, comparison)
         details = ""
@@ -560,7 +568,7 @@ class TestFileGUI(FileViewGUI):
     def getRootIterAndColour(self, heading, rootDir=None):
         if not rootDir:
             rootDir = self.currentTest.getDirectory()
-        headerRow = [ heading + " Files", "white", rootDir, None, "", "" ]
+        headerRow = [heading + " Files", "white", rootDir, None, "", ""]
         stditer = self.model.insert_before(None, None, headerRow)
         colour = guiutils.guiConfig.getCompositeValue("file_colours", "static_" + heading.lower(), defaultKey="static")
         return stditer, colour
@@ -584,7 +592,7 @@ class TestFileGUI(FileViewGUI):
         try:
             return list(self.currentTest.app.extraReadFiles(self.currentTest).items())
         except Exception:
-            sys.stderr.write("WARNING - ignoring exception thrown by '" + self.currentTest.getConfigValue("config_module") + \
+            sys.stderr.write("WARNING - ignoring exception thrown by '" + self.currentTest.getConfigValue("config_module") +
                              "' configuration while requesting extra data files, not displaying any such files\n")
             return OrderedDict()
 
@@ -596,7 +604,7 @@ class TestFileGUI(FileViewGUI):
         currDir = self.currentTest.getDirectory()
         self.addDataFilesUnderIter(datiter, dataFiles, colour, currDir)
         if inheritedDataFiles:
-            inheritedRow = [ self.inheritedText, "white", currDir, None, "", "" ]
+            inheritedRow = [self.inheritedText, "white", currDir, None, "", ""]
             inheritedIter = self.model.insert_before(datiter, None, inheritedRow)
             for suite, inherited in list(inheritedDataFiles.items()):
                 self.addDataFilesUnderIter(inheritedIter, inherited, colour, suite.getDirectory())
@@ -609,7 +617,7 @@ class TestFileGUI(FileViewGUI):
         for name, filelist in externalFiles:
             exiter = self.model.insert_before(datiter, None)
             self.model.set_value(exiter, 0, name)
-            self.model.set_value(exiter, 1, "white") # mostly to trigger output...
+            self.model.set_value(exiter, 1, "white")  # mostly to trigger output...
             for file in filelist:
                 self.addFileToModel(exiter, file, colour)
 

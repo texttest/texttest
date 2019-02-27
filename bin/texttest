@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
-import sys, os
+import sys
+import os
+
 
 def fixSysPath(fileName):
     install_root = os.path.dirname(os.path.dirname(fileName))
@@ -8,10 +10,11 @@ def fixSysPath(fileName):
     # Also accept a setup with a "site" subdirectory containing local modules,
     # or a "generic" directory containing the TextTest core with local modules in the root
     # Also allow tying a TextTest installation to a StoryText one
-    for subdir in [ "", "lib", "site/lib", "storytext" ]:
+    for subdir in ["", "lib", "site/lib", "storytext"]:
         libDir = os.path.abspath(os.path.join(install_root, subdir))
         if os.path.isdir(libDir):
             sys.path.append(libDir)
+
 
 try:
     # If there is a separate script "texttest", want to use the local tree
@@ -31,6 +34,6 @@ if (major, minor, micro) >= texttest_version.required_python_version:
 else:
     strVersion = str(major) + "." + str(minor) + "." + str(micro)
     reqVersion = str(reqMajor) + "." + str(reqMinor) + "." + str(reqMicro)
-    sys.stderr.write("Could not start TextTest due to Python version problems :\n" + \
-                     "TextTest " + texttest_version.version + " requires at least Python " + \
+    sys.stderr.write("Could not start TextTest due to Python version problems :\n" +
+                     "TextTest " + texttest_version.version + " requires at least Python " +
                      reqVersion + ": found version " + strVersion + ".\n")

@@ -9,8 +9,9 @@ try:
 except ImportError:
     def applicationEventRename(*args, **kw):
         pass
+
     def applicationEvent(*args, **kw):
-        pass    
+        pass
 
 
 # Compulsory responder to generate application events. Always present. See respond module
@@ -29,32 +30,32 @@ class ApplicationEventResponder(plugins.Responder):
             eventName += " rerun"
         category = test.uniqueName
         timeDelay = self.getTimeDelay()
-        applicationEvent(eventName, category + " lifecycle", [ "lifecycle" ], timeDelay)
-        
+        applicationEvent(eventName, category + " lifecycle", ["lifecycle"], timeDelay)
+
     def notifyAdd(self, test, initial):
         if initial and test.classId() == "test-case":
             eventName = "test " + test.uniqueName + " to be read"
-            applicationEvent(eventName, test.uniqueName, [ test.uniqueName + " lifecycle", "read", "lifecycle" ])
+            applicationEvent(eventName, test.uniqueName, [test.uniqueName + " lifecycle", "read", "lifecycle"])
 
     def notifyUniqueNameChange(self, test, newName):
         if test.classId() == "test-case":
             applicationEventRename("test " + test.uniqueName + " to", "test " + newName + " to",
-                                                     test.uniqueName, newName)
-            
+                                   test.uniqueName, newName)
+
     def notifyRerunTriggered(self, test):
         self.rerunTests.append(test)
 
     def getTimeDelay(self):
         try:
             return int(os.getenv("TEXTTEST_FILEWAIT_SLEEP", 1))
-        except ValueError: # pragma: no cover - pathological case
+        except ValueError:  # pragma: no cover - pathological case
             return 1
-        
+
     def notifyBackgroundActionCompleted(self, *args):
         applicationEvent("completion of background actions", "background")
 
     def notifyAllRead(self, *args):
-        applicationEvent("all tests to be read", "read", [ "lifecycle" ])
+        applicationEvent("all tests to be read", "read", ["lifecycle"])
 
     def notifyAllComplete(self):
         applicationEvent("completion of test actions", "lifecycle")

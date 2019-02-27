@@ -3,6 +3,7 @@ from . import abstractqueuesystem
 import os
 from texttestlib import plugins
 
+
 class QueueSystem(abstractqueuesystem.QueueSystem):
     def __init__(self, app):
         self.coreFileLocation = self.getCoreFileLocation(app)

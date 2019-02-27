@@ -1,5 +1,7 @@
 
-import sys, os, subprocess
+import sys
+import os
+import subprocess
 from texttestlib.default import colorer
 from texttestlib import plugins
 from texttestlib.jobprocess import killSubProcessAndChildren
@@ -23,11 +25,11 @@ class TextDisplayResponder(plugins.Responder):
             return "Known Bugs"
         elif category.startswith("faster") or category.startswith("slower") or category == "smaller" or category == "larger":
             return "Performance Differences"
-        elif category in [ "killed", "unrunnable", "cancelled", "abandoned" ]:
+        elif category in ["killed", "unrunnable", "cancelled", "abandoned"]:
             return "Incomplete"
         else:
             return "Failures"
-        
+
     def shouldDescribe(self, test):
         return test.state.hasFailed()
 
@@ -46,10 +48,10 @@ class TextDisplayResponder(plugins.Responder):
                 if summaryKey not in self.resultSummary:
                     self.resultSummary[summaryKey] = 0
                 self.resultSummary[summaryKey] += 1
-            
+
         if self.shouldDescribe(test):
-            self.writeDescription(test, summary=False)  
-                
+            self.writeDescription(test, summary=False)
+
     def notifyAllComplete(self):
         if self.enableSummary:
             plugins.log.info("Results:")
@@ -59,9 +61,9 @@ class TextDisplayResponder(plugins.Responder):
                 for test in self.failedTests:
                     self.writeDescription(test, summary=True)
                 plugins.log.info("")
-            parts = [ summaryKey + ": " + str(count) for summaryKey, count in list(self.resultSummary.items()) ]
+            parts = [summaryKey + ": " + str(count) for summaryKey, count in list(self.resultSummary.items())]
             plugins.log.info(", ".join(parts))
-     
+
     def printTestWithColorEnabled(self, test, color, summary):
         colorer.enableOutputColor(color)
         self.describe(test, summary)
@@ -69,15 +71,15 @@ class TextDisplayResponder(plugins.Responder):
 
     def getPrefix(self, test):
         return test.getIndent()
-    
+
     def describe(self, test, summary):
         prefix = "  " if summary else self.getPrefix(test)
         desc = test.state.description()
         if summary and "\n" in desc:
             desc = " ".join(desc.splitlines()[:2])
         plugins.log.info(prefix + repr(test) + " " + desc)
-            
-            
+
+
 class InteractiveResponder(plugins.Responder):
     def __init__(self, optionMap, *args):
         plugins.Responder.__init__(self)
@@ -118,7 +120,7 @@ class InteractiveResponder(plugins.Responder):
     def useInteractiveResponse(self, test):
         return test.state.hasFailed() and not self.overwriteFailure
 
-    def presentInteractiveDialog(self, test):            
+    def presentInteractiveDialog(self, test):
         performView = self.askUser(test, allowView=1)
         if performView:
             self.writeTextDiffs(test)
@@ -131,11 +133,11 @@ class InteractiveResponder(plugins.Responder):
             return None, None
         if comparison.newResult():
             tool = test.getCompositeConfigValue("view_program", comparison.stem)
-            cmdArgs = [ tool, comparison.tmpCmpFile ]
+            cmdArgs = [tool, comparison.tmpCmpFile]
         else:
             tool = test.getCompositeConfigValue("diff_program", comparison.stem)
-            cmdArgs = [ tool, comparison.stdCmpFile, comparison.tmpCmpFile ]
-        return tool, cmdArgs        
+            cmdArgs = [tool, comparison.stdCmpFile, comparison.tmpCmpFile]
+        return tool, cmdArgs
 
     def writeTextDiffs(self, test):
         outputText = test.state.freeText
@@ -157,9 +159,9 @@ class InteractiveResponder(plugins.Responder):
                     plugins.log.info("<No window created - could not find graphical difference tool '" + tool + "'>")
 
     def getPrefix(self, test):
-        return test.getIndent() # Mostly so we can override for queuesystem module
+        return test.getIndent()  # Mostly so we can override for queuesystem module
 
-    def askUser(self, test, allowView, process=None):      
+    def askUser(self, test, allowView, process=None):
         versions = test.app.getSaveableVersions()
         options = ""
         for i in range(len(versions)):

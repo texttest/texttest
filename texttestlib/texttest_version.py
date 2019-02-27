@@ -9,6 +9,6 @@ version = "trunk"
 
 # Which python version do we require?
 required_python_version = (2, 6, 0)
-    
+
 # Which pygtk version do we require?
 required_pygtk_version = (2, 16, 0)

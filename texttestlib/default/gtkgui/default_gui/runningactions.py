@@ -3,19 +3,24 @@
 The various ways to launch the dynamic GUI from the static GUI
 """
 from gi.repository import Gtk, GObject
-import os, sys, stat
+import os
+import sys
+import stat
 from texttestlib import plugins
 from .. import guiplugins
 from copy import copy, deepcopy
 from io import StringIO
 
 # Runs the dynamic GUI, but not necessarily with all the options available from the configuration
+
+
 class BasicRunningAction:
     runNumber = 1
+
     def __init__(self, inputOptions):
         self.inputOptions = inputOptions
         self.testCount = 0
-        
+
     def getTabTitle(self):
         return "Running"
 
@@ -29,7 +34,7 @@ class BasicRunningAction:
             return str(self.testCount) + " tests"
 
     def performOnCurrent(self):
-        self.startTextTestProcess(self.getUseCaseName(), [ "-g" ])
+        self.startTextTestProcess(self.getUseCaseName(), ["-g"])
 
     def getTestsAffected(self, testSelOverride):
         if testSelOverride:
@@ -37,13 +42,13 @@ class BasicRunningAction:
         else:
             # Take a copy so we aren't fooled by selection changes
             return copy(self.currTestSelection)
-        
+
     def getRunWriteDirectory(self, app):
         return os.path.join(self.getLogRootDirectory(app), "dynamic_run" + str(self.runNumber))
-        
+
     def startTextTestProcess(self, usecase, runModeOptions, testSelOverride=None, filterFileOverride=None):
         app = self.getCurrentApplication()
-        writeDir = self.getRunWriteDirectory(app)        
+        writeDir = self.getRunWriteDirectory(app)
         plugins.ensureDirectoryExists(writeDir)
         filterFile = self.createFilterFile(writeDir, filterFileOverride)
         ttOptions = runModeOptions + self.getTextTestOptions(filterFile, app, usecase)
@@ -52,13 +57,13 @@ class BasicRunningAction:
         errFile = os.path.join(writeDir, "errors.log")
         BasicRunningAction.runNumber += 1
         description = "Dynamic GUI started at " + plugins.localtime()
-        cmdArgs = self.getInterpreterArgs() + [ sys.argv[0] ] + ttOptions
+        cmdArgs = self.getInterpreterArgs() + [sys.argv[0]] + ttOptions
         env = self.getNewUseCaseEnvironment(usecase)
         testsAffected = self.getTestsAffected(testSelOverride)
         guiplugins.processMonitor.startProcess(cmdArgs, description, env=env, killOnTermination=self.killOnTermination(),
                                                stdout=open(logFile, "w"), stderr=open(errFile, "w"),
                                                exitHandler=self.checkTestRun,
-                                               exitHandlerArgs=(errFile,testsAffected,filterFile,usecase))
+                                               exitHandlerArgs=(errFile, testsAffected, filterFile, usecase))
 
     def getCurrentApplication(self):
         return self.currAppSelection[0] if self.currAppSelection else self.validApps[0]
@@ -86,7 +91,7 @@ class BasicRunningAction:
         return environ
 
     def getSignalsSent(self):
-        return [ "SaveSelection" ]
+        return ["SaveSelection"]
 
     def createFilterFile(self, writeDir, filterFileOverride):
         # Because the description of the selection can be extremely long, we write it in a file and refer to it
@@ -95,37 +100,39 @@ class BasicRunningAction:
             filterFileName = os.path.join(writeDir, "gui_select")
             self.notify("SaveSelection", filterFileName)
             return filterFileName
-        elif filterFileOverride is not NotImplemented: 
+        elif filterFileOverride is not NotImplemented:
             return filterFileOverride
-    
+
     def getInterpreterArgs(self):
-        interpreterArg = os.getenv("TEXTTEST_DYNAMIC_GUI_INTERPRETER", "") # Alternative interpreter for the dynamic GUI : mostly useful for coverage / testing
+        # Alternative interpreter for the dynamic GUI : mostly useful for coverage / testing
+        interpreterArg = os.getenv("TEXTTEST_DYNAMIC_GUI_INTERPRETER", "")
         if interpreterArg:
             return plugins.splitcmd(interpreterArg.replace("ttpython", sys.executable))
-        else: # pragma: no cover - cannot test without StoryText on dynamic GUI
-            return [ sys.executable ]
+        else:  # pragma: no cover - cannot test without StoryText on dynamic GUI
+            return [sys.executable]
 
     def getOptionGroups(self):
-        return [ self.optionGroup ]
+        return [self.optionGroup]
 
     def getTextTestOptions(self, filterFile, app, usecase):
         ttOptions = self.getCmdlineOptionForApps(filterFile)
         for group in self.getOptionGroups():
-            ttOptions += self.getCommandLineArgs(group, self.getCommandLineKeys(usecase), self.getCommandLineExcludeKeys())
+            ttOptions += self.getCommandLineArgs(group, self.getCommandLineKeys(usecase),
+                                                 self.getCommandLineExcludeKeys())
         # May be slow to calculate for large test suites, cache it
         self.testCount = len(self.getTestCaseSelection())
-        ttOptions += [ "-count", str(self.testCount * self.getCountMultiplier()) ]
+        ttOptions += ["-count", str(self.testCount * self.getCountMultiplier())]
         if filterFile:
-            ttOptions += [ "-f", filterFile ]
+            ttOptions += ["-f", filterFile]
         tmpFilterDir = self.getTmpFilterDir(app)
         if tmpFilterDir:
-            ttOptions += [ "-fd", tmpFilterDir ]
+            ttOptions += ["-fd", tmpFilterDir]
         return ttOptions
 
     def getCommandLineKeys(self, *args):
         # assume everything by default
         return []
-    
+
     def getCommandLineExcludeKeys(self):
         return []
 
@@ -140,20 +147,20 @@ class BasicRunningAction:
             if value:
                 options.append(value)
         return options
-    
+
     def getTmpFilterDir(self, app):
         return os.path.join(app.writeDirectory, "temporary_filter_files")
 
     def getAppIdentifier(self, app):
         return app.name + app.versionSuffix()
-        
+
     def getCmdlineOptionForApps(self, filterFile):
         if not filterFile:
             return []
-        
+
         apps = sorted(self.currAppSelection, key=self.validApps.index)
         appNames = list(map(self.getAppIdentifier, apps))
-        return [ "-a", ",".join(appNames) ]
+        return ["-a", ",".join(appNames)]
 
     def checkTestRun(self, errFile, testSel, filterFile, usecase):
         if not testSel:
@@ -162,9 +169,9 @@ class BasicRunningAction:
             self.handleCompletion(testSel, filterFile, usecase)
             if len(self.currTestSelection) >= 1 and self.currTestSelection[0] in testSel:
                 self.currTestSelection[0].filesChanged()
-                
+
         testSel[0].notify("CloseDynamic", usecase)
-    
+
     def checkErrorFile(self, errFile, testSel, usecase):
         if os.path.isfile(errFile) and len(testSel) > 0:
             errText = testSel[0].app.filterErrorText(errFile)
@@ -180,7 +187,7 @@ class BasicRunningAction:
         return True
 
     def handleCompletion(self, *args):
-        pass # only used when recording
+        pass  # only used when recording
 
     def getConfirmationMessage(self):
         # For extra speed we check the selection first before we calculate all the test cases again...
@@ -195,36 +202,44 @@ class BasicRunningAction:
         pass
 
 
-class ReconnectToTests(BasicRunningAction,guiplugins.ActionDialogGUI):
+class ReconnectToTests(BasicRunningAction, guiplugins.ActionDialogGUI):
     def __init__(self, allApps, dynamic, inputOptions):
         guiplugins.ActionDialogGUI.__init__(self, allApps, dynamic)
         BasicRunningAction.__init__(self, inputOptions)
         self.addOption("v", "Version to reconnect to")
-        self.addOption("reconnect", "Temporary result directory", os.getenv("TEXTTEST_TMP", ""), selectDir=True, description="Specify a directory containing temporary texttest results. The reconnection will use a random subdirectory matching the version used.")
+        self.addOption("reconnect", "Temporary result directory", os.getenv("TEXTTEST_TMP", ""), selectDir=True,
+                       description="Specify a directory containing temporary texttest results. The reconnection will use a random subdirectory matching the version used.")
         appGroup = plugins.OptionGroup("Invisible")
         self.addApplicationOptions(allApps, appGroup, inputOptions)
         self.addSwitch("reconnfull", "Recomputation", options=appGroup.getOption("reconnfull").options)
-        
+
     def _getStockId(self):
         return "connect"
+
     def _getTitle(self):
         return "Re_connect..."
+
     def getTooltip(self):
         return "Reconnect to previously run tests"
+
     def performedDescription(self):
         return "Reconnected to"
+
     def getUseCaseName(self):
         return "reconnect"
+
     def performOnCurrent(self):
-        self.startTextTestProcess(self.getUseCaseName(), [ "-g" ] + self.getVanillaOption())
+        self.startTextTestProcess(self.getUseCaseName(), ["-g"] + self.getVanillaOption())
+
     def getAppIdentifier(self, app):
         # Don't send version data, we have our own field with that info and it has a slightly different meaning
         return app.name
+
     def getSizeAsWindowFraction(self):
         return 0.8, 0.7
-    
-    
-class ReloadTests(BasicRunningAction,guiplugins.ActionDialogGUI):
+
+
+class ReloadTests(BasicRunningAction, guiplugins.ActionDialogGUI):
     def __init__(self, allApps, dynamic, inputOptions):
         guiplugins.ActionDialogGUI.__init__(self, allApps, dynamic)
         BasicRunningAction.__init__(self, inputOptions)
@@ -233,45 +248,47 @@ class ReloadTests(BasicRunningAction,guiplugins.ActionDialogGUI):
         # Can be a limitation of this for the moment.
         self.addApplicationOptions(allApps, self.appGroup, inputOptions)
         self.addSwitch("reconnfull", "Recomputation", options=self.appGroup.getOption("reconnfull").options)
-    
+
     def getTmpDirectory(self):
         return self.currAppSelection[0].writeDirectory
-    
+
     def _getStockId(self):
         return "connect"
-    
+
     def _getTitle(self):
         return "Re_load tests..."
-    
+
     def getTooltip(self):
         return "Reload current results into new dynamic GUI"
-    
+
     def performedDescription(self):
         return "Reloaded"
-    
+
     def getUseCaseName(self):
         return "reload"
-    
+
     def performOnCurrent(self):
         if self.appGroup.getOptionValue("reconnfull") == 0:
             # We want to reload the results exactly as they are currently
             # This will only be possible if we make sure to save the teststate files first
             self.saveTestStates()
-        self.startTextTestProcess(self.getUseCaseName(), [ "-g", "-reconnect", self.getTmpDirectory() ] + self.getVanillaOption())
-    
+        self.startTextTestProcess(self.getUseCaseName(), [
+                                  "-g", "-reconnect", self.getTmpDirectory()] + self.getVanillaOption())
+
     def saveTestStates(self):
         for test in self.currTestSelection:
-            if test.state.isComplete(): # might look weird but this notification also comes in scripts etc.
+            if test.state.isComplete():  # might look weird but this notification also comes in scripts etc.
                 test.saveState()
-            
+
     def getAppIdentifier(self, app):
         # Don't send version data, we have our own field with that info and it has a slightly different meaning
         return app.name
-    
+
 
 # base class for RunTests and RerunTests, i.e. all the options are available
 class RunningAction(BasicRunningAction):
     originalVersion = ""
+
     def __init__(self, allApps, inputOptions):
         BasicRunningAction.__init__(self, inputOptions)
         self.optionGroups = []
@@ -291,7 +308,7 @@ class RunningAction(BasicRunningAction):
         RunningAction.originalVersion = self.getVersionString()
 
     def getFileTypes(self, allApps):
-        ignoreTypes = [ "testsuite", "knownbugs", "stdin", "input", "testcustomize.py" ]
+        ignoreTypes = ["testsuite", "knownbugs", "stdin", "input", "testcustomize.py"]
         fileTypes = []
         for app in allApps:
             for ft in app.defFileStems("builtin") + app.defFileStems("default"):
@@ -306,7 +323,7 @@ class RunningAction(BasicRunningAction):
             fileType = self.temporaryGroup.getValue("filetype")
             writeDir = os.path.dirname(filterFile)
             tmpDir = self.makeTemporarySettingsDir(writeDir, app, fileType, contents)
-            ret += [ "-td", tmpDir ]
+            ret += ["-td", tmpDir]
         return ret
 
     def makeTemporarySettingsDir(self, writeDir, app, fileType, contents):
@@ -316,7 +333,7 @@ class RunningAction(BasicRunningAction):
         with open(fileName, "w") as f:
             f.write(contents)
         return tmpDir
-    
+
     def getGroupNames(self, allApps):
         if len(allApps) > 0:
             return allApps[0].getAllRunningGroupNames(allApps)
@@ -326,7 +343,7 @@ class RunningAction(BasicRunningAction):
 
     def createCheckBox(self, switch, *args):
         widget = guiplugins.OptionGroupGUI.createCheckBox(self, switch, *args)
-        self.storeSwitch(switch, [ widget ])
+        self.storeSwitch(switch, [widget])
         return widget
 
     def createRadioButtons(self, switch, *args):
@@ -339,7 +356,7 @@ class RunningAction(BasicRunningAction):
             disablingOptionValue, group = self.disablingInfo[switch]
             if disablingOptionValue < len(widgets):
                 self.disableWidgets[widgets[disablingOptionValue]] = switch, disablingOptionValue, group
-            
+
     def getOption(self, optName):
         for group in self.optionGroups:
             opt = group.getOption(optName)
@@ -399,7 +416,7 @@ class RunningAction(BasicRunningAction):
     def createNotebook(self):
         notebook = Gtk.Notebook()
         notebook.set_name("sub-notebook for running")
-        tabNames = [ "Basic", "Advanced" ]
+        tabNames = ["Basic", "Advanced"]
         frames = []
         for group in self.optionGroups:
             if group.name in tabNames:
@@ -439,7 +456,7 @@ class RunningAction(BasicRunningAction):
         for widget, data in list(self.disableWidgets.items()):
             self.updateSensitivity(widget, data)
             widget.connect("toggled", self.updateSensitivity, data)
-        self.disableWidgets = {} # not needed any more
+        self.disableWidgets = {}  # not needed any more
 
     def notifyReset(self, *args):
         for optionGroup in self.optionGroups:
@@ -450,11 +467,11 @@ class RunningAction(BasicRunningAction):
         return "media-play"
 
 
-class RunTests(RunningAction,guiplugins.ActionTabGUI):
+class RunTests(RunningAction, guiplugins.ActionTabGUI):
     def __init__(self, allApps, dummy, inputOptions):
         guiplugins.ActionTabGUI.__init__(self, allApps)
         RunningAction.__init__(self, allApps, inputOptions)
-        
+
     def _getTitle(self):
         return "_Run"
 
@@ -474,7 +491,7 @@ class RunTests(RunningAction,guiplugins.ActionTabGUI):
     def notifySetRunName(self, name):
         nameOption = self.getOption("name")
         self.updateName(nameOption, name)
-        
+
     def addApplicationOptions(self, allApps, group, inputOptions):
         guiplugins.ActionTabGUI.addApplicationOptions(self, allApps, group, inputOptions)
         nameOption = group.getOption("name")
@@ -482,7 +499,7 @@ class RunTests(RunningAction,guiplugins.ActionTabGUI):
             self.updateName(nameOption, nameOption.getValue())
 
 
-class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
+class RerunTests(RunningAction, guiplugins.ActionDialogGUI):
     def __init__(self, allApps, dummy, inputOptions):
         guiplugins.ActionDialogGUI.__init__(self, allApps)
         RunningAction.__init__(self, allApps, inputOptions)
@@ -494,14 +511,14 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
                 return
 
     def updateOptions(self):
-        checkouts = []        
+        checkouts = []
         for app in self.currAppSelection:
             path = app.getGivenCheckoutPath(app)
             if path and path not in checkouts and not app.isAutogeneratedFromCwd(path):
                 checkouts.append(path)
         if checkouts:
             self.getOption("c").setValue(",".join(checkouts))
-        
+
     def _getTitle(self):
         return "_Rerun"
 
@@ -510,50 +527,50 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
 
     def getUseCaseName(self):
         return "rerun"
-    
+
     def getSignalsSent(self):
-        return RunningAction.getSignalsSent(self) + [ "Mark" ]
+        return RunningAction.getSignalsSent(self) + ["Mark"]
 
     def killOnTermination(self):
-        return False # don't want rerun GUIs to disturb each other like this
+        return False  # don't want rerun GUIs to disturb each other like this
 
     def getCommandLineExcludeKeys(self):
-        return [ "mark" ]
-    
+        return ["mark"]
+
     def getTmpFilterDir(self, app):
-        return "" # don't want selections returned here, send them to the static GUI
-    
+        return ""  # don't want selections returned here, send them to the static GUI
+
     def getConfirmationMessage(self):
         return BasicRunningAction.getConfirmationMessage(self)
-    
+
     def getTextTestOptions(self, filterFile, app, usecase):
         rerunId = str(self.runNumber)
         if not self.getOption("name").getValue():
             rerunId += " from " + plugins.startTimeString()
-        return RunningAction.getTextTestOptions(self, filterFile, app, usecase) + [ "-rerun", rerunId ]
-    
+        return RunningAction.getTextTestOptions(self, filterFile, app, usecase) + ["-rerun", rerunId]
+
     def getLogRootDirectory(self, app):
         if "f" in self.inputOptions:
             logRootDir = os.path.dirname(self.inputOptions["f"])
             if os.path.basename(logRootDir).startswith("dynamic_run"):
                 return logRootDir
         return BasicRunningAction.getLogRootDirectory(self, app)
-    
+
     def getRunWriteDirectory(self, app):
         fromDynamic = self.startedFromDynamicGui(app)
         if fromDynamic:
             return os.path.join(os.getenv("TEXTTEST_TMP"), "dynamic_run" + str(self.runNumber) + "_" + plugins.startTimeString().replace(":", ""))
         else:
             return RunningAction.getRunWriteDirectory(self, app)
-            
+
     def startedFromDynamicGui(self, app):
         return not app.useStaticGUI() and not "dynamic_run" in os.path.basename(self.getLogRootDirectory(app))
-    
+
     def getExtraParent(self, app):
         for other in self.validApps:
             if app in other.extras:
                 return other
-    
+
     def getExtraVersions(self, app):
         if app.extras or any((v.startswith("copy_") for v in app.versions)):
             return []
@@ -565,7 +582,7 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
             return [v for v in app.versions if v in extrasGiven]
 
     def getAppIdentifier(self, app):
-        parts = [ app.name ] + self.getExtraVersions(app)
+        parts = [app.name] + self.getExtraVersions(app)
         return ".".join(parts)
 
     def checkTestRun(self, errFile, testSel, filterFile, usecase):
@@ -577,7 +594,7 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
                 writeDir = os.path.dirname(errFile)
                 plugins.rmtree(writeDir)
             testSel[0].notify("CloseDynamic", usecase)
-            
+
     def getOrderedOptions(self, optionGroup):
         options, switches = self.extractSwitches(optionGroup)
         return options + switches
@@ -586,18 +603,19 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
         if optionGroup is self.optionGroup:
             notebook = self.createNotebook()
             vbox.pack_start(notebook, True, True, 0)
-            return None, None # no file chooser info
+            return None, None  # no file chooser info
         else:
             return guiplugins.ActionDialogGUI.fillVBox(self, vbox, optionGroup, includeOverrides=False)
-        
+
     def performOnCurrent(self):
         RunningAction.performOnCurrent(self)
         if self.getOption("mark").getValue():
             lastRunText = str(self.runNumber - 1)
             self.rerunTests = copy(self.currTestSelection)
             for test in self.currTestSelection:
-                self.notify("Mark", test, "Test is being rerun in another window, numbered " + lastRunText, "Rerun " + lastRunText)
-                
+                self.notify("Mark", test, "Test is being rerun in another window, numbered " +
+                            lastRunText, "Rerun " + lastRunText)
+
     def getTestCaseSelection(self):
         if self.rerunTests:
             tests = self.rerunTests
@@ -610,7 +628,7 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
         return 0.8, 0.9
 
 
-class RecordTest(BasicRunningAction,guiplugins.ActionDialogGUI):
+class RecordTest(BasicRunningAction, guiplugins.ActionDialogGUI):
     def __init__(self, allApps, dynamic, inputOptions):
         guiplugins.ActionDialogGUI.__init__(self, allApps, dynamic)
         BasicRunningAction.__init__(self, inputOptions)
@@ -637,9 +655,9 @@ class RecordTest(BasicRunningAction,guiplugins.ActionDialogGUI):
 
     def addSwitches(self):
         if self.currentApp and self.currentApp.usesCaptureMock():
-            self.currentApp.addCaptureMockSwitch(self.optionGroup, value=1) # record new by default
+            self.currentApp.addCaptureMockSwitch(self.optionGroup, value=1)  # record new by default
         self.addSwitch("rep", "Automatically replay test after recording it", 2,
-                       options = [ "Disabled", "In background", "Using dynamic GUI" ])
+                       options=["Disabled", "In background", "Using dynamic GUI"])
         if self.currentApp and self.currentApp.getConfigValue("extra_test_process_postfix"):
             self.addSwitch("mult", "Record multiple runs of system")
 
@@ -664,15 +682,15 @@ class RecordTest(BasicRunningAction,guiplugins.ActionDialogGUI):
         if self.optionGroup.getSwitchValue("mult"):
             self.touchFiles(test)
         self.updateRecordTime(test)
-        self.startTextTestProcess("record", [ "-g", "-record" ] + self.getVanillaOption())
+        self.startTextTestProcess("record", ["-g", "-record"] + self.getVanillaOption())
 
     def shouldShowCurrent(self, *args):
         # override the default so it's disabled if there are no apps
-        return len(self.validApps) > 0 and guiplugins.ActionDialogGUI.shouldShowCurrent(self, *args) 
+        return len(self.validApps) > 0 and guiplugins.ActionDialogGUI.shouldShowCurrent(self, *args)
 
     def isValidForApp(self, app):
         return app.getConfigValue("use_case_record_mode") != "disabled" and \
-               app.getConfigValue("use_case_recorder") != "none"
+            app.getConfigValue("use_case_recorder") != "none"
 
     def updateOptions(self):
         if self.currentApp is not self.currAppSelection[0]:
@@ -690,6 +708,7 @@ class RecordTest(BasicRunningAction,guiplugins.ActionDialogGUI):
         file = self.getUseCaseFile(test)
         if file:
             self._updateRecordTime(file)
+
     def _updateRecordTime(self, file):
         newTime = plugins.modifiedTime(file)
         if newTime != self.recordTime:
@@ -697,14 +716,16 @@ class RecordTest(BasicRunningAction,guiplugins.ActionDialogGUI):
             return True
         else:
             return False
+
     def getChangedUseCaseVersion(self, test):
-        test.refreshFiles() # update cache after record run
+        test.refreshFiles()  # update cache after record run
         file = self.getUseCaseFile(test)
         if not file or not self._updateRecordTime(file):
             return
 
         parts = os.path.basename(file).split(".")
         return ".".join(parts[2:])
+
     def getMultipleTestWarning(self):
         return "record " + self.describeTests() + " simultaneously"
 
@@ -725,16 +746,16 @@ class RecordTest(BasicRunningAction,guiplugins.ActionDialogGUI):
             self.notify("Status", "Recording and auto-replay completed for " + repr(test))
 
     def getCommandLineKeys(self, usecase):
-        keys = [ "v", "c", "m" ]
+        keys = ["v", "c", "m"]
         if usecase == "record":
             keys.append("rectraffic")
         return keys
 
     def getReplayRunModeOptions(self, overwriteVersion):
         if self.optionGroup.getSwitchValue("rep") == 2:
-            return [ "-autoreplay", "-g" ]
+            return ["-autoreplay", "-g"]
         else:
-            return [ "-autoreplay", "-o", overwriteVersion ]
+            return ["-autoreplay", "-o", overwriteVersion]
 
     def _getTitle(self):
         return "Record _Use-Case"
@@ -748,14 +769,14 @@ class RunScriptAction(BasicRunningAction):
         return "script"
 
     def performOnCurrent(self, **kw):
-        self.startTextTestProcess(self.getUseCaseName(), [ "-g" ] + self.getVanillaOption(), **kw)
+        self.startTextTestProcess(self.getUseCaseName(), ["-g"] + self.getVanillaOption(), **kw)
 
     def getCommandLineArgs(self, optionGroup, *args):
-        args = [ self.scriptName() ]
+        args = [self.scriptName()]
         for key, option in list(optionGroup.options.items()):
             args.append(key + "=" + str(option.getValue()))
 
-        return [ "-s", " ".join(args) ]
+        return ["-s", " ".join(args)]
 
 
 class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
@@ -767,13 +788,13 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
         self.addOption("new", "Text to replace it with (may contain regexp back references)", multilineEntry=True)
         self.addOption("file", "File stem(s) to perform replacement in", allocateNofValues=2)
         self.storytextDirs = {}
-            
+
     def getCmdlineOptionForApps(self, filterFile):
         options = RunScriptAction.getCmdlineOptionForApps(self, filterFile)
         if self.shouldAddShortcuts():
             options[1] = options[1] + ",shortcut"
             directoryStr = os.path.dirname(filterFile) + os.pathsep + os.pathsep.join(self.inputOptions.rootDirectories)
-            options += [ "-d", directoryStr ]
+            options += ["-d", directoryStr]
         return options
 
     def createFilterFile(self, writeDir, filterFileOverride):
@@ -801,7 +822,7 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
     def notifyUsecaseRename(self, argstr, *args):
         self.showQueryDialog(self.getParentWindow(), "Usecase names were renamed. Would you like to update them in all usecases now?",
                              Gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respondUsecaseRename, respondData=(argstr, False, "*usecase*,stdout"))
-        
+
     def notifyShortcutRename(self, argstr, *args):
         self.showQueryDialog(self.getParentWindow(), "Shortcuts were renamed. Would you like to update all usecases now?",
                              Gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respondUsecaseRename, respondData=(argstr, True, "*usecase*"))
@@ -812,7 +833,7 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
 
     def respondUsecaseRename(self, dialog, ans, args):
         if ans == Gtk.ResponseType.YES:
-            oldName, newName =  args[0].split(" renamed to ")
+            oldName, newName = args[0].split(" renamed to ")
             if args[1]:
                 self.optionGroup.setValue("regexp", 1)
                 self.addSwitch("argsReplacement", "", 1)
@@ -826,16 +847,16 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
         for app, storyTextHome in list(self.storytextDirs.items()):
             self.createConfigFile(app, writeDir)
             self.createTestSuiteFile(app, storyTextHome, writeDir)
-    
+
     def createConfigFile(self, app, writeDir):
         configFileName = os.path.join(writeDir, "config.shortcut")
-        with  open(configFileName, "w") as configFile:
+        with open(configFileName, "w") as configFile:
             configFile.write("executable:None\n")
             configFile.write("filename_convention_scheme:standard\n")
             configFile.write("use_case_record_mode:GUI\n")
             configFile.write("use_case_recorder:storytext")
         return configFileName
-    
+
     def createTestSuiteFile(self, app, storyTextHome, writeDir):
         suiteFileName = os.path.join(writeDir, "testsuite.shortcut")
         with open(suiteFileName, "w") as suiteFile:
@@ -853,7 +874,7 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
 
     def performedDescription(self):
         return "Replaced text in files for"
-    
+
     def getSizeAsWindowFraction(self):
         # size of the dialog
         return 0.5, 0.5
@@ -883,14 +904,13 @@ class TestFileFilterHelper:
             os.rename(tmpFileName, bakFileName)
         with open(tmpFileName, "w") as tmpFile:
             tmpFile.write(text)
-            
+
         # Don't want people editing by mistake, remove write permissions
         os.chmod(tmpFileName, stat.S_IREAD)
         self.notify("ViewReadonlyFile", tmpFileName)
-        
-    def getSignalsSent(self):
-        return [ "ViewReadonlyFile" ]
 
+    def getSignalsSent(self):
+        return ["ViewReadonlyFile"]
 
 
 class TestFileFiltering(TestFileFilterHelper, guiplugins.ActionGUI):
@@ -902,12 +922,12 @@ class TestFileFiltering(TestFileFilterHelper, guiplugins.ActionGUI):
 
     def getTextToShow(self, test, fileName):
         return test.app.applyFiltering(test, fileName)
-    
+
     def performOnCurrent(self):
-        self.reloadConfigForSelected() # Always make sure we're up to date here
+        self.reloadConfigForSelected()  # Always make sure we're up to date here
         text = self.getTextToShow(self.currTestSelection[0], self.currFileSelection[0][0])
         self.showTextInFile(text)
-    
+
 
 class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
     def __init__(self, *args, **kw):
@@ -915,60 +935,62 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
         self.textBuffer = None
         self.filtersWithModels = []
         self.toRemove = {}
-        
+
     def _getTitle(self):
         return "Show Filters"
-    
+
     def isActiveOnCurrent(self):
         return len(self.currFileSelection) == 1 and len(self.currTestSelection) == 1
-        
+
     def addContents(self):
-        self.reloadConfigForSelected() # Always make sure we're up to date here
+        self.reloadConfigForSelected()  # Always make sure we're up to date here
         fileName = self.currFileSelection[0][0]
         test = self.currTestSelection[0]
         allFilters, versionApp = test.app.getAllFilters(test, fileName)
         if allFilters:
             self.addFilterBoxes(allFilters, fileName, test, versionApp)
         else:
-            messageBox = self.createDialogMessage("No run_dependent_text filters defined for file '" + os.path.basename(fileName) + "' for this test.", Gtk.STOCK_DIALOG_INFO)
+            messageBox = self.createDialogMessage(
+                "No run_dependent_text filters defined for file '" + os.path.basename(fileName) + "' for this test.", Gtk.STOCK_DIALOG_INFO)
             self.dialog.vbox.pack_start(messageBox, True, True, 0)
-            
+
     def editFilter(self, cell, path, newText, model):
         lineFilter = model[path][0]
         model[path][0] = lineFilter.makeNew(newText)
-            
+
     def showToggled(self, cell, path, model):
         # Toggle the toggle button
         newValue = not model[path][1]
         model[path][1] = newValue
-        
+
     def setText(self, column, cell, model, iter):
         cell.set_property('text', model.get_value(iter, 0).originalText)
 
     def getStem(self, fileName):
         return os.path.basename(fileName).split(".")[0]
-    
+
     def addRow(self, menuItem, model, selection, configKey):
         iter = self.getSelectedIters(selection)[-1]
         lineFilter, relpath, stem = model.get(iter, 0, 2, 3)
-        newIter = model.insert_after(iter, [ lineFilter.makeNew(""), True, relpath, stem, "" ])
+        newIter = model.insert_after(iter, [lineFilter.makeNew(""), True, relpath, stem, ""])
         path = model.get_path(newIter)
         column = selection.get_tree_view().get_column(0)
         selection.get_tree_view().set_cursor(path, column, start_editing=True)
-    
+
     def getSelectedIters(self, selection):
         iters = []
+
         def addSelIter(model, path, iter):
             iters.append(iter)
-            
+
         selection.selected_foreach(addSelIter)
         return iters
-    
+
     def removeRow(self, menuItem, model, selection, configKey):
         for iter in self.getSelectedIters(selection):
             self.addChangeData(model, iter, configKey, self.toRemove)
             model.remove(iter)
-    
+
     def makePopup(self, *args):
         menu = Gtk.Menu()
         menuItem = Gtk.MenuItem("Add Row")
@@ -980,14 +1002,14 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
         menuItem.connect("activate", self.removeRow, *args)
         menuItem.show()
         return menu
-    
+
     def showPopup(self, treeview, event, popupMenu):
         if event.button == 3:
             pathInfo = treeview.get_path_at_pos(int(event.x), int(event.y))
             if pathInfo is not None:
                 treeview.grab_focus()
                 popupMenu.popup(None, None, None, event.button, event.time)
-                
+
     def addFilterBoxes(self, allFilters, fileName, test, versionApp):
         filterFrame = Gtk.Frame.new("Filters to apply")
         filterFrame.set_border_width(1)
@@ -995,12 +1017,13 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
         for filterObj in allFilters:
             listStore = Gtk.ListStore(GObject.TYPE_PYOBJECT, bool, str, str, str)
             for lineFilter in filterObj.lineFilters:
-                lineFilterFile, stem = test.getConfigFileDefining(versionApp, filterObj.configKey, self.getStem(fileName), lineFilter.originalText)
+                lineFilterFile, stem = test.getConfigFileDefining(
+                    versionApp, filterObj.configKey, self.getStem(fileName), lineFilter.originalText)
                 relPath = plugins.relpath(lineFilterFile, test.app.getDirectory()) if lineFilterFile else "???"
-                listStore.append([ lineFilter, True, relPath, stem, lineFilter.originalText ])
+                listStore.append([lineFilter, True, relPath, stem, lineFilter.originalText])
             treeView = Gtk.TreeView(listStore)
             treeView.set_name(filterObj.configKey + " Tree View")
-        
+
             cell = Gtk.CellRendererText()
             cell.set_property('editable', True)
             cell.connect('edited', self.editFilter, listStore)
@@ -1008,23 +1031,23 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
             column.pack_start(cell, True)
             column.set_cell_data_func(cell, self.setText)
             treeView.append_column(column)
-            
+
             toggleCell = Gtk.CellRendererToggle()
             toggleCell.set_property('activatable', True)
             toggleCell.connect("toggled", self.showToggled, listStore)
-            column = Gtk.TreeViewColumn("Enabled", toggleCell, active=1)         
+            column = Gtk.TreeViewColumn("Enabled", toggleCell, active=1)
             treeView.append_column(column)
-            
+
             cell = Gtk.CellRendererText()
-            column = Gtk.TreeViewColumn("Config File", cell, text=2)         
+            column = Gtk.TreeViewColumn("Config File", cell, text=2)
             treeView.append_column(column)
-            
+
             selection = treeView.get_selection()
             selection.set_mode(Gtk.SelectionMode.MULTIPLE)
-            
-            popup = self.makePopup(listStore, selection, filterObj.configKey) 
+
+            popup = self.makePopup(listStore, selection, filterObj.configKey)
             treeView.connect("button_press_event", self.showPopup, popup)
-            
+
             frame = Gtk.Frame()
             frame.set_border_width(1)
             frame.add(treeView)
@@ -1038,22 +1061,23 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
         with open(fileName) as f:
             self.textBuffer.set_text(f.read())
         self.dialog.vbox.pack_start(frame, True, True, 0)
-        
+
     def testFiltering(self, *args):
         filteredText = self.getFilteredText()
         self.showTextInFile(filteredText)
-        
+
     def getText(self):
         return self.textBuffer.get_text(self.textBuffer.get_start_iter(), self.textBuffer.get_end_iter(), True)
-        
+
     def updateFilter(self, fileFilter, model):
         enabledFilters = []
+
         def addFilter(model, path, iter):
             if model.get_value(iter, 1):
                 enabledFilters.append(model.get_value(iter, 0))
         model.foreach(addFilter)
         fileFilter.lineFilters = enabledFilters
-        
+
     def getFilteredText(self):
         inFile = StringIO()
         inFile.write(self.getText())
@@ -1068,7 +1092,7 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
         value = outFile.getvalue()
         outFile.close()
         return value
-    
+
     def addChangeData(self, model, iter, configKey, changes):
         fileName, stem, origText = model.get(iter, 2, 3, 4)
         oldLine = stem + ":" + origText
@@ -1077,6 +1101,7 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
 
     def getChanges(self):
         changes = {}
+
         def addChange(model, path, iter, configKey):
             text = model.get_value(iter, 0).originalText
             oldText = model.get_value(iter, 4)
@@ -1093,7 +1118,7 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
     def getSectionName(self, line):
         pos = line.find("]")
         return line[1:pos]
-    
+
     def applyChanges(self, line, changeList):
         for oldText, newText in changeList:
             if line.startswith(oldText):
@@ -1103,7 +1128,7 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
                 else:
                     return line.replace(oldText, newText, 1) if newText else None, None
         return line, None
-    
+
     def saveChanges(self):
         changesByFile = self.getChanges()
         if changesByFile:
@@ -1127,12 +1152,12 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
                                     newFileLines.append(newLine + "\n")
                                 currNewLines = []
                             newFileLines.append(line)
-                                
+
                 with open(fullPath, "w") as f:
                     for line in newFileLines:
                         f.write(line)
 
-    def createButtons(self):        
+    def createButtons(self):
         button = self.dialog.add_button('Test Filtering', Gtk.ResponseType.NONE)
         button.connect("clicked", self.testFiltering)
         self.dialog.add_button(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
@@ -1144,10 +1169,10 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
         if responseId == Gtk.ResponseType.ACCEPT:
             self.saveChanges()
         guiplugins.ActionResultDialogGUI.respond(self, dialog, responseId)
-        
+
     def getSizeAsWindowFraction(self):
         return 0.8, 0.9
-    
+
 
 class InsertShortcuts(RunScriptAction, guiplugins.OptionGroupGUI):
     def __init__(self, allApps, dynamic, inputOptions):
@@ -1156,31 +1181,32 @@ class InsertShortcuts(RunScriptAction, guiplugins.OptionGroupGUI):
 
     def scriptName(self):
         return "default.InsertShortcuts"
-    
+
     def _getTitle(self):
         return "Insert Shortcuts into Usecases"
-    
+
     def getTootip(self):
         return self._getTitle()
-    
+
     def notifyShortcut(self, *args):
         self.showQueryDialog(self.getParentWindow(), "New shortcuts were created. Would you like to insert them into all usecases now?",
                              Gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respondShortcut)
-        
+
     def respondShortcut(self, dialog, ans, *args):
         if ans == Gtk.ResponseType.YES:
             self.performOnCurrent(filterFileOverride=NotImplemented)
         dialog.hide()
-        
+
     def performedDescription(self):
         return "Inserted shortcuts into usecases for"
-    
+
     def isValidForApp(self, app):
         return app.getConfigValue("use_case_record_mode") != "disabled" and \
-               app.getConfigValue("use_case_recorder") != "none"
+            app.getConfigValue("use_case_recorder") != "none"
+
 
 def getInteractiveActionClasses(dynamic):
     if dynamic:
-        return [ RerunTests, ReloadTests ]
+        return [RerunTests, ReloadTests]
     else:
-        return [ RunTests, RecordTest, ReconnectToTests, ReplaceText, ShowFilters, TestFileFiltering, InsertShortcuts ]
+        return [RunTests, RecordTest, ReconnectToTests, ReplaceText, ShowFilters, TestFileFiltering, InsertShortcuts]

@@ -1,4 +1,8 @@
-import os, filecmp, string, shutil, logging
+import os
+import filecmp
+import string
+import shutil
+import logging
 from texttestlib.default import performance, knownbugs
 from texttestlib import plugins
 from collections import OrderedDict
@@ -9,9 +13,10 @@ from fnmatch import fnmatch
 plugins.addCategory("success", "succeeded")
 plugins.addCategory("failure", "FAILED")
 
+
 class BaseTestComparison(plugins.TestState):
     def __init__(self, category, previousInfo, completed, lifecycleChange=""):
-        plugins.TestState.__init__(self, category, "", started=1, completed=completed, \
+        plugins.TestState.__init__(self, category, "", started=1, completed=completed,
                                    lifecycleChange=lifecycleChange, executionHosts=previousInfo.executionHosts)
         self.allResults = []
         self.changedResults = []
@@ -27,7 +32,7 @@ class BaseTestComparison(plugins.TestState):
         return len(self.newResults) == len(self.allResults)
 
     def findComparison(self, stem, includeSuccess=False):
-        lists = [ self.changedResults, self.newResults, self.missingResults ]
+        lists = [self.changedResults, self.newResults, self.missingResults]
         if includeSuccess:
             lists.append(self.correctResults)
         self.diag.info("Finding comparison for stem " + stem)
@@ -36,9 +41,9 @@ class BaseTestComparison(plugins.TestState):
                 if comparison.stem == stem:
                     return comparison, list
         return None, None
-    
+
     def findComparisonsMatching(self, pattern):
-        lists = [ self.changedResults, self.newResults, self.missingResults, self.correctResults ]
+        lists = [self.changedResults, self.newResults, self.missingResults, self.correctResults]
         self.diag.info("Finding comparison matching stem " + pattern)
         comps = []
         for list in lists:
@@ -46,7 +51,7 @@ class BaseTestComparison(plugins.TestState):
                 if fnmatch(comparison.stem, pattern):
                     comps.append(comparison)
         return comps
-    
+
     def removeComparison(self, stem):
         comparison, newList = self.findComparison(stem)
         newList.remove(comparison)
@@ -111,7 +116,7 @@ class BaseTestComparison(plugins.TestState):
         for tmpStem, tmpFile in list(tmpFiles.items()):
             self.notifyIfMainThread("ActionProgress")
             stdFile = stdFiles.get(tmpStem)
-            self.diag.info("Comparing " + repr(stdFile) + "\nwith " + tmpFile) 
+            self.diag.info("Comparing " + repr(stdFile) + "\nwith " + tmpFile)
             comparison = self.createFileComparison(test, tmpStem, stdFile, tmpFile)
             if comparison:
                 self.addComparison(comparison)
@@ -153,7 +158,8 @@ class BaseTestComparison(plugins.TestState):
             stem = os.path.basename(file).split(".")[0]
             stemDict[stem] = file
         return stemDict
-        
+
+
 class TestComparison(BaseTestComparison):
     def __init__(self, previousInfo, app, lifecycleChange="", copyFailedPrediction=True):
         BaseTestComparison.__init__(self, "failure", previousInfo, completed=1, lifecycleChange=lifecycleChange)
@@ -163,8 +169,8 @@ class TestComparison(BaseTestComparison):
         # Cache these only so it gets output when we pickle, so we can re-interpret if needed... data may be moved
         self.appAbsPath = app.getDirectory()
         self.appWriteDir = app.writeDirectory
-        
-    def categoryRepr(self):    
+
+    def categoryRepr(self):
         if self.failedPrediction:
             longDescription = self.categoryDescriptions[self.category][1]
             return longDescription + " (" + self.failedPrediction.briefText + ")"
@@ -214,7 +220,7 @@ class TestComparison(BaseTestComparison):
 
     def hasSucceeded(self):
         return self.category == "success"
-    
+
     def getExitCode(self):
         if self.hasFailed():
             if self.failedPrediction is not None:
@@ -227,7 +233,7 @@ class TestComparison(BaseTestComparison):
 
     def warnOnSave(self):
         return bool(self.failedPrediction)
-    
+
     def getComparisonsForRecalculation(self):
         comparisons = []
         for comparison in self.allResults:
@@ -238,7 +244,7 @@ class TestComparison(BaseTestComparison):
                 comparisons.append(comparison)
         self.diag.info("All file comparisons up to date")
         return comparisons
-    
+
     def getMostSevereFileComparison(self):
         worstSeverity = None
         worstResult = None
@@ -248,7 +254,7 @@ class TestComparison(BaseTestComparison):
                 worstSeverity = severity
                 worstResult = result
         return worstResult
-    
+
     def getTypeBreakdown(self):
         if self.hasSucceeded():
             return self.category, self.briefText
@@ -265,23 +271,26 @@ class TestComparison(BaseTestComparison):
             return "failure", details
         else:
             return "success", details
+
     def getComparisons(self):
-        return self.changedResults + self.newResults + self.missingResults    
+        return self.changedResults + self.newResults + self.missingResults
+
     def _comparisonsString(self, comparisons):
         return ",".join([repr(x) for x in comparisons])
     # Sort according to failure_display_priority. Lower means show earlier,
-    # files with the same prio should be not be shuffled. 
+    # files with the same prio should be not be shuffled.
+
     def getSortedComparisons(self):
         return sorted(self.changedResults, key=self.displayPriority) + \
-               sorted(self.newResults, key=self.displayPriority) + \
-               sorted(self.missingResults, key=self.displayPriority)
-    
+            sorted(self.newResults, key=self.displayPriority) + \
+            sorted(self.missingResults, key=self.displayPriority)
+
     def displayPriority(self, item):
         return item.displayPriority, item.stem
 
     def description(self):
         return repr(self) + self.getDifferenceSummary()
-    
+
     def getDifferenceSummary(self):
         texts = []
         if len(self.newResults) > 0:
@@ -294,12 +303,14 @@ class TestComparison(BaseTestComparison):
             return " " + ", ".join(texts)
         else:
             return ""
+
     def getPostText(self):
         if not self.hasResults():
             return " - NONE!"
         if len(self.getComparisons()) == 0:
             return " - SUCCESS! (on " + self.attemptedComparisonsOutput() + ")"
         return " (on " + self.attemptedComparisonsOutput() + ")"
+
     def attemptedComparisonsOutput(self):
         baseNames = []
         for comparison in self.allResults:
@@ -310,7 +321,7 @@ class TestComparison(BaseTestComparison):
         return ",".join(baseNames)
 
     def getPerformanceStems(self, test):
-        return [ "performance" ] + list(test.getConfigValue("performance_logfile_extractor").keys())
+        return ["performance"] + list(test.getConfigValue("performance_logfile_extractor").keys())
 
     def createFileComparison(self, test, stem, standardFile, tmpFile):
         if stem in self.getPerformanceStems(test):
@@ -319,7 +330,7 @@ class TestComparison(BaseTestComparison):
             elif not test.app.executingOnPerformanceMachine(test, stem):
                 # Don't care if performance is missing if we aren't on performance machines
                 return None
-        
+
         return FileComparison(test, stem, standardFile, tmpFile, testInProgress=0)
 
     def categorise(self, variablesToStore=[], successOnNoResult=True):
@@ -342,16 +353,16 @@ class TestComparison(BaseTestComparison):
 
     def getFreeTextInfo(self, variablesToStore=[]):
         texts = self.variablesToText(variablesToStore)
-        texts += [ fileComp.getFreeText() for fileComp in self.getSortedComparisons() ] 
+        texts += [fileComp.getFreeText() for fileComp in self.getSortedComparisons()]
         return "".join(texts)
-    
+
     def variablesToText(self, variables):
         return [self.variableToText(var) + "\n" for var in variables if os.getenv(var)]
 
     def variableToText(self, var):
-        texts = [t[0] + t[1:] for t in var.split("_") ]
+        texts = [t[0] + t[1:] for t in var.split("_")]
         return " ".join(texts) + ":" + os.getenv(var)
-        
+
     def findParentStems(self, onlyStems):
         parents = set()
         for stem in onlyStems:
@@ -360,13 +371,13 @@ class TestComparison(BaseTestComparison):
                 if parent not in onlyStems:
                     parents.add(parent)
         return parents
-    
+
     def rebuildFromSplit(self, onlyStems, *args):
         parentStems = self.findParentStems(onlyStems)
         for stem in parentStems:
             parentComp, splitComps = self.findComparisonsForSplit(stem)
             parentComp.overwriteFromSplit(splitComps, *args)
-            
+
     def findComparisonsForSplit(self, stem):
         parentComp, splitComps = None, []
         for comp in self.allResults:
@@ -388,9 +399,9 @@ class TestComparison(BaseTestComparison):
             self.updateStatus(test, str(comparison), versionString)
             comparison.saveMissing(versionString, self.fakeMissingFileText(), backupVersions)
         # Save any external file edits we may have made. Only do this on partial saves for CaptureMock related files
-        if len(onlyStems) == 0 or "externalmocks" in onlyStems or "traffic" in onlyStems:  
+        if len(onlyStems) == 0 or "externalmocks" in onlyStems or "traffic" in onlyStems:
             self.saveFileEdits(test, versionString)
-        elif any(("/" in stem for stem in onlyStems)): # We've explicitly selected split files
+        elif any(("/" in stem for stem in onlyStems)):  # We've explicitly selected split files
             self.rebuildFromSplit(onlyStems, test, exact, versionString, backupVersions)
         if overwriteSuccessFiles:
             for comparison in self.filterComparisons(self.correctResults, onlyStems):
@@ -420,23 +431,23 @@ class TestComparison(BaseTestComparison):
             stdFile = stdFiles.get(fileComp.stem)
             self.diag.info("Recomputing against " + repr(stdFile))
             fileComp.setStandardFile(stdFile)
-        
+
     def recalculateComparisons(self, test):
         self.removeSplitComparisons(test)
-        for fileComp in self.allResults:      
+        for fileComp in self.allResults:
             fileComp.recompute(test)
-    
+
     def splitResultFiles(self, *args):
         return sum((fileComp.split(*args) for fileComp in self.allResults), [])
-    
+
     def stemMatches(self, stem, onlyStems):
         return stem in onlyStems or ("/" in stem and stem.split("/")[0] in onlyStems)
-    
+
     def filterComparisons(self, resultList, onlyStems):
         if len(onlyStems) == 0:
             return resultList
         else:
-            return [ comp for comp in resultList if self.stemMatches(comp.stem, onlyStems) ]
+            return [comp for comp in resultList if self.stemMatches(comp.stem, onlyStems)]
 
     def updateStatus(self, test, compStr, versionString):
         testRepr = "Approving " + repr(test) + " : "
@@ -448,14 +459,15 @@ class TestComparison(BaseTestComparison):
         self.notifyIfMainThread("ActionProgress")
 
     def makeNewState(self, test, lifeCycleDest):
-        crashed = hasattr(self, "failedPrediction") and self.failedPrediction is not None and self.failedPrediction.category == "crash"
+        crashed = hasattr(
+            self, "failedPrediction") and self.failedPrediction is not None and self.failedPrediction.category == "crash"
         newState = TestComparison(self, test.app, "be " + lifeCycleDest, copyFailedPrediction=crashed)
         for comparison in self.allResults:
             newState.addComparison(comparison)
         variablesToStore = test.app.getTestRunVariables()
         newState.categorise(variablesToStore)
         return knownbugs.CheckForBugs().checkTest(test, newState)[0] or newState
-    
+
     def removeSplitComparisons(self, test):
         toRemove = []
         for fileComp in self.allResults:
@@ -465,32 +477,40 @@ class TestComparison(BaseTestComparison):
         for comp in toRemove:
             self.allResults.remove(comp)
 
+
 # for back-compatibility, preserve old names
 performance.PerformanceTestComparison = TestComparison
 
+
 class ProgressTestComparison(BaseTestComparison):
     def __init__(self, previousInfo):
-        BaseTestComparison.__init__(self, previousInfo.category, previousInfo, completed=0, lifecycleChange="be recalculated")
+        BaseTestComparison.__init__(self, previousInfo.category, previousInfo,
+                                    completed=0, lifecycleChange="be recalculated")
         if isinstance(previousInfo, ProgressTestComparison):
             self.runningState = previousInfo.runningState
         else:
             self.runningState = previousInfo
+
     def createFileComparison(self, test, stem, standardFile, tmpFile):
         return FileComparison(test, stem, standardFile, tmpFile, testInProgress=1)
+
     def categorise(self, *args, **kwargs):
         self.briefText = self.runningState.briefText
         self.freeText = self.runningState.freeText + self.progressText()
+
     def progressText(self):
         perc = self.calculatePercentage()
         if perc is not None:
             return "\nReckoned to be " + str(perc) + "% complete by comparing total file sizes at " + plugins.localtime() + "."
         else:
             return ""
+
     def getSize(self, fileName):
         if fileName and os.path.isfile(fileName):
             return os.path.getsize(fileName)
         else:
             return 0
+
     def calculatePercentage(self):
         stdSize, tmpSize = 0, 0
         for comparison in self.changedResults + self.correctResults:
@@ -499,6 +519,7 @@ class ProgressTestComparison(BaseTestComparison):
 
         if stdSize > 0:
             return (tmpSize * 100) / stdSize
+
     def makeModifiedState(self, *args):
         newRunningState = self.runningState.makeModifiedState(*args)
         if newRunningState:
@@ -512,6 +533,7 @@ class ProgressTestComparison(BaseTestComparison):
             newState.categorise()
             return newState
 
+
 class MakeComparisons(plugins.Action):
     def __init__(self, testComparisonClass=None, progressComparisonClass=None, ignoreMissing=False, enableColor=False, compareSuites=False):
         self.testComparisonClass = self.getClass(testComparisonClass, TestComparison)
@@ -519,7 +541,7 @@ class MakeComparisons(plugins.Action):
         self.ignoreMissing = ignoreMissing
         self.enableColor = enableColor
         self.compareSuites = compareSuites
-        
+
     def getClass(self, given, defaultClass):
         if given:
             return given
@@ -544,7 +566,7 @@ class MakeComparisons(plugins.Action):
         newState = self.progressComparisonClass(state)
         newState.setObservers(observers)
         if not test.state.isComplete():
-            newState.computeFor(test, ignoreMissing=True, incompleteOnly=True)        
+            newState.computeFor(test, ignoreMissing=True, incompleteOnly=True)
 
     def setUpSuite(self, suite):
         if self.compareSuites:
@@ -552,19 +574,23 @@ class MakeComparisons(plugins.Action):
         else:
             self.describe(suite)
 
-    
+
 class PrintObsoleteVersions(plugins.Action):
     scriptDoc = "Lists all files with version IDs that are equivalent to a non-versioned file"
+
     def __init__(self):
         self.filesToRemove = []
+
     def __repr__(self):
         return "Removing obsolete versions for"
+
     def __del__(self):
         if len(self.filesToRemove):
             print("Summary : Remove these files!")
             print("=============================")
             for file in self.filesToRemove:
-                print(file)         
+                print(file)
+
     def __call__(self, test):
         self.describe(test)
         compFiles = {}
@@ -580,11 +606,11 @@ class PrintObsoleteVersions(plugins.Action):
                 for index2 in range(index1 + 1, len(compFilesMatchingStem)):
                     self.compareFiles(test, compFilesMatchingStem[index1], compFilesMatchingStem[index2])
                 os.remove(compFilesMatchingStem[index1][1])
-        
+
     def cmpFile(self, file):
         basename = os.path.basename(file)
         return mktemp(basename + "cmp")
-    
+
     def filterFile(self, test, file):
         newFile = self.cmpFile(file)
         stem = os.path.basename(file).split(".")[0]
@@ -609,6 +635,7 @@ class PrintObsoleteVersions(plugins.Action):
                 self.checkObsolete(test, origFile2, local2, origFile1)
             else:
                 print(test.getIndent() + local1, "equivalent to", local2)
+
     def checkObsolete(self, test, obsoleteFile, obsoleteLocal, causeFile):
         fallbackFile = self.getFallbackFile(test, obsoleteFile)
         if plugins.samefile(fallbackFile, causeFile):
@@ -616,11 +643,12 @@ class PrintObsoleteVersions(plugins.Action):
             self.filesToRemove.append(obsoleteFile)
         else:
             print(test.getIndent() + obsoleteLocal, "is a version-priority-fixing copy of", os.path.basename(causeFile))
+
     def getFallbackFile(self, test, fileName):
         parts = os.path.basename(fileName).split(".", 2)
         names = test.getAllFileNames(parts[0], parts[-1])
         if len(names) > 1:
             return names[-2]
-        
+
     def setUpSuite(self, suite):
         self.describe(suite)

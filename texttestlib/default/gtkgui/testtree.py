@@ -8,6 +8,7 @@ import logging
 from texttestlib import plugins
 from collections import OrderedDict
 
+
 class TestColumnGUI(guiutils.SubGUI):
     def __init__(self, dynamic, testCount):
         guiutils.SubGUI.__init__(self)
@@ -30,7 +31,7 @@ class TestColumnGUI(guiutils.SubGUI):
     def createView(self):
         testRenderer = Gtk.CellRendererText()
         self.column = Gtk.TreeViewColumn(self.getTitle(), testRenderer, text=0, background=1, foreground=7)
-        self.column.name = "Test Name" # Not a widget, so we can't set a name, do this instead
+        self.column.name = "Test Name"  # Not a widget, so we can't set a name, do this instead
         self.column.set_resizable(True)
         self.column.set_cell_data_func(testRenderer, self.renderSuitesBold)
         if not self.dynamic:
@@ -43,7 +44,7 @@ class TestColumnGUI(guiutils.SubGUI):
             self.column.set_sort_indicator(True)
             self.column.set_sort_order(Gtk.SortType.DESCENDING)
         return self.column
-    
+
     def renderSuitesBold(self, dummy, cell, model, iter, data):
         if model.get_value(iter, 2)[0].classId() == "test-case":
             cell.set_property('font', "")
@@ -74,8 +75,8 @@ class TestColumnGUI(guiutils.SubGUI):
             self.notify("Status", "Tests sorted according to testsuite file.")
         self.notify("RefreshTestSelection")
         self.notify("ActionStop")
-        
-    def setSortingOrder(self, order, suite = None):
+
+    def setSortingOrder(self, order, suite=None):
         if not suite:
             for suite in self.allSuites:
                 self.setSortingOrder(order, suite)
@@ -93,9 +94,9 @@ class TestColumnGUI(guiutils.SubGUI):
         if self.versionString and len(self.versionString) > 40:
             reducedVersionString = self.versionString[:40] + "..."
         else:
-            reducedVersionString = self.versionString  
+            reducedVersionString = self.versionString
 
-        if self.testSuiteSelection:              
+        if self.testSuiteSelection:
             # We don't care about totals with test suites
             title += plugins.pluralise(self.nofSelectedTests, "suite") + " selected"
             if self.versionString:
@@ -103,7 +104,7 @@ class TestColumnGUI(guiutils.SubGUI):
             elif self.nofDistinctSelectedTests != self.nofSelectedTests:
                 title += ", " + str(self.nofDistinctSelectedTests) + " distinct"
             return title
-        
+
         if self.nofSelectedTests == self.totalNofTests:
             title += "All " + str(self.totalNofTests) + " selected"
         else:
@@ -116,7 +117,8 @@ class TestColumnGUI(guiutils.SubGUI):
                 if self.nofDistinctSelectedTests == self.totalNofDistinctTests:
                     title += ", all " + str(self.totalNofDistinctTests) + " distinct"
                 else:
-                    title += ", " + str(self.nofDistinctSelectedTests) + "/" + str(self.totalNofDistinctTests) + " distinct"
+                    title += ", " + str(self.nofDistinctSelectedTests) + "/" + \
+                        str(self.totalNofDistinctTests) + " distinct"
 
         if self.totalNofTestsShown == self.totalNofTests:
             if self.dynamic and self.totalNofTests > 0:
@@ -148,7 +150,7 @@ class TestColumnGUI(guiutils.SubGUI):
     def countTests(self, tests):
         if self.dynamic:
             return len(tests), False
-        
+
         testCount, suiteCount = 0, 0
         for test in tests:
             if test.classId() == "test-case":
@@ -162,30 +164,31 @@ class TestColumnGUI(guiutils.SubGUI):
 
     def getVersionString(self, tests, distinctTestCount):
         if not self.dynamic and distinctTestCount == 1 and self.totalNofTests != self.totalNofDistinctTests:
-            versions = [ test.app.getFullVersion().replace("_", "__") or "<default>" for test in tests ]
+            versions = [test.app.getFullVersion().replace("_", "__") or "<default>" for test in tests]
             return "version" + ("s" if len(versions) > 1 else "") + " " + ",".join(versions)
         else:
             return ""
-                            
+
     def notifyNewTestSelection(self, tests, dummyApps, distinctTestCount, *args, **kw):
         if self.dynamic:
             tests = [t for t in tests if t.classId() == "test-case"]
         self.updateTestInfo(tests, distinctTestCount)
-        
+
     def updateTestInfo(self, tests, distinctTestCount):
         newCount, suitesOnly = self.countTests(tests)
         if distinctTestCount > newCount:
             distinctTestCount = newCount
         newVersionStr = self.getVersionString(tests, distinctTestCount)
         if self.nofSelectedTests != newCount or newVersionStr != self.versionString or \
-               self.nofDistinctSelectedTests != distinctTestCount or suitesOnly != self.testSuiteSelection:
-            self.diag.info("New selection count = " + repr(newCount) + ", distinct = " + str(distinctTestCount) + ", test suites only = " + repr(suitesOnly))
+                self.nofDistinctSelectedTests != distinctTestCount or suitesOnly != self.testSuiteSelection:
+            self.diag.info("New selection count = " + repr(newCount) + ", distinct = " +
+                           str(distinctTestCount) + ", test suites only = " + repr(suitesOnly))
             self.nofSelectedTests = newCount
             self.nofDistinctSelectedTests = distinctTestCount
             self.testSuiteSelection = suitesOnly
             self.versionString = newVersionStr
             self.updateTitle()
-            
+
     def notifyVisibility(self, tests, newValue):
         testCount = sum((int(test.classId() == "test-case") for test in tests))
         if newValue:
@@ -201,15 +204,18 @@ class TestIteratorMap:
         self.dynamic = dynamic
         self.parentApps = {}
         for app in allApps:
-            for extra in [ app ] + app.extras:
+            for extra in [app] + app.extras:
                 self.parentApps[extra] = app
+
     def getKey(self, test):
         if self.dynamic:
             return test
         elif test is not None:
             return self.parentApps.get(test.app, test.app), test.getRelPath()
+
     def store(self, test, iter):
         self.dict[self.getKey(test)] = iter
+
     def updateIterator(self, test, oldRelPath):
         # relative path of test has changed
         key = self.parentApps.get(test.app, test.app), oldRelPath
@@ -232,9 +238,9 @@ class TestIteratorMap:
 
 class TestTreeGUI(guiutils.ContainerGUI):
     def __init__(self, dynamic, allApps, popupGUI, subGUI):
-        guiutils.ContainerGUI.__init__(self, [ subGUI ])
-        self.model = Gtk.TreeStore(GObject.TYPE_STRING, GObject.TYPE_STRING, GObject.TYPE_PYOBJECT,\
-                                   GObject.TYPE_STRING, GObject.TYPE_STRING, GObject.TYPE_BOOLEAN, \
+        guiutils.ContainerGUI.__init__(self, [subGUI])
+        self.model = Gtk.TreeStore(GObject.TYPE_STRING, GObject.TYPE_STRING, GObject.TYPE_PYOBJECT,
+                                   GObject.TYPE_STRING, GObject.TYPE_STRING, GObject.TYPE_BOOLEAN,
                                    GObject.TYPE_STRING, GObject.TYPE_STRING)
         self.popupGUI = popupGUI
         self.itermap = TestIteratorMap(dynamic, allApps)
@@ -274,7 +280,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
             else:
                 self.treeView.expand_all()
         self.notify("AllRead")
-        
+
     def makeRowVisible(self, model, dummyPath, iter):
         model.set_value(iter, 5, True)
 
@@ -290,7 +296,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         nodeName = self.getNodeName(suite, parent)
         self.diag.info("Adding node with name " + nodeName)
         colour = guiutils.guiConfig.getTestColour("not_started")
-        row = [ nodeName, colour, [ suite ], "", colour, self.newTestsVisible, "", "black" ]
+        row = [nodeName, colour, [suite], "", colour, self.newTestsVisible, "", "black"]
         iter = self.model.insert_before(parent, follower, row)
         storeIter = iter.copy()
         self.itermap.store(suite, storeIter)
@@ -299,7 +305,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
             filterPath = self.filteredModel.convert_child_path_to_path(path)
             self.treeView.expand_to_path(filterPath)
         return iter
-    
+
     def createView(self):
         self.filteredModel = self.model.filter_new()
         self.filteredModel.set_visible_column(5)
@@ -339,7 +345,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
 
         self.popupGUI.createView()
         return self.addScrollBars(self.treeView, hpolicy=Gtk.PolicyType.NEVER)
-    
+
     def notifyTopWindow(self, *args):
         # avoid the quit button getting initial focus, give it to the tree view (why not?)
         self.treeView.grab_focus()
@@ -356,7 +362,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
     def userChangedSelection(self, *args):
         if not self.selecting and not hasattr(self.selection, "unseen_changes"):
             self.selectionChanged(direct=True)
-            
+
     def selectionChanged(self, direct):
         newSelection = self.getSelected()
         if newSelection != self.selectedTests:
@@ -369,12 +375,12 @@ class TestTreeGUI(guiutils.ContainerGUI):
         # recalculate the action sensitiveness and make sure we can still see the selected tests.
         self.sendSelectionNotification(self.selectedTests)
         self.scrollToFirstTest()
-        
+
     def notifyRecomputed(self, test):
         iter = self.itermap.getIterator(test)
         # If we've recomputed, clear the recalculation icons
         self.setNewRecalculationStatus(iter, test, [])
-        
+
     def getSortedSelectedTests(self, suite):
         appTests = [test for test in self.selectedTests if test.app is suite.app]
         allTests = suite.allTestsAndSuites()
@@ -398,9 +404,9 @@ class TestTreeGUI(guiutils.ContainerGUI):
                 for subTest in test.testcases:
                     if self.isVisible(subTest):
                         self.writeSelectedTest(subTest, file)
-                return    
-        file.write(test.getRelPath() + "\n")        
-        
+                return
+        file.write(test.getRelPath() + "\n")
+
     def updateRecalculationMarker(self, model, dummy, iter):
         tests = model.get_value(iter, 2)
         if not tests[0].stateInGui.isComplete():
@@ -437,11 +443,11 @@ class TestTreeGUI(guiutils.ContainerGUI):
             if test.app not in apps:
                 apps.append(test.app)
         return apps
-    
+
     def notifyActionStart(self, foreground=True):
         if not foreground:
             self.longActionRunning = True
-    
+
     def notifyActionStop(self, foreground=True):
         if not foreground:
             if self.longActionRunning and self.recreateOnActionStop:
@@ -464,7 +470,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
             self.subguis[0].updateTestInfo(tests, self.selection.count_selected_rows())
         else:
             self.sendActualSelectionNotification(direct)
-            
+
     def updateRecalculationMarkers(self):
         if self.dynamic:
             self.selection.selected_foreach(self.updateRecalculationMarker)
@@ -472,6 +478,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
     def getSelected(self):
         allSelected = []
         prevSelected = set(self.selectedTests)
+
         def addSelTest(model, dummy, iter, selected):
             selected += self.getNewSelected(model.get_value(iter, 2), prevSelected)
 
@@ -484,7 +491,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
             return tests
         else:
             return list(intersection)
-        
+
     def findIter(self, test):
         try:
             childIter = self.itermap.getIterator(test)
@@ -493,7 +500,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         except RuntimeError:
             # convert_child_iter_to_iter throws RunTimeError if the row is hidden in the TreeModelFilter
             self.diag.info("Could not find iterator for " + repr(test) + ", possibly row is hidden.")
-            
+
     def notifySetTestSelection(self, selTests, criteria="", selectCollapsed=True, direct=False):
         actualSelection = self.selectTestRows(selTests, selectCollapsed)
         # Here it's been set via some indirect mechanism, might want to behave differently
@@ -501,7 +508,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         self.updateRecalculationMarkers()
 
     def selectTestRows(self, selTests, selectCollapsed=True):
-        self.selecting = True # don't respond to each individual programmatic change here
+        self.selecting = True  # don't respond to each individual programmatic change here
         self.selection.unselect_all()
         treeView = self.selection.get_tree_view()
         firstPath = None
@@ -530,7 +537,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
             iterValid, iter = self.findIter(test)
             path = self.filteredModel.get_path(iter)
             self.scrollToPath(path)
-        
+
     def scrollToPath(self, path):
         treeView = self.selection.get_tree_view()
         cellArea = treeView.get_cell_area(path, treeView.get_columns()[0])
@@ -555,7 +562,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         self.model.set_value(iter, 1, colour1)
         self.model.set_value(iter, 3, detailText)
         self.model.set_value(iter, 4, colour2)
-        if test.classId() == "test-suite": #Happens with Replace Text sometimes
+        if test.classId() == "test-suite":  # Happens with Replace Text sometimes
             self.testSuitesWithResults.add(test)
         if approved:
             self.checkRelatedForRecalculation(test)
@@ -563,7 +570,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
     def notifyLifecycleChange(self, test, *args):
         if test in self.selectedTests:
             self.notify("LifecycleChange", test, *args)
-            
+
     def notifyFileChange(self, test, *args):
         if test in self.selectedTests:
             self.notify("FileChange", test, *args)
@@ -583,17 +590,17 @@ class TestTreeGUI(guiutils.ContainerGUI):
         else:
             self.diag.info("No iterator found for " + repr(test))
             return False
-        
+
     def findAllTests(self):
         tests = []
         self.model.foreach(self.appendTest, tests)
         return tests
-    
+
     def appendTest(self, model, dummy, iter, tests):
         for test in model.get_value(iter, 2):
             if test.classId() == "test-case":
                 tests.append(test)
-                
+
     def getTestForAutoSelect(self):
         allTests = self.findAllTests()
         if len(allTests) == 1:
@@ -606,7 +613,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         if self.selection.get_tree_view():
             test = self.getTestForAutoSelect()
             if test:
-                actualSelection = self.selectTestRows([ test ])
+                actualSelection = self.selectTestRows([test])
                 self.sendSelectionNotification(actualSelection)
 
     def notifyAdd(self, test, initial):
@@ -614,7 +621,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
             self.notify("TestTreeCounters", initial=initial, totalDelta=1,
                         totalShownDelta=self.getTotalShownDelta(), totalRowsDelta=self.getTotalRowsDelta(test))
         elif self.dynamic and test.isEmpty():
-            return # don't show empty suites in the dynamic GUI
+            return  # don't show empty suites in the dynamic GUI
 
         self.diag.info("Adding test " + repr(test))
         self.tryAddTest(test, initial)
@@ -623,7 +630,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
             # Also include the knock-on effects, i.e. selecting the test tab etc
             self.notifySetTestSelection([test], direct=True)
 
-    def notifyClipboard(self, tests, cut=False):        
+    def notifyClipboard(self, tests, cut=False):
         if cut:
             colourKey = "clipboard_cut"
         else:
@@ -649,7 +656,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         if self.dynamic:
             return int(self.newTestsVisible)
         else:
-            return 1 # we hide them temporarily for performance reasons, so can't do as above
+            return 1  # we hide them temporarily for performance reasons, so can't do as above
 
     def tryAddTest(self, test, initial=False):
         iter = self.itermap.getIterator(test)
@@ -662,7 +669,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
             suiteIter = self.tryAddTest(suite, initial)
         followIter = self.findFollowIter(suite, test, initial)
         return self.addSuiteWithParent(test, suiteIter, followIter)
-    
+
     def findFollowIter(self, suite, test, initial):
         if not initial and suite:
             follower = suite.getFollower(test)
@@ -712,13 +719,13 @@ class TestTreeGUI(guiutils.ContainerGUI):
         if col_id is None:
             self.model.set_default_sort_func(self.sortByTestCases)
         self.model.set_sort_column_id(Gtk.TREE_SORTABLE_DEFAULT_SORT_COLUMN_ID, Gtk.SortType.ASCENDING)
-        
+
     def sortByTestCases(self, model, iter1, iter2, *args):
         test1 = self.model.get_value(iter1, 2)[0]
         test2 = self.model.get_value(iter2, 2)[0]
         index1 = test1.parent.testcases.index(test1)
         index2 = test2.parent.testcases.index(test2)
-        return -1 if index1 < index2 else 1        
+        return -1 if index1 < index2 else 1
 
     def notifyVisibility(self, tests, newValue):
         self.diag.info("Visibility change for " + repr(tests) + " to " + repr(newValue))
@@ -735,9 +742,9 @@ class TestTreeGUI(guiutils.ContainerGUI):
             self.notify("Visibility", changedTests, newValue)
             if self.treeView:
                 self.updateVisibilityInViews(newValue)
-                
+
     def updateVisibilityInViews(self, newValue):
-        if newValue: # if things have become visible, expand everything
+        if newValue:  # if things have become visible, expand everything
             self.treeView.expand_all()
             GObject.idle_add(self.scrollToFirstTest)
         else:
@@ -791,4 +798,3 @@ class TestTreeGUI(guiutils.ContainerGUI):
 
     def hasVisibleChildren(self, suite):
         return any((self.isMarkedVisible(test) for test in suite.testcases))
-

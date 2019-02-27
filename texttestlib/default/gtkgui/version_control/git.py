@@ -1,4 +1,6 @@
-import datetime, time, os
+import datetime
+import time
+import os
 from texttestlib import plugins
 from . import vcs_independent
 
@@ -8,17 +10,19 @@ DATE_FORMAT = '%Y-%m-%dT%H:%M:%S'
 
 class GitInterface(vcs_independent.VersionControlInterface):
     def __init__(self, controlDir):
-        self.warningStateInfo = { "M": "Modified", "D":"Deleted", "A":"Added", "R":"Renamed"}
-        self.errorStateInfo = { "??": "Unknown"}
-        self.allStateInfo = { "C": "Copied", "U": "Unmerged" } # "!!" for ignored files is only available on git versions < 1.7.4
+        self.warningStateInfo = {"M": "Modified", "D": "Deleted", "A": "Added", "R": "Renamed"}
+        self.errorStateInfo = {"??": "Unknown"}
+        # "!!" for ignored files is only available on git versions < 1.7.4
+        self.allStateInfo = {"C": "Copied", "U": "Unmerged"}
         self.allStateInfo.update(self.warningStateInfo)
         self.allStateInfo.update(self.errorStateInfo)
         self.vcsDirectory = os.path.dirname(controlDir)
         vcs_independent.VersionControlInterface.__init__(self, controlDir, "Git",
                                                          list(self.warningStateInfo.values()), list(self.errorStateInfo.values()), "HEAD")
-        self.defaultArgs["rm"] = [ "--force", "-r" ]
-        self.defaultArgs["status"] = [ "--porcelain" ] # Would like to use --ignored but it is not available on git versions < 1.7.4
-        self.defaultArgs["log"] = [ "-p", "--follow", "--date=format:%s" % DATE_FORMAT ]
+        self.defaultArgs["rm"] = ["--force", "-r"]
+        # Would like to use --ignored but it is not available on git versions < 1.7.4
+        self.defaultArgs["status"] = ["--porcelain"]
+        self.defaultArgs["log"] = ["-p", "--follow", "--date=format:%s" % DATE_FORMAT]
 
     def getDateFromLog(self, output):
         for line in output.splitlines():
@@ -26,7 +30,7 @@ class GitInterface(vcs_independent.VersionControlInterface):
                 return datetime.datetime.strptime(line.split()[1], DATE_FORMAT)
 
     def getGraphicalDiffArgs(self, diffProgram):
-        return [ "git", "difftool", "-t", diffProgram, "-y"]
+        return ["git", "difftool", "-t", diffProgram, "-y"]
 
     def startGUIProcess(self, cmdArgs, **kw):
         relArgs = list(map(self.makeRelPath, cmdArgs))
@@ -52,7 +56,7 @@ class GitInterface(vcs_independent.VersionControlInterface):
     def getIgnoredFiles(self, path):
         if not os.path.isdir(path):
             return []
-        _, stdout,_ = self.getProcessResults(["git", "ls-files", "--other", "-i", "--exclude-standard",  path])
+        _, stdout, _ = self.getProcessResults(["git", "ls-files", "--other", "-i", "--exclude-standard",  path])
         return stdout.split()
 
     def makeRelPath(self, arg):
@@ -74,14 +78,14 @@ class GitInterface(vcs_independent.VersionControlInterface):
         return vcs_independent.VersionControlInterface.callProgram(self, cmdName, fileArgs, cwd=self.vcsDirectory, **kwargs)
 
     def getCombinedRevisionOptions(self, r1, r2):
-        return [ r1 + ".." + r2, "--" ]
+        return [r1 + ".." + r2, "--"]
 
     def getSingleRevisionOptions(self, r1):
-        return [ r1 ]
+        return [r1]
 
     def removePath(self, path):
         # Git doesn't remove unknown files
-        retCode = self.callProgram("rm", [ path ])
+        retCode = self.callProgram("rm", [path])
         plugins.removePath(path)
         return retCode == 0
 
@@ -89,7 +93,9 @@ class GitInterface(vcs_independent.VersionControlInterface):
         retCode, _, stderr = self.getProcessResults(["git", "push", "-n"], cwd=vcsDirectory)
         return retCode == 0 and stderr.strip() != "Everything up-to-date"
 
+
 vcs_independent.vcsClass = GitInterface
+
 
 class FilteredDiffGUI(vcs_independent.FilteredDiffGUI):
     def __init__(self, *args):
@@ -98,11 +104,12 @@ class FilteredDiffGUI(vcs_independent.FilteredDiffGUI):
 
     def getTmpFileArgs(self, fileName, revision):
         revStr = revision or "master"
-        return [ revStr + ":" + vcs_independent.vcs.makeRelPath(fileName) ]
+        return [revStr + ":" + vcs_independent.vcs.makeRelPath(fileName)]
 
 
 class FilteredDiffGUIRecursive(FilteredDiffGUI):
     recursive = True
+
 
 class UpdateGUI(vcs_independent.UpdateGUI):
     def getCommandName(self):
@@ -115,7 +122,7 @@ class UpdateGUI(vcs_independent.UpdateGUI):
 
 class InteractiveActionConfig(vcs_independent.InteractiveActionConfig):
     def diffClasses(self):
-        return [ vcs_independent.DiffGUI, vcs_independent.DiffGUIRecursive, FilteredDiffGUI, FilteredDiffGUIRecursive ]
+        return [vcs_independent.DiffGUI, vcs_independent.DiffGUIRecursive, FilteredDiffGUI, FilteredDiffGUIRecursive]
 
     def getUpdateClass(self):
         return UpdateGUI

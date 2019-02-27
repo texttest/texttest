@@ -4,6 +4,8 @@ from gi.repository import Gtk
 # Semi-ugly hack to get hold of the button in a treeview header (treeviewcolumn)
 # See e.g. http://www.tenslashsix.com/?p=109 or http://piman.livejournal.com/361173.html
 # or google on e.g. 'gtk treeview header popup menu' for more info.
+
+
 class ButtonedTreeViewColumn(Gtk.TreeViewColumn):
     def __init__(self, title="", *args, **kwargs):
         super(ButtonedTreeViewColumn, self).__init__(None, *args, **kwargs)

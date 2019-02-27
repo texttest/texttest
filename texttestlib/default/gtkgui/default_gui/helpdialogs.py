@@ -1,34 +1,44 @@
 import gi
 from gi.repository import Gtk, GObject, GdkPixbuf
-import os, sys, glob
+import os
+import sys
+import glob
 from texttestlib import plugins, texttest_version
 from .. import guiplugins, guiutils
 
 # Show useful info about TextTest.
 # I don't particularly like the standard Gtk.AboutDialog, and we also want
 # to show pygtk/gtk/python versions in our dialog, so we create our own ...
+
+
 class AboutTextTest(guiplugins.ActionResultDialogGUI):
     website = "http://www.texttest.org"
+
     def __init__(self, *args, **kw):
         self.creditsButton = None
         self.licenseButton = None
         self.versionsButton = None
         guiplugins.ActionResultDialogGUI.__init__(self, *args, **kw)
-        
+
     def getDialogTitle(self):
         return "About TextTest"
+
     def isActiveOnCurrent(self, *args):
         return True
+
     def _getStockId(self):
         return "about"
+
     def _getTitle(self):
         return "_About TextTest"
+
     def messageAfterPerform(self):
         return ""
+
     def getTooltip(self):
         return "show information about texttest"
-    
-    def createButtons(self):        
+
+    def createButtons(self):
         self.creditsButton = self.dialog.add_button('texttest-stock-credits', Gtk.ResponseType.NONE)
         self.licenseButton = self.dialog.add_button('_License', Gtk.ResponseType.NONE)
         self.versionsButton = self.dialog.add_button('_Versions', Gtk.ResponseType.NONE)
@@ -36,7 +46,7 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         self.licenseButton.connect("clicked", self.showLicense)
         self.versionsButton.connect("clicked", self.showVersions)
         guiplugins.ActionResultDialogGUI.createButtons(self)
-        
+
     def addContents(self):
         imageDir, retro = guiutils.getImageDir()
         imageType = "gif" if retro else "png"
@@ -56,7 +66,7 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         # On Windows the default URI hook fails and causes trouble...
         # According to the docs you can set "None" here but that doesn't seem to work...
         # disabled this MB 2018-12-05
-        # Gtk.link_button_set_uri_hook(lambda x, y : None) 
+        # Gtk.link_button_set_uri_hook(lambda x, y : None)
         urlButton = Gtk.LinkButton(self.website, self.website)
         urlButton.set_property("border-width", 0)
         urlButtonbox = Gtk.HBox()
@@ -71,10 +81,10 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         self.dialog.vbox.pack_start(licenseLabel, False, False, 0)
         self.dialog.set_resizable(False)
 
-    def urlClicked(self, *args): 
+    def urlClicked(self, *args):
         status = guiplugins.openLinkInBrowser(self.website)
         self.notify("Status", status)
-        
+
     def showCredits(self, *args):
         newDialog = TextFileDisplayDialog(self.validApps, False, {}, "CREDITS.txt", self.dialog)
         newDialog.performOnCurrent()
@@ -87,13 +97,17 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         newDialog = ShowVersions(self.validApps)
         newDialog.performOnCurrent()
 
+
 class ShowVersions(guiplugins.ActionResultDialogGUI):
     def isActiveOnCurrent(self, *args):
         return True
+
     def _getTitle(self):
         return "Component _Versions"
+
     def messageAfterPerform(self):
         return ""
+
     def getTooltip(self):
         return "show component version information"
 
@@ -111,7 +125,8 @@ class ShowVersions(guiplugins.ActionResultDialogGUI):
         table.set_row_spacings(1)
         table.set_col_spacings(columnSpacings)
         for rowNo, (title, versionTuple) in enumerate(data):
-            table.attach(self.justify(title + ":", 0.0), 0, 1, rowNo, rowNo + 1, xoptions=Gtk.AttachOptions.FILL, xpadding=1)
+            table.attach(self.justify(title + ":", 0.0), 0, 1, rowNo, rowNo +
+                         1, xoptions=Gtk.AttachOptions.FILL, xpadding=1)
             table.attach(self.justify(self.makeString(versionTuple), float(alignRight)), 1, 2, rowNo, rowNo + 1)
 
         header = Gtk.Label()
@@ -126,17 +141,17 @@ class ShowVersions(guiplugins.ActionResultDialogGUI):
             padding = kw["padding"]
             del kw["padding"]
         vbox.pack_start(centeredTable, True, True, padding, **kw)
-    
-    def addContents(self):
-        versionList = [ ("TextTest", texttest_version.version),
-                        ("Python", sys.version_info),
-                        ("GTK", (Gtk.get_major_version(), Gtk.get_minor_version(), Gtk.get_micro_version())),
-                        ("PyGI", gi.version_info) ]
 
-        installationList = [ ("Test Suite", os.getenv("TEXTTEST_HOME")),
-                             ("TextTest", plugins.installationRoots[0]),
-                             ("Python", sys.executable) ]
-        
+    def addContents(self):
+        versionList = [("TextTest", texttest_version.version),
+                       ("Python", sys.version_info),
+                       ("GTK", (Gtk.get_major_version(), Gtk.get_minor_version(), Gtk.get_micro_version())),
+                       ("PyGI", gi.version_info)]
+
+        installationList = [("Test Suite", os.getenv("TEXTTEST_HOME")),
+                            ("TextTest", plugins.installationRoots[0]),
+                            ("Python", sys.executable)]
+
         vbox = Gtk.VBox()
         self.addTable(vbox, "version", versionList, alignRight=True, columnSpacings=0)
         self.addTable(vbox, "installation", installationList, alignRight=False, columnSpacings=5, padding=10)
@@ -144,8 +159,8 @@ class ShowVersions(guiplugins.ActionResultDialogGUI):
         frame.set_padding(10, 10, 10, 10)
         frame.add(vbox)
         self.dialog.vbox.pack_start(frame, True, True, 0)
-        
-    def justify(self, label, leftFill, markup = False):
+
+    def justify(self, label, leftFill, markup=False):
         alignment = Gtk.Alignment.new(leftFill, 0.0, 0.0, 0.0)
         if markup:
             l = Gtk.Label()
@@ -155,13 +170,14 @@ class ShowVersions(guiplugins.ActionResultDialogGUI):
             alignment.add(Gtk.Label(label=label))
         return alignment
 
+
 class TextFileDisplayDialog(guiplugins.ActionResultDialogGUI):
     def __init__(self, allApps, dynamic, inputOptions, fileName, parent=None):
         self.parent = parent
         self.fileName = fileName
         self.title = self.makeTitleFromFileName(fileName)
         guiplugins.ActionResultDialogGUI.__init__(self, allApps, dynamic)
-        
+
     def getParentWindow(self):
         if self.parent:
             return self.parent
@@ -170,11 +186,11 @@ class TextFileDisplayDialog(guiplugins.ActionResultDialogGUI):
 
     def makeTitleFromFileName(self, fileName):
         words = fileName.replace(".txt", "").split("_")
-        return " ".join([ word.capitalize() for word in words ])
+        return " ".join([word.capitalize() for word in words])
 
     def messageAfterPerform(self):
         return ""
-        
+
     def _getTitle(self):
         return self.title
 
@@ -183,7 +199,7 @@ class TextFileDisplayDialog(guiplugins.ActionResultDialogGUI):
 
     def isActiveOnCurrent(self, *args):
         return True
-    
+
     def getDialogTitle(self):
         return "TextTest " + self.title
 
@@ -200,7 +216,7 @@ class TextFileDisplayDialog(guiplugins.ActionResultDialogGUI):
             file.close()
             buffer = Gtk.TextBuffer()
             buffer.set_text(text)
-        except Exception as e: #pragma : no cover - should never happen
+        except Exception as e:  # pragma : no cover - should never happen
             self.showErrorDialog("Failed to show " + self.fileName + " file:\n" + str(e))
             return
 
@@ -216,15 +232,15 @@ class TextFileDisplayDialog(guiplugins.ActionResultDialogGUI):
             window = Gtk.ScrolledWindow()
             window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
             window.add(textView)
-            notebook.append_page(window, label)        
+            notebook.append_page(window, label)
             parentSize = self.topWindow.get_size()
             self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[1] * 0.7))
         else:
             notebook.append_page(textView, label)
-            
+
         self.dialog.vbox.pack_start(notebook, True, True, 0)
-        
-        
+
+
 class VersionInfoDialogGUI(guiplugins.ActionResultDialogGUI):
     def isActiveOnCurrent(self, *args):
         return True
@@ -262,26 +278,27 @@ class VersionInfoDialogGUI(guiplugins.ActionResultDialogGUI):
             versionStr = ".".join(map(str, version))
             notebook.append_page(scrolledWindow, Gtk.Label(label=self.labelPrefix() + versionStr))
 
-        if notebook.get_n_pages() == 0: #pragma : no cover - should never happen
+        if notebook.get_n_pages() == 0:  # pragma : no cover - should never happen
             raise plugins.TextTestError("\nNo " + self.getTitle() + " could be found in\n" + docDir + "\n")
         else:
             parentSize = self.topWindow.get_size()
             self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[1] * 0.7))
             self.dialog.vbox.pack_start(notebook, True, True, 0)
-            
+
     def labelPrefix(self):
         return ""
 
-            
+
 class ShowMigrationNotes(VersionInfoDialogGUI):
     def _getTitle(self):
         return "_Migration Notes"
+
     def getTooltip(self):
         return "show texttest migration notes"
 
     def getDialogTitle(self):
         return "TextTest Migration Notes"
-        
+
     def readVersionInfo(self, docDir):
         versionInfo = {}
         for fileName in glob.glob(os.path.join(docDir, "MigrationNotes*")):
@@ -292,16 +309,17 @@ class ShowMigrationNotes(VersionInfoDialogGUI):
     def labelPrefix(self):
         return "from "
 
-    
+
 class ShowChangeLogs(VersionInfoDialogGUI):
     def _getTitle(self):
         return "_Change Logs"
+
     def getTooltip(self):
         return "show texttest change logs"
 
     def getDialogTitle(self):
         return "TextTest Change Logs"
-    
+
     def readVersionInfo(self, docDir):
         versionInfo = {}
         currVersions = ()
@@ -322,7 +340,7 @@ class ShowChangeLogs(VersionInfoDialogGUI):
 
 
 def getInteractiveActionClasses():
-    classes = [ ShowMigrationNotes, ShowChangeLogs, ShowVersions, AboutTextTest ]
-    for fileName in plugins.findDataPaths([ "*.txt" ], dataDirName="doc"):
+    classes = [ShowMigrationNotes, ShowChangeLogs, ShowVersions, AboutTextTest]
+    for fileName in plugins.findDataPaths(["*.txt"], dataDirName="doc"):
         classes.append(plugins.Callable(TextFileDisplayDialog, os.path.basename(fileName)))
     return classes

@@ -118,12 +118,12 @@ class QueueSystemConfig(default.Config):
         value = self.optionIntValue("l")
         if value == 1: # local
             return False
-        elif value == 2 and "count" in self.optionMap:
+        elif value == 2 and self.optionMap.has_key("count"):
             count = int(self.optionMap.get("count"))
             minCount = min((app.getConfigValue("queue_system_min_test_count") for app in allApps))
             return count >= minCount
         else:
-            if "reconnect" in self.optionMap:
+            if self.optionMap.has_key("reconnect"):
                 # GUI gives us a numeric value, can also get it from the command line
                 return self.optionValue("reconnfull") in [ "2", "grid" ]
             else:
@@ -141,7 +141,7 @@ class QueueSystemConfig(default.Config):
         return self.slaveRun() or default.Config.hasExplicitInterface(self)
 
     def slaveRun(self):
-        return "slave" in self.optionMap
+        return self.optionMap.has_key("slave")
 
     def getWriteDirectoryName(self, app):
         return self.optionMap.get("slave") or default.Config.getWriteDirectoryName(self, app)
@@ -278,7 +278,7 @@ class QueueSystemConfig(default.Config):
     def _getResponderClasses(self, allApps, *args):
         self.useQueueSystem = self.calculateUseQueueSystem(allApps)
         if self.useQueueSystem and not self.cloudUseConsistent(allApps):
-            raise plugins.TextTestError("No support currently for running ec2cloud tests at the same time as tests with other queue systems")
+            raise plugins.TextTestError, "No support currently for running ec2cloud tests at the same time as tests with other queue systems"
         
         if self.slaveRun():
             return self.getSlaveResponderClasses()
@@ -373,7 +373,7 @@ class DocumentEnvironment(default.DocumentEnvironment):
     def setUpApplication(self, app):
         default.DocumentEnvironment.setUpApplication(self, app)
         vars = self.findAllVariables(app, [ "QUEUE_SYSTEM_" ], os.path.dirname(__file__))
-        print("The following variables can be used in environment files :")
+        print "The following variables can be used in environment files :"
         for key in sorted(vars.keys()):
             argList = vars[key]
-            print(key + "|" + "|".join(argList))
+            print key + "|" + "|".join(argList)

@@ -7,15 +7,14 @@ Contains the main control code and is the only point of contact with the core fr
 # First make sure we can import the GUI modules: if we can't, throw appropriate exceptions
 
 from texttestlib import texttest_version
-from functools import reduce
 
 def raiseException(msg):
     from texttestlib.plugins import TextTestError
-    raise TextTestError("Could not start TextTest " + texttest_version.version + " GUI due to PyGTK GUI library problems :\n" + msg)
+    raise TextTestError, "Could not start TextTest " + texttest_version.version + " GUI due to PyGTK GUI library problems :\n" + msg
 
 try:
     import gtk
-except Exception as e:
+except Exception, e:
     raiseException("Unable to import module 'gtk' - " + str(e))
 
 pygtkVersion = gtk.pygtk_version
@@ -27,7 +26,7 @@ if pygtkVersion < requiredPygtkVersion:
 
 try:
     import gobject
-except Exception as e:
+except Exception, e:
     raiseException("Unable to import module 'gobject' - " + str(e))
 
 import testtree, filetrees, statusviews, textinfo, actionholders, version_control, guiplugins, guiutils, os, sys, logging
@@ -53,7 +52,7 @@ class IdleHandlerManager:
 
     def notifyActionProgress(self, *args):
         if self.sourceId >= 0:
-            raise plugins.TextTestError("No Action currently exists to have progress on!")
+            raise plugins.TextTestError, "No Action currently exists to have progress on!"
 
     def notifyActionStop(self, *args):
         # Activate idle function again, see comment in notifyActionStart
@@ -97,7 +96,7 @@ class GUIController(plugins.Responder, plugins.Observable):
     def __init__(self, optionMap, allApps):
         includeSite, includePersonal = optionMap.configPathOptions()
         self.readGtkRCFiles(includeSite, includePersonal)
-        self.dynamic = "gx" not in optionMap
+        self.dynamic = not optionMap.has_key("gx")
         self.initialApps = self.storeInitial(allApps)
         self.interactiveActionHandler = InteractiveActionHandler(self.dynamic, allApps, optionMap)
         self.setUpGlobals(allApps, includePersonal)
@@ -117,7 +116,7 @@ class GUIController(plugins.Responder, plugins.Observable):
         self.statusMonitor = statusviews.StatusMonitorGUI(initialStatus)
         self.textInfoGUI = textinfo.TextInfoGUI(self.dynamic)
         runName = optionMap.get("name", "").replace("<time>", plugins.startTimeString())
-        reconnect = "reconnect" in optionMap
+        reconnect = optionMap.has_key("reconnect")
         self.runInfoGUI = textinfo.RunInfoGUI(self.dynamic, runName, reconnect)
         self.testRunInfoGUI = textinfo.TestRunInfoGUI(self.dynamic, reconnect)
         self.progressMonitor = statusviews.TestProgressMonitor(self.dynamic, testCount)
@@ -135,7 +134,7 @@ class GUIController(plugins.Responder, plugins.Observable):
         self.topWindowGUI = self.createTopWindowGUI(allApps, runName, optionMap.get("rerun"))
     
     def createNewApplication(self, optionMap):
-        from .default_gui import ImportApplication
+        from default_gui import ImportApplication
         return ImportApplication([], False, optionMap).runDialog()
 
     def storeInitial(self, allApps):
@@ -160,7 +159,7 @@ class GUIController(plugins.Responder, plugins.Observable):
         if matching != 0:
             inline = guiConfig.getValue("gui_entry_completion_inline")
             completions = guiConfig.getCompositeValue("gui_entry_completions", "", modeDependent=True)
-            from .entrycompletion import manager
+            from entrycompletion import manager
             manager.start(matching, inline, completions)
 
     def getTestTreeObservers(self):
@@ -174,7 +173,7 @@ class GUIController(plugins.Responder, plugins.Observable):
         # otherwise we go via the test tree. Include add/remove as lifecycle, also final completion
         return [ self.progressBarGUI, self.progressMonitor, self.textInfoGUI.timeMonitor, self.testTreeGUI, 
                  self.statusMonitor, self.runInfoGUI, self.idleManager, self.topWindowGUI ] + \
-                 [obs for obs in self.defaultActionGUIs if hasattr(obs, "notifyAllComplete")]
+                 filter(lambda obs: hasattr(obs, "notifyAllComplete"), self.defaultActionGUIs)
 
     def getActionObservers(self):
         return [ self.progressMonitor, self.testTreeGUI, self.testFileGUI, self.appFileGUI, self.statusMonitor,
@@ -195,7 +194,7 @@ class GUIController(plugins.Responder, plugins.Observable):
     def getExitObservers(self, frameworkObservers):
         # Don't put ourselves in the observers twice or lots of weird stuff happens.
         # Important that closing the GUI is the last thing to be done, so make sure we go at the end...
-        frameworkExitObservers = list(filter(self.isFrameworkExitObserver, frameworkObservers))
+        frameworkExitObservers = filter(self.isFrameworkExitObserver, frameworkObservers)
         return [ self.statusMonitor ] + self.defaultActionGUIs + [ guiplugins.processMonitor, self.testTreeGUI, self.menuBarGUI ] + \
                frameworkExitObservers + [ self.idleManager, self ]
 
@@ -206,7 +205,7 @@ class GUIController(plugins.Responder, plugins.Observable):
         return [ self.toolBarGUI, self.shortcutBarGUI, self.statusMonitor ]
 
     def getAddSuitesObservers(self):
-        actionObservers = [obs for obs in self.allActionGUIs() if hasattr(obs, "addSuites")]
+        actionObservers = filter(lambda obs: hasattr(obs, "addSuites"), self.allActionGUIs())
         return [ guiutils.guiConfig, self.testColumnGUI, self.appFileGUI ] + actionObservers + \
                [ self.rightWindowGUI, self.topWindowGUI, self.idleManager ]
     
@@ -237,7 +236,7 @@ class GUIController(plugins.Responder, plugins.Observable):
 
         actionGUIs = self.allActionGUIs()
         # mustn't send ourselves here otherwise signals get duplicated...
-        frameworkObserversToUse = [obs for obs in frameworkObservers if obs is not self]
+        frameworkObserversToUse = filter(lambda obs: obs is not self, frameworkObservers)
         observers = actionGUIs + self.getActionObservers() + frameworkObserversToUse
         for actionGUI in actionGUIs:
             actionGUI.setObservers(observers)
@@ -397,7 +396,7 @@ class TopWindowGUI(guiutils.ContainerGUI):
         self.topWindow = gtk.Window(gtk.WINDOW_TOPLEVEL)
         self.topWindow.set_name("Top Window")
         try:
-            from . import stockitems
+            import stockitems
             stockitems.register(self.topWindow)
         except Exception: #pragma : no cover - should never happen
             plugins.printWarning("Failed to register texttest stock icons.")
@@ -405,7 +404,7 @@ class TopWindowGUI(guiutils.ContainerGUI):
         iconFile = self.getIcon()
         try:
             self.topWindow.set_icon_from_file(iconFile)
-        except Exception as e:
+        except Exception, e:
             plugins.printWarning("Failed to set texttest window icon.\n" + str(e), stdout=True)
         self.setWindowTitle()
 
@@ -448,7 +447,7 @@ class TopWindowGUI(guiutils.ContainerGUI):
 
     def dynamicAppNameTitle(self):
         appsWithVersions = self.organiseApps()
-        allAppNames = [ self.appRepresentation(appName, versionSuffices) for appName, versionSuffices in list(appsWithVersions.items()) ]
+        allAppNames = [ self.appRepresentation(appName, versionSuffices) for appName, versionSuffices in appsWithVersions.items() ]
         return ",".join(allAppNames)
 
     def appRepresentation(self, appName, versionSuffices):
@@ -515,7 +514,7 @@ class ShortcutBarGUI(guiutils.SubGUI):
         # Do this first, so we set up interceptors and so on early on
         try:
             from storytext import createShortcutBar
-            from .version_control.custom_widgets_storytext import customEventTypes
+            from version_control.custom_widgets_storytext import customEventTypes
             uiMapFiles = plugins.findDataPaths([ "*.uimap" ], *args)
             self.widget = createShortcutBar(uiMapFiles=uiMapFiles, customEventTypes=customEventTypes)
             self.widget.show()
@@ -745,7 +744,7 @@ class InteractiveActionHandler:
     
     def _getIntvActionConfig(self, module):
         try:
-            exec("from " + module + " import InteractiveActionConfig")
+            exec "from " + module + " import InteractiveActionConfig"
             return InteractiveActionConfig() #@UndefinedVariable
         except ImportError:
             self.diag.info("Rejected GUI configuration from module " + repr(module) + "\n" + plugins.getExceptionString())
@@ -770,7 +769,7 @@ class InteractiveActionHandler:
                 if len(subinstances) == 1:
                     instances.append(subinstances[0])
                 else:
-                    showable = [x for x in subinstances if x.shouldShow()]
+                    showable = filter(lambda x: x.shouldShow(), subinstances)
                     if len(showable) == 1:
                         instances.append(showable[0])
                     else:
@@ -796,7 +795,7 @@ class InteractiveActionHandler:
                     if className in config.getInteractiveActionClasses(self.dynamic):
                         realClassName = replacements.get(className, className)
                         classNames.setdefault(realClassName, []).append(app)
-            return list(classNames.items())
+            return classNames.items()
     
     def tryMakeInstance(self, className, apps):
         # Basically a workaround for crap error message with variable className from python...

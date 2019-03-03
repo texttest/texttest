@@ -16,7 +16,7 @@ class WrongOSException(RuntimeError):
 class JobProcess:
     def __init__(self, pid):
         if os.name == "nt":
-            raise WrongOSException("JobProcess doesn't work on Windows")
+            raise WrongOSException, "JobProcess doesn't work on Windows"
         self.pid = pid
         self.name = None
 
@@ -96,7 +96,7 @@ class JobProcess:
             proc = subprocess.Popen([ "ps" ] + psArgs, stdout=subprocess.PIPE,
                                     stderr=subprocess.STDOUT, stdin=open(os.devnull))
             return proc.communicate()[0].splitlines()
-        except (IOError, OSError) as detail:
+        except (IOError, OSError), detail:
             if "Interrupted system call" in str(detail):
                 return self.getPsLines(psArgs)
             else:
@@ -107,7 +107,7 @@ class JobProcess:
             lines = self.getPsLines([ "-p", str(self.pid) ])
             if len(lines) < 2 or lines[-1].strip().endswith("<defunct>"):
                 return "returncode" # should return return code but can't be bothered, don't use it currently
-        except (OSError, select.error) as detail:
+        except (OSError, select.error), detail:
             if str(detail).find("Interrupted system call") != -1:
                 return self.poll()
             else:
@@ -132,7 +132,7 @@ def killArbitaryProcess(pid, sig=None):
         elif runCmd([ "pskill", pidStr ]): # Windows 2000
             return True
         else:
-            print("WARNING - none of taskkill (Vista), tskill (XP) nor pskill (2000) found, not able to kill processes")
+            print "WARNING - none of taskkill (Vista), tskill (XP) nor pskill (2000) found, not able to kill processes"
             return False
 
 def killSubProcessAndChildren(process, sig=None, cmd=None):

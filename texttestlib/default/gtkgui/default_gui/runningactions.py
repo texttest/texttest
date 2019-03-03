@@ -7,7 +7,7 @@ import gtk, gobject, os, sys, stat
 from texttestlib import plugins
 from .. import guiplugins
 from copy import copy, deepcopy
-from io import StringIO
+from StringIO import StringIO
 
 # Runs the dynamic GUI, but not necessarily with all the options available from the configuration
 class BasicRunningAction:
@@ -134,7 +134,7 @@ class BasicRunningAction:
 
     def getVanillaOption(self):
         options = []
-        if "vanilla" in self.inputOptions:
+        if self.inputOptions.has_key("vanilla"):
             options.append("-vanilla")
             value = self.inputOptions.get("vanilla")
             if value:
@@ -152,7 +152,7 @@ class BasicRunningAction:
             return []
         
         apps = sorted(self.currAppSelection, key=self.validApps.index)
-        appNames = list(map(self.getAppIdentifier, apps))
+        appNames = map(self.getAppIdentifier, apps)
         return [ "-a", ",".join(appNames) ]
 
     def checkTestRun(self, errFile, testSel, filterFile, usecase):
@@ -335,7 +335,7 @@ class RunningAction(BasicRunningAction):
         return buttons
 
     def storeSwitch(self, switch, widgets):
-        if switch in self.disablingInfo:
+        if self.disablingInfo.has_key(switch):
             disablingOptionValue, group = self.disablingInfo[switch]
             if disablingOptionValue < len(widgets):
                 self.disableWidgets[widgets[disablingOptionValue]] = switch, disablingOptionValue, group
@@ -406,7 +406,7 @@ class RunningAction(BasicRunningAction):
                 label = gtk.Label(group.name)
                 tab = self.createTab(group, frames)
                 notebook.append_page(tab, label)
-            elif len(list(group.keys())) > 0:
+            elif len(group.keys()) > 0:
                 frames.append(self.createFrame(group, group.name))
         self.connectDisablingSwitches()
         notebook.show_all()
@@ -436,7 +436,7 @@ class RunningAction(BasicRunningAction):
         self.setGroupSensitivity(group, sensitive, ignoreWidget=widget)
 
     def connectDisablingSwitches(self):
-        for widget, data in list(self.disableWidgets.items()):
+        for widget, data in self.disableWidgets.items():
             self.updateSensitivity(widget, data)
             widget.connect("toggled", self.updateSensitivity, data)
         self.disableWidgets = {} # not needed any more
@@ -533,7 +533,7 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
         return RunningAction.getTextTestOptions(self, filterFile, app, usecase) + [ "-rerun", rerunId ]
     
     def getLogRootDirectory(self, app):
-        if "f" in self.inputOptions:
+        if self.inputOptions.has_key("f"):
             logRootDir = os.path.dirname(self.inputOptions["f"])
             if os.path.basename(logRootDir).startswith("dynamic_run"):
                 return logRootDir
@@ -559,10 +559,10 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
             return []
         extraParent = self.getExtraParent(app)
         if extraParent:
-            return [v for v in app.versions if v not in extraParent.versions]
+            return filter(lambda v: v not in extraParent.versions, app.versions)
         else:
             extrasGiven = app.getConfigValue("extra_version")
-            return [v for v in app.versions if v in extrasGiven]
+            return filter(lambda v: v in extrasGiven, app.versions)
 
     def getAppIdentifier(self, app):
         parts = [ app.name ] + self.getExtraVersions(app)
@@ -752,7 +752,7 @@ class RunScriptAction(BasicRunningAction):
 
     def getCommandLineArgs(self, optionGroup, *args):
         args = [ self.scriptName() ]
-        for key, option in list(optionGroup.options.items()):
+        for key, option in optionGroup.options.items():
             args.append(key + "=" + str(option.getValue()))
 
         return [ "-s", " ".join(args) ]
@@ -823,7 +823,7 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
         dialog.hide()
 
     def createShortcutApps(self, writeDir):
-        for app, storyTextHome in list(self.storytextDirs.items()):
+        for app, storyTextHome in self.storytextDirs.items():
             self.createConfigFile(app, writeDir)
             self.createTestSuiteFile(app, storyTextHome, writeDir)
     
@@ -1084,8 +1084,8 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
                 self.addChangeData(model, iter, configKey, changes)
         for fileFilter, model in self.filtersWithModels:
             model.foreach(addChange, fileFilter.configKey)
-        for fileName, removeData in list(self.toRemove.items()):
-            for removeKey, removeLines in list(removeData.items()):
+        for fileName, removeData in self.toRemove.items():
+            for removeKey, removeLines in removeData.items():
                 changes.setdefault(fileName, {}).setdefault(removeKey, []).extend(removeLines)
         self.toRemove = {}
         return changes
@@ -1108,7 +1108,7 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
         changesByFile = self.getChanges()
         if changesByFile:
             app = self.currAppSelection[0]
-            for fileName, changes in list(changesByFile.items()):
+            for fileName, changes in changesByFile.items():
                 newFileLines = []
                 fullPath = os.path.join(app.getDirectory(), fileName)
                 currSection = None

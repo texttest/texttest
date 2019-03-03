@@ -62,7 +62,7 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         urlButtonbox.pack_start(urlButton, expand=True, fill=False)
         urlButton.connect("clicked", self.urlClicked)
         licenseLabel = gtk.Label()
-        licenseLabel.set_markup("<span size='small'>Copyright " + '\xa9' + " The authors</span>\n")
+        licenseLabel.set_markup("<span size='small'>Copyright " + u'\xa9' + " The authors</span>\n")
         self.dialog.vbox.pack_start(logoFrame, expand=False, fill=False)
         self.dialog.vbox.pack_start(mainLabel, expand=True, fill=True)
         self.dialog.vbox.pack_start(messageLabel, expand=False, fill=False)
@@ -197,7 +197,7 @@ class TextFileDisplayDialog(guiplugins.ActionResultDialogGUI):
             file.close()
             buffer = gtk.TextBuffer()
             buffer.set_text(text)
-        except Exception as e: #pragma : no cover - should never happen
+        except Exception, e: #pragma : no cover - should never happen
             self.showErrorDialog("Failed to show " + self.fileName + " file:\n" + str(e))
             return
 
@@ -260,7 +260,7 @@ class VersionInfoDialogGUI(guiplugins.ActionResultDialogGUI):
             notebook.append_page(scrolledWindow, gtk.Label(self.labelPrefix() + versionStr))
 
         if notebook.get_n_pages() == 0: #pragma : no cover - should never happen
-            raise plugins.TextTestError("\nNo " + self.getTitle() + " could be found in\n" + docDir + "\n")
+            raise plugins.TextTestError, "\nNo " + self.getTitle() + " could be found in\n" + docDir + "\n"
         else:
             parentSize = self.topWindow.get_size()
             self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[1] * 0.7))

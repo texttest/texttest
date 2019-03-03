@@ -1,7 +1,7 @@
 
 import os, sys, time
 from texttestlib import plugins
-from .comparefile import FileComparison
+from comparefile import FileComparison
 
 # This module won't work without an external module creating a file called performance.app
 # This file should be of a format understood by the function below i.e. a single line containing
@@ -71,7 +71,7 @@ def parseTimeExpression(timeExpression):
     if timeExpression.startswith(">"):
         return ">", plugins.getNumberOfSeconds(timeExpression[1:])
     else:
-        raise plugins.TextTestError("Could not parse time expression '" + timeExpression + "' : all expressions must begin with '<' or '>'.") 
+        raise plugins.TextTestError, "Could not parse time expression '" + timeExpression + "' : all expressions must begin with '<' or '>'." 
 
 class PerformanceConfigSettings:
     def __init__(self, test, stem):
@@ -249,7 +249,7 @@ class TimeFilter(plugins.Filter):
     option = "r"
     def __init__(self, timeLimit, *args):
         self.minTime = 0.0
-        self.maxTime = sys.maxsize
+        self.maxTime = sys.maxint
         times = plugins.commasplit(timeLimit)
         if timeLimit.count("<") == 0 and timeLimit.count(">") == 0: # Backwards compatible
             if len(times) == 1:
@@ -304,7 +304,7 @@ class TimeGroupFilter(plugins.Filter):
             return tests
 
         testPerfDict = self.makePerformanceDictionary(tests)
-        perfs = list(testPerfDict.keys())
+        perfs = testPerfDict.keys()
         perfs.sort(self.comparePerformance)
         newTests = []
         for perf in perfs:
@@ -339,16 +339,16 @@ class PerformanceStatistics(plugins.ScriptWithArgs):
         self.file = optDict.get("file", "performance")
     def setUpSuite(self, suite):
         if suite.parent:
-            print(suite.getIndent() + suite.name)
+            print suite.getIndent() + suite.name
         else:
             entries = [ suite.app.description(), "Version '" + self.app.getFullVersion() + "'" ]
             if self.compareVersion is not None:
                 entries += [ "Version '" + self.compareVersion + "'", self.file + " change" ]
             self.printUnderlined(self.getPaddedLine(entries))
     def printUnderlined(self, title):
-        print("-" * len(title))
-        print(title)
-        print("-" * len(title))
+        print "-" * len(title)
+        print title
+        print "-" * len(title)
     def getPaddedLine(self, entries):
         line = entries[0].ljust(40)
         for entry in entries[1:]:
@@ -366,7 +366,7 @@ class PerformanceStatistics(plugins.ScriptWithArgs):
             self.settings = PerformanceConfigSettings(test, self.file)
             perfComp = PerformanceComparison(comparePerf, perf, self.settings)
             entries += [ self.format(comparePerf), perfComp.getSummary() ]
-        print(self.getPaddedLine(entries))
+        print self.getPaddedLine(entries)
     def format(self, number):
         if number < 0:
             return "N/A"
@@ -391,6 +391,6 @@ class PerformanceStatistics(plugins.ScriptWithArgs):
             perfComp = PerformanceComparison(self.compareTotal, self.total, self.settings)
             entries += [ self.format(self.compareTotal), perfComp.getSummary() ]
         entries.append(str(self.testCount))
-        print(self.getPaddedLine(entries))
+        print self.getPaddedLine(entries)
     def setUpApplication(self, app):
         self.app = app

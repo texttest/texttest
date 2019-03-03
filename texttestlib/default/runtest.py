@@ -221,7 +221,7 @@ class RunTest(plugins.Action):
         # copy_test_path might be handled in a grid/cloud slave
         # Can't guarantee we get the right value here. So we fake it...
         copyVars = test.getConfigValue("copy_test_path", expandVars=False)
-        for var, value in list(testEnv.items()):
+        for var, value in testEnv.items():
             if test.app.hasChanged(var, value):
                 if "$" + var in copyVars or "${" + var + "}" in copyVars:
                     value = test.makeTmpFileName(os.path.basename(value), forComparison=False)
@@ -261,7 +261,7 @@ class RunTest(plugins.Action):
                                     env=testEnv, startupinfo=self.getProcessStartUpInfo(test))
         except OSError:
             message = "OS-related error starting the test command - probably cannot find the program " + repr(commandArgs[0])
-            raise plugins.TextTestError(message)
+            raise plugins.TextTestError, message
 
     def getProcessStartUpInfo(self, test):
         # Used for hiding the windows if we're on Windows!
@@ -311,7 +311,7 @@ class RunTest(plugins.Action):
             cmdString = cmdString.replace(test.app.writeDirectory, remoteTmp)
         scriptFile.write("exec " + cmdString + "\n")
         scriptFile.close()
-        os.chmod(scriptFileName, 0o775) # make executable
+        os.chmod(scriptFileName, 0775) # make executable
         remoteTmp = test.app.getRemoteTestTmpDir(test)[1]
         if remoteTmp:
             test.app.copyFileRemotely(scriptFileName, "localhost", remoteTmp, runMachine)
@@ -369,7 +369,7 @@ class RunTest(plugins.Action):
 
         # Don't expand environment if we're running on a different file system
         expandVars = test.app.getRunMachine() == "localhost" or not test.getConfigValue("remote_copy_program")
-        for interpreterName, interpreter in list(test.getConfigValue("interpreters", expandVars=expandVars).items()):
+        for interpreterName, interpreter in test.getConfigValue("interpreters", expandVars=expandVars).items():
             args += self.getInterpreterArgs(test, interpreter)
             args += test.getCommandLineOptions(stem=interpreterName + "_options")
             if postfix:

@@ -17,7 +17,7 @@ try: #Following switcheroo ensures that if PIL is installed it's used instead
     # of the HTMLgen-bundled copies.
     import Image
 except ImportError:
-    from . import ImageH
+    import ImageH
     Image = ImageH
     del ImageH
 

@@ -7,7 +7,6 @@ import gtk, gobject, guiutils, os, sys, operator, logging, string
 from texttestlib import plugins
 from ordereddict import OrderedDict
 from copy import copy
-from functools import reduce
 
 class FileViewGUI(guiutils.SubGUI):
     inheritedText = "(Inherited from parent suites)"
@@ -238,8 +237,8 @@ class ApplicationFileGUI(FileViewGUI):
         self.notifyReloadConfig()
 
     def notifyReloadConfig(self):
-        for appName, scriptArgs in list(self.testScripts.items()):
-            nonexistent = [s for s in scriptArgs if not os.path.isfile(s)]
+        for appName, scriptArgs in self.testScripts.items():
+            nonexistent = filter(lambda s: not os.path.isfile(s), scriptArgs)
             for scriptArg in nonexistent:
                 scriptArgs.remove(scriptArg)
         self.recreateModel(None, preserveSelection=True)
@@ -247,7 +246,7 @@ class ApplicationFileGUI(FileViewGUI):
     def getScriptArgs(self, suite):
         scriptArgs = set()
         scriptCmds = [ suite.getConfigValue("executable", expandVars=False) ] + \
-            list(suite.getConfigValue("interpreters", expandVars=False).values())
+            suite.getConfigValue("interpreters", expandVars=False).values()
             
         for scriptCmd in scriptCmds:
             for rawScriptArg in scriptCmd.split():
@@ -260,7 +259,7 @@ class ApplicationFileGUI(FileViewGUI):
     def addSuites(self, suites):
         for suite in suites:
             currUsecaseHome = suite.getEnvironment("STORYTEXT_HOME")
-            if currUsecaseHome != os.getenv("STORYTEXT_HOME") and os.path.isdir(currUsecaseHome) and currUsecaseHome not in list(self.storytextDirs.values()):
+            if currUsecaseHome != os.getenv("STORYTEXT_HOME") and os.path.isdir(currUsecaseHome) and currUsecaseHome not in self.storytextDirs.values():
                 self.storytextDirs[suite.app] = currUsecaseHome
                 if not suite.parent:
                     self.notify("UsecaseHome", suite, currUsecaseHome)
@@ -309,7 +308,7 @@ class ApplicationFileGUI(FileViewGUI):
         if len(importedFiles) > 0:
             importediter = self.model.insert_before(None, None)
             self.model.set_value(importediter, 0, "Imported Files")
-            sortedFiles = list(importedFiles.values())
+            sortedFiles = importedFiles.values()
             sortedFiles.sort()
             for importedFile in sortedFiles:
                 self.addFileToModel(importediter, importedFile, colour, self.allApps)
@@ -355,7 +354,7 @@ class ApplicationFileGUI(FileViewGUI):
     def getImportedFiles(self, file, app = None):
         imports = []
         if os.path.isfile(file):
-            importLines = [l for l in open(file, "r").readlines() if l.startswith("import_config_file")]
+            importLines = filter(lambda l: l.startswith("import_config_file"), open(file, "r").readlines())
             for line in importLines:
                 try:
                     file = line.split(":")[1].strip()
@@ -579,7 +578,7 @@ class TestFileGUI(FileViewGUI):
 
     def getExternalDataFiles(self):
         try:
-            return list(self.currentTest.app.extraReadFiles(self.currentTest).items())
+            return self.currentTest.app.extraReadFiles(self.currentTest).items()
         except Exception:
             sys.stderr.write("WARNING - ignoring exception thrown by '" + self.currentTest.getConfigValue("config_module") + \
                              "' configuration while requesting extra data files, not displaying any such files\n")
@@ -595,7 +594,7 @@ class TestFileGUI(FileViewGUI):
         if inheritedDataFiles:
             inheritedRow = [ self.inheritedText, "white", currDir, None, "", "" ]
             inheritedIter = self.model.insert_before(datiter, None, inheritedRow)
-            for suite, inherited in list(inheritedDataFiles.items()):
+            for suite, inherited in inheritedDataFiles.items():
                 self.addDataFilesUnderIter(inheritedIter, inherited, colour, suite.getDirectory())
 
     def addExternalFilesToModel(self):

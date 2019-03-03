@@ -24,13 +24,13 @@
  'votes': '0'}
 """
 
-import xmlrpc.client, re, urllib.request, urllib.parse, urllib.error
+import xmlrpclib, re, urllib
 from ordereddict import OrderedDict
 
 def convertToString(value):
-    if type(value) in (str, str):
+    if type(value) in (str, unicode):
         ret = value.replace("\r", "") # Get given Windows line endings but Python doesn't use them internally
-        if type(ret) == str:
+        if type(ret) == unicode:
             import locale
             encoding = locale.getdefaultlocale()[1] or "utf-8"
             return ret.encode(encoding, "replace")
@@ -40,15 +40,15 @@ def convertToString(value):
         return ", ".join(map(convertDictToString, value))
 
 def convertDictToString(dict):
-    if "name" in dict:
+    if dict.has_key("name"):
         return dict["name"]
-    elif "values" in dict:
+    elif dict.has_key("values"):
         return dict["values"]
     else:
         return "No value defined"
 
 def transfer(oldDict, newDict, key, postfix=""):
-    if key in oldDict:
+    if oldDict.has_key(key):
         newDict[key] = convertToString(oldDict[key]) + postfix
 
 def findId(info, currId):
@@ -65,14 +65,14 @@ def filterReply(bugInfo, statuses, resolutions):
     transfer(bugInfo, newBugInfo, "key")
     transfer(bugInfo, newBugInfo, "summary")
     newBugInfo["status"] = findId(statuses, bugInfo["status"])
-    if "resolution" in bugInfo:
+    if bugInfo.has_key("resolution"):
         newBugInfo["resolution"] = findId(resolutions, bugInfo["resolution"]) + "\n"
     else:
         transfer(bugInfo, newBugInfo, "assignee", "\n")
     newBugInfo["components"] = convertToString(bugInfo["components"])
     priorityStr = convertToString(bugInfo["priority"])
     priorityStr = str(int(priorityStr) -1) if priorityStr.isdigit() else priorityStr
-    remainder = [k for k in list(bugInfo.keys()) if k not in ignoreFields and (k not in newBugInfo or k == "priority") and isInteresting(bugInfo[k])]
+    remainder = filter(lambda k: k not in ignoreFields and (k not in newBugInfo or k == "priority") and isInteresting(bugInfo[k]), bugInfo.keys())
     remainder.sort()
     for key in remainder:
         if key == "priority":
@@ -89,13 +89,13 @@ def parseReply(bugInfo, statuses, resolutions, location, id):
         newBugInfo = filterReply(bugInfo, statuses, resolutions)
         ruler = "*" * 50 + "\n"
         message = ruler
-        for fieldName, value in list(newBugInfo.items()):
+        for fieldName, value in newBugInfo.items():
             message += fieldName.capitalize() + ": " + str(value) + "\n"
         message += ruler + "\n"
         bugId = newBugInfo['key']
         message += "View bug " + bugId + " using Jira URL=" + makeURL(location, str(bugId)) + "\n\n"
         message += convertToString(bugInfo.get("description", ""))
-        isResolved = "resolution" in newBugInfo
+        isResolved = newBugInfo.has_key("resolution")
         statusText = newBugInfo["resolution"].strip() if isResolved else newBugInfo['status']
         return statusText, message, isResolved, id
     except (IndexError, KeyError):
@@ -104,39 +104,39 @@ def parseReply(bugInfo, statuses, resolutions, location, id):
     
 def findBugInfo(bugId, location, username, password):
     scriptLocation = location + "/rpc/xmlrpc"
-    proxy = xmlrpc.client.ServerProxy(scriptLocation)
+    proxy = xmlrpclib.ServerProxy(scriptLocation)
     try:
         auth = proxy.jira1.login(username, password)
-    except xmlrpc.client.Fault as e:
+    except xmlrpclib.Fault, e:
         return "LOGIN FAILED", e.faultString, False, bugId
-    except Exception as e:
+    except Exception, e:
         message = "Failed to log in to '" + scriptLocation + "': " + str(e) + ".\n\nPlease make sure that the configuration entry 'bug_system_location' points to a correct location of a Jira version 3.x installation. The current value is '" + location + "'."
         return "BAD SCRIPT", message, False, bugId
 
     try:
         bugInfo = proxy.jira1.getIssue(auth, bugId)
         statuses = proxy.jira1.getStatuses(auth)
-        if "resolution" in bugInfo:
+        if bugInfo.has_key("resolution"):
             resolutions = proxy.jira1.getResolutions(auth)
         else:
             resolutions = []
         return parseReply(bugInfo, statuses, resolutions, location, bugId)
-    except xmlrpc.client.Fault as e:
+    except xmlrpclib.Fault, e:
         renamedBug = getRenamedBug(bugId, location)
         if renamedBug:
             return findBugInfo(renamedBug, location, username, password)
         else:
             return "NONEXISTENT", e.faultString, True, bugId
-    except Exception as e:
+    except Exception, e:
         message = "Failed to fetch data from '" + scriptLocation + "': " + str(e)
         return "BAD SCRIPT", message, False, bugId
 
 def getRenamedBug(bugId, location):
     try:
-        url = urllib.request.urlopen(makeURL(location, bugId))
+        url = urllib.urlopen(makeURL(location, bugId))
     except IOError:
         return None
-    bugs = getBugsFromText(urllib.request.url2pathname(url.geturl()), "")
+    bugs = getBugsFromText(urllib.url2pathname(url.geturl()), "")
     if len(bugs) == 1:
         renamed, _ = bugs[0]
         if renamed != bugId:

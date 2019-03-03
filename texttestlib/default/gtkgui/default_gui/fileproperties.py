@@ -106,7 +106,7 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
                 self.processFile(file, properties, errors)
 
         if len(errors):
-            raise plugins.TextTestError("Failed to get file properties:\n" + "\n".join(errors))
+            raise plugins.TextTestError, "Failed to get file properties:\n" + "\n".join(errors)
 
         return properties
     def processFile(self, file, properties, errors):
@@ -114,7 +114,7 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
             try:
                 prop = FileProperties(file)
                 properties.append(prop)
-            except Exception as e:
+            except Exception, e:
                 errors.append(str(e))
 
     # xalign = 1.0 means right aligned, 0.0 means left aligned
@@ -135,7 +135,7 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
 
     def createVBox(self, dirToProperties):
         vbox = gtk.VBox()
-        for dir, properties in list(dirToProperties.items()):
+        for dir, properties in dirToProperties.items():
             expander = gtk.Expander()
             expander.set_label_widget(self.justify(dir))
             table = gtk.Table(len(properties), 7)

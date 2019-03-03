@@ -1,7 +1,7 @@
 
 import logging, os
 from ordereddict import OrderedDict
-from .batchutils import getBatchRunName
+from batchutils import getBatchRunName
 from string import Template
 from locale import getpreferredencoding
 from texttestlib import plugins
@@ -24,13 +24,13 @@ class JUnitResponder(plugins.Responder):
     def notifyComplete(self, test):
         if not self.useJUnitFormat(test.app):
             return
-        if test.app not in self.appData:
+        if not self.appData.has_key(test.app):
             self._addApplication(test)
         self.appData[test.app].storeResult(test)
         
     def notifyAllComplete(self):
         # allApps is {appname : [app]}
-        for appList in list(self.allApps.values()):
+        for appList in self.allApps.values():
             # appData is {app : data}
             for app in appList:
                 if self.useJUnitFormat(app):
@@ -109,8 +109,8 @@ class JUnitApplicationData:
         """
         Replace char with `"\\x%02x" % ord(char)` if char not allowed in CDATA.
         """
-        u_text = str(text, getpreferredencoding(), 'replace')
-        return "".join(("\\x%02x" % ord(char), char)[cls._allowed(ord(char))]
+        u_text = unicode(text, getpreferredencoding(), 'replace')
+        return u"".join((u"\\x%02x" % ord(char), char)[cls._allowed(ord(char))]
                        for char in u_text).encode('utf-8')
 
     @staticmethod
@@ -177,7 +177,7 @@ class ReportWriter:
     def writeResults(self, app, appData):
         self.diag.info("writing results in junit format for app " + app.fullName())
         appResultsDir = self._createResultsDir(app)
-        for testName, result in list(appData.getResults().items()):
+        for testName, result in appData.getResults().items():
             if result["success"]:
                 text = Template(success_template).substitute(result)
             elif result["error"]:

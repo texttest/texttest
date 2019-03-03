@@ -1,9 +1,9 @@
 
 import sys, os, logging.config, string, shutil, socket, time, re, stat, shlex, types, fnmatch, subprocess
-from collections import OrderedDict
+from ordereddict import OrderedDict
 from traceback import format_exception
 from threading import currentThread
-from queue import Queue, Empty
+from Queue import Queue, Empty
 from glob import glob
 from datetime import datetime
 
@@ -80,7 +80,7 @@ def startTimeString(format=datetimeFormat):
 
 def importAndCall(moduleName, callableName, *args):
     command = "from " + moduleName + " import " + callableName + " as _callable"
-    exec(command)
+    exec command
     return _callable(*args) #@UndefinedVariable
 
 def installationDir(name):
@@ -169,15 +169,15 @@ def getNumberOfSeconds(timeString):
             return seconds
     except ValueError:
         pass
-    raise TextTestError("Illegal time format '" + timeString + \
-          "' :  Use format HH:MM:SS or MM:SS, or a single number to denote a number of minutes.")
+    raise TextTestError, "Illegal time format '" + timeString + \
+          "' :  Use format HH:MM:SS or MM:SS, or a single number to denote a number of minutes."
 
 def printWarning(message, stdout=False):
     if stdout:
         if log:
             log.warning("WARNING: " + message)
         else:
-            print("WARNING: " + message)
+            print "WARNING: " + message
     else:
         sys.stderr.write("WARNING: " + message + "\n")
 
@@ -369,10 +369,10 @@ class TestSelectionFilter(TextFilter):
         return myEntries
 
     def getSectionsToFind(self, allEntries, app, suites):        
-        allHeaders = [entry for entry in allEntries if entry.startswith("appdata=" + app.name)]
+        allHeaders = filter(lambda entry: entry.startswith("appdata=" + app.name), allEntries)
         if len(allHeaders) <= 1:
             return allHeaders
-        allApps = [a for a in [ suite.app for suite in suites ] if a.name == app.name]
+        allApps = filter(lambda a: a.name == app.name, [ suite.app for suite in suites ])
         sections = []
         for header in allHeaders:
             versionSet = set(header.split(".")[1:])
@@ -399,7 +399,7 @@ class TestSelectionFilter(TextFilter):
         # Really want some kind of "multimax" here
         bestHeader = max(allHeaders, key=matchKey)
         bestKey = matchKey(bestHeader)
-        return [h for h in allHeaders if matchKey(h) == bestKey]
+        return filter(lambda h: matchKey(h) == bestKey, allHeaders)
 
     def getVersionSetMatchKey(self, vset1, vset2):
         return len(vset1.intersection(vset2)), -len(vset1.symmetric_difference(vset2))
@@ -466,11 +466,11 @@ class ScriptWithArgs(Action):
                 if newKey in allowedArgs:
                     currKey = newKey
                     dict[currKey] = val
-                elif currKey in dict:
+                elif dict.has_key(currKey):
                     dict[currKey] += " " + arg
                 else:
-                    print("Unrecognised option '" + newKey + "'")
-            elif currKey in dict:
+                    print "Unrecognised option '" + newKey + "'"
+            elif dict.has_key(currKey):
                 dict[currKey] += " " + arg
         return dict
 
@@ -527,7 +527,7 @@ class Observable:
         self.observers.append(observer)
 
     def setObservers(self, observers):
-        self.observers = [x for x in observers if x is not self]
+        self.observers = filter(lambda x: x is not self, observers)
 
     def inMainThread(self):
         return currentThread().getName() == "MainThread"
@@ -637,7 +637,7 @@ class TestState(Observable):
         return self.categoryRepr() + self.hostRepr() + self.colonRepr()
 
     def categoryRepr(self):
-        if self.category not in self.categoryDescriptions:
+        if not self.categoryDescriptions.has_key(self.category):
             return self.category
         longDescription = self.categoryDescriptions[self.category][1]
         return longDescription
@@ -791,15 +791,15 @@ def hostsMatch(hostname, localhost):
 
 # Hacking around os.path.getcwd not working with AMD automounter
 def abspath(path):
-    if "PWD" in os.environ:
+    if os.environ.has_key("PWD"):
         return os.path.join(os.environ["PWD"], path)
     else:
         return os.path.abspath(path)
 
 # deepcopy(os.environ) still seems to retain links to the actual environment, create a clean copy
 def copyEnvironment(values={}, ignoreVars=[]):
-    for var, value in list(os.environ.items()):
-        if var not in values and var not in ignoreVars:
+    for var, value in os.environ.items():
+        if not values.has_key(var) and var not in ignoreVars:
             values[var] = value
     return values
 
@@ -858,7 +858,7 @@ def removePath(path):
 
 # Useful utility, free text input as comma-separated list which may have spaces
 def commasplit(input):
-    return list(map(string.strip, input.split(",")))
+    return map(string.strip, input.split(","))
 
 # Another useful thing that saves an import and remembering weird stuff
 def modifiedTime(filename):
@@ -889,7 +889,7 @@ def samefile(writeDir, currDir):
 def makeWriteable(path):
     currMode = os.stat(path)[stat.ST_MODE]
     currPerm = stat.S_IMODE(currMode)
-    newPerm = currPerm | 0o220
+    newPerm = currPerm | 0220
     os.chmod(path, newPerm)
 
 def getPaths(d):
@@ -919,13 +919,13 @@ def rmtree(dir, attempts=100):
         try:
             shutil.rmtree(realDir)
             return
-        except Exception as e:
+        except Exception, e:
             if str(e).find("Permission") != -1 or str(e).find("Access") != -1:
                 # We own this stuff, don't respect readonly flags set by ourselves, it might just be the SUT doing so...
                 for path in getPaths(realDir):
                     try:
                         makeWriteable(path)
-                    except OSError as e:
+                    except OSError, e:
                         log.info("Could not change permissions to be able to remove directory " +
                                  dir + " : - " + str(e))
                         return
@@ -965,11 +965,11 @@ class ResponseAggregator:
         basicValue = self.methods[0](*args, **kwargs)
         for i, extraMethod in enumerate(self.methods[1:]):
             extraValue = extraMethod(*args, **kwargs)
-            if type(basicValue) == list:
+            if type(basicValue) == types.ListType:
                 for item in extraValue:
                     if not item in basicValue:
                         basicValue.append(item)
-            elif type(basicValue) == dict:
+            elif type(basicValue) == types.DictType:
                 basicValue.update(extraValue)
             elif extraValue != basicValue:
                 if self.isSet(extraValue):
@@ -1075,7 +1075,7 @@ def ensureDirectoryExists(path, attempts=5):
 def retryOnInterrupt(function, *args):
     try:
         return function(*args)
-    except (IOError, OSError) as detail:
+    except (IOError, OSError), detail:
         if str(detail).find("Interrupted system call") != -1:
             return retryOnInterrupt(function, *args)
         else:
@@ -1084,12 +1084,12 @@ def retryOnInterrupt(function, *args):
 def tryFileChange(function, permissionMessage, *args):
     try:
         return function(*args)
-    except OSError as e:
+    except OSError, e:
         errorStr = str(e)
         if "Permission" in errorStr:
-            raise TextTestError(permissionMessage)
+            raise TextTestError, permissionMessage
         else:
-            raise TextTestError(errorStr)
+            raise TextTestError, errorStr
 
 def getExceptionString():
     type, value, traceback = sys.exc_info()
@@ -1152,7 +1152,7 @@ class PreviewGenerator:
 
     def getPreviewFromLines(self, lines):
         cutLines = self.getCutLines(lines)
-        lines = list(map(self.getWrappedLine, cutLines))
+        lines = map(self.getWrappedLine, cutLines)
         return "".join(lines)
 
     def getWrappedLine(self, line):
@@ -1397,7 +1397,7 @@ class MultiEntryDictionary(OrderedDict):
     def findFileDefiningValue(self, value, valueDict, envMapping):
         if value in valueDict:
             return value
-        for storedValue in list(valueDict.keys()):
+        for storedValue in valueDict.keys():
             if "$" in storedValue and self.expandEnvironment(storedValue, envMapping) == value:
                 return storedValue
                 
@@ -1413,9 +1413,9 @@ class MultiEntryDictionary(OrderedDict):
     def getNewSectionInfo(self, line, insert=True, errorOnUnknown=False):
         name = self.getEntryName(line[1:-1])
         if name != "end":
-            if name in self:
+            if self.has_key(name):
                 value = self[name]
-                if isinstance(value, OrderedDict) or type(value) == dict:
+                if isinstance(value, OrderedDict) or type(value) == types.DictType:
                     return name
                 else:
                     self.warn("Config entry name '" + name + "' incorrectly used as a section marker.")
@@ -1443,11 +1443,11 @@ class MultiEntryDictionary(OrderedDict):
             
     def _addEntry(self, entryName, entry, currDict, currSection, 
                   insert=True, errorOnUnknown=False, errorOnClashWithGlobal=True):
-        if currDict is not self and entryName in self and errorOnClashWithGlobal:
+        if currDict is not self and self.has_key(entryName) and errorOnClashWithGlobal:
             self.warn("Config entry name '" + entryName + "' found in section '" + currSection +
                       "', but defined at global scope. Did you forget an [end] marker?")
 
-        entryExists = entryName in currDict
+        entryExists = currDict.has_key(entryName)
         if entryExists:
             self.diag.info("Entry existed, setting " + entryName + "=" + str(entry))
             self.insertEntry(entryName, entry, currDict)
@@ -1459,17 +1459,17 @@ class MultiEntryDictionary(OrderedDict):
                 self.warn("Config entry name '" + entryName + "' not recognised.")
 
     def getDictionaryValueType(self, currDict):
-        val = list(currDict.values())
+        val = currDict.values()
         if len(val) == 0:
-            return bytes
+            return types.StringType
         else:
             return type(val[0])
 
     def castEntry(self, dummy, entry, currDict):
-        if type(entry) != bytes:
+        if type(entry) != types.StringType:
             return entry
         dictValType = self.getDictionaryValueType(currDict)
-        if dictValType == list:
+        if dictValType == types.ListType:
             return self.getBasicList(entry)
         else:
             return dictValType(entry)
@@ -1494,9 +1494,9 @@ class MultiEntryDictionary(OrderedDict):
 
     def insertEntry(self, entryName, entry, currDict):
         currType = type(currDict[entryName])
-        if currType == list:
+        if currType == types.ListType:
             currDict[entryName] = self.getListValue(entry, currDict[entryName])
-        elif currType == dict:
+        elif currType == types.DictType:
             newCurrDict = self.getSectionInfo(entryName)[0]
             if "default" in newCurrDict:
                 self.insertEntry("default", entry, newCurrDict)
@@ -1526,9 +1526,9 @@ class MultiEntryDictionary(OrderedDict):
             return None
         listVal = []
         usingList = False
-        for currSubKey, currValue in list(dict.items()):
+        for currSubKey, currValue in dict.items():
             if fnmatch.fnmatch(subKey, currSubKey):
-                if type(currValue) == list:
+                if type(currValue) == types.ListType:
                     listVal += currValue
                     usingList = True
                 else:
@@ -1538,7 +1538,7 @@ class MultiEntryDictionary(OrderedDict):
         if subKey != defaultSubKey:
             defValue = dict.get(defaultSubKey)
             if defValue is not None:
-                if type(defValue) == list:
+                if type(defValue) == types.ListType:
                     listVal += defValue
                     return listVal
                 else:
@@ -1554,7 +1554,7 @@ class MultiEntryDictionary(OrderedDict):
             return [ string.Template(element).safe_substitute(envMapping) for element in value ]
         elif isinstance(value, dict):
             newDict = value.__class__()
-            for key, val in list(value.items()):
+            for key, val in value.items():
                 newDict[key] = cls.expandEnvironment(val, envMapping)
             return newDict
         else:
@@ -1758,18 +1758,18 @@ class OptionGroup:
         self.options = OrderedDict()
         
     def reset(self):
-        for option in list(self.options.values()):
+        for option in self.options.values():
             option.reset()
 
     def setValue(self, key, value):
-        if key in self.options:
+        if self.options.has_key(key):
             self.options[key].setValue(value)
             return True
         else:
             return False #pragma : no cover - should never happen
 
     def getValue(self, key, defValue = None):
-        if key in self.options:
+        if self.options.has_key(key):
             return self.options[key].getValue()
         else:
             return defValue
@@ -1781,13 +1781,13 @@ class OptionGroup:
     getSwitchValue = getValue
 
     def addSwitch(self, key, *args, **kwargs):
-        if key in self.options:
+        if self.options.has_key(key):
             return False
         self.options[key] = Switch(*args, **kwargs)
         return True
 
     def addOption(self, key, *args, **kwargs):
-        if key in self.options:
+        if self.options.has_key(key):
             return False
         self.options[key] = TextOption(*args, **kwargs)
         return True
@@ -1802,18 +1802,18 @@ class OptionGroup:
 
     def getOptionValueMap(self):
         values = {}
-        for key, option in list(self.options.items()):
+        for key, option in self.options.items():
             value = option.getValue()
             if value:
                 values[key] = option.getValue()
         return values
 
     def keys(self):
-        return list(self.options.keys())
+        return self.options.keys()
 
     def getOptionsForCmdLine(self, *args):
         commandLines = []
-        for key, option in list(self.options.items()):
+        for key, option in self.options.items():
             if self.accept(key, option, *args):
                 commandLines.append((key, option.getCmdLineValue()))
             

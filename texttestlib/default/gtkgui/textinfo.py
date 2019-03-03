@@ -177,7 +177,7 @@ class TextViewGUI(guiutils.SubGUI):
 
     def getDescriptionParagraphs(self, test):
         paragraphs = [ self.getDescription(test) ]
-        for stem in sorted(set([ "performance" ] + list(test.getConfigValue("performance_logfile_extractor").keys()))):
+        for stem in sorted(set([ "performance" ] + test.getConfigValue("performance_logfile_extractor").keys())):
             fileName = test.getFileName(stem)
             if fileName and os.path.isfile(fileName):
                 paragraphs.append(self.getFilePreview(fileName))

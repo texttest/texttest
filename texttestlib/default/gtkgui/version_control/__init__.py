@@ -20,7 +20,7 @@ def getConfigFromDirectory(directory):
                 controlDir = os.path.join(directory, controlDirName)
                 if module != "cvs" or not os.path.isdir(os.path.join(controlDir, "CVS")):
                     # Avoid overarching directories "CVS" which are not control directories...
-                    exec("from " + module + " import InteractiveActionConfig")
+                    exec "from " + module + " import InteractiveActionConfig"
                     return InteractiveActionConfig(controlDir) #@UndefinedVariable
             except ImportError: # There may well be more VCSs than we have support for...
                 pass

@@ -2,7 +2,7 @@
 import os, filecmp, time, subprocess, logging, re
 from texttestlib import plugins
 from shutil import copyfile
-
+from itertools import izip
 from fnmatch import fnmatch
 
 class FileComparison:
@@ -60,7 +60,7 @@ class FileComparison:
     def split(self, test, separators):
         separator = separators.get(self.stem)
         if not separator: # try wildcards
-            for key, value in list(separators.items()):
+            for key, value in separators.items():
                 if fnmatch(self.stem, key):
                     separator = value
                     break
@@ -69,7 +69,7 @@ class FileComparison:
             tmpParts = self.splitFile(test, self.tmpCmpFile, sepRegex)
             origParts = self.splitFile(test, self.stdCmpFile, sepRegex)
             return [ SplitFileComparison(self, test, self.stem, origPart, tmpPart) \
-                     for origPart, tmpPart in zip(origParts, tmpParts) ]
+                     for origPart, tmpPart in izip(origParts, tmpParts) ]
         else:
             return []
 
@@ -125,7 +125,7 @@ class FileComparison:
     def __getstate__(self):
         # don't pickle the diagnostics
         state = {}
-        for var, value in list(self.__dict__.items()):
+        for var, value in self.__dict__.items():
             if var != "diag" and var != "recalculationTime":
                 state[var] = value
         return state
@@ -291,7 +291,7 @@ class FileComparison:
             cmdArgs = plugins.splitcmd(self.textDiffTool) + [ self.stdCmpFile, self.tmpCmpFile ]
             proc = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
             return self.previewGenerator.getPreview(proc.stdout)
-        except OSError as e:
+        except OSError, e:
             self.diag.info("No diff report: full exception printout\n" + plugins.getExceptionString())
             return "No difference report could be created: could not find textual difference tool '" + self.textDiffTool + "'\n" + \
                    "(" + str(e) + ")"
@@ -384,7 +384,7 @@ class FileComparison:
             else:
                 self.saveResults(tmpFile, self.stdFile)
         else:
-            raise plugins.TextTestError("The following file seems to have been removed since it was created:\n" + repr(tmpFile)) 
+            raise plugins.TextTestError, "The following file seems to have been removed since it was created:\n" + repr(tmpFile) 
         self.differenceCache = self.APPROVED
 
     def saveMissing(self, versionString, autoGenText, backupVersionStrings):

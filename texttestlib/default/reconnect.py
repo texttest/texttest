@@ -12,7 +12,7 @@ class ReconnectConfig:
     runDirCache = {}
     datedVersions = set()
     def __init__(self, optionMap):
-        self.fullRecalculate = "reconnfull" in optionMap
+        self.fullRecalculate = optionMap.has_key("reconnfull")
         self.diag = logging.getLogger("Reconnection")
         self.reconnectTmpInfo = optionMap.get("reconnect")
         self.reconnDir = None
@@ -28,7 +28,7 @@ class ReconnectConfig:
             keys = [ app.fullName() ] + app.versions
         for i in range(len(keys)):
             subKey = ".".join(keys[:i+1])
-            if i == len(keys) - 1 or subKey not in self.runDirCache:
+            if i == len(keys) - 1 or not self.runDirCache.has_key(subKey):
                 self.runDirCache[subKey] = runDir
                 self.diag.info("Caching " + subKey + " = " + runDir)
 
@@ -85,7 +85,7 @@ class ReconnectConfig:
     def getReconnectRunDirs(self, app, fetchDir):
         correctNames = sorted(os.listdir(fetchDir))
         fullPaths = [ os.path.join(fetchDir, d) for d in correctNames ]
-        return [d for d in fullPaths if self.isRunDirectoryFor(app, d)]
+        return filter(lambda d: self.isRunDirectoryFor(app, d), fullPaths)
     
     def getFilter(self):
         return ReconnectFilter(self.reconnDir)
@@ -147,7 +147,7 @@ class ReconnectConfig:
                     self.diag.info("Found list " + repr(vlist))
                     if givenExtras:
                         vset = frozenset(vlist).difference(givenExtras)
-                        vlist = [v for v in vlist if v in vset]
+                        vlist = filter(lambda v: v in vset, vlist)
                     if vlist not in vlists:
                         vlists.append(vlist)
         return vlists
@@ -175,7 +175,7 @@ class ReconnectConfig:
                     continue # If the given version isn't included, ignore it
                 extraVersionSet = versionSet.difference(appVersions)
                 # Important to preserve the order of the versions as received
-                extraVersionList = [v for v in versionList if v in extraVersionSet]
+                extraVersionList = filter(lambda v: v in extraVersionSet, versionList)
                 extraVersion = ".".join(extraVersionList)
                 if len(groupDirs) == 1:
                     if extraVersion:
@@ -187,7 +187,7 @@ class ReconnectConfig:
                     datedVersionMap = {}
                     for dir in groupDirs:
                         datedVersionMap[os.path.basename(dir).split(".")[-2]] = dir
-                    datedVersions = sorted(list(datedVersionMap.keys()), key=self.dateValue, reverse=True)
+                    datedVersions = sorted(datedVersionMap.keys(), key=self.dateValue, reverse=True)
                     self.datedVersions.update(datedVersions)
                     self.diag.info("Found candidate dated versions: " + repr(datedVersions))
                     if not extraVersion: # one of them has to be the main version...
@@ -219,17 +219,17 @@ class ReconnectConfig:
 
     def checkSanity(self, app):
         if self.errorMessage: # We failed already, basically
-            raise plugins.TextTestError(self.errorMessage)
+            raise plugins.TextTestError, self.errorMessage
 
         runDir = self.findRunDir(app)
         if not runDir:
-            raise plugins.TextTestWarning("Could not find any runs matching " + app.description()) 
+            raise plugins.TextTestWarning, "Could not find any runs matching " + app.description() 
         self.diag.info("Found run directory " + repr(runDir))
         self.reconnDir = self.findAppDirUnder(app, runDir)        
         self.diag.info("Found application directory " + repr(self.reconnDir))
         if not self.reconnDir:
-            raise plugins.TextTestWarning("Could not find an application directory matching " + app.description() + \
-                  " for the run directory found at " + runDir)
+            raise plugins.TextTestWarning, "Could not find an application directory matching " + app.description() + \
+                  " for the run directory found at " + runDir
         for datedVersion in self.datedVersions:
             app.addConfigEntry("unsaveable_version", datedVersion)
             
@@ -298,7 +298,7 @@ class ReconnectTest(plugins.Action):
                 targetPath = os.path.join(tmpDir, os.path.basename(fullPath))
                 try:
                     shutil.copyfile(fullPath, targetPath)
-                except EnvironmentError as e:
+                except EnvironmentError, e:
                     # File could not be copied, may not have been readable
                     # Write the exception to it instead
                     targetFile = open(targetPath, "w")

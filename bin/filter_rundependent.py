@@ -26,7 +26,7 @@ if __name__ == "__main__":
                       help="use test relative path RELPATH", metavar="RELPATH")
     (options, args) = parser.parse_args()
     if options.module:
-        exec("import " + options.module)
+        exec "import " + options.module
     allPaths = plugins.findDataPaths([ "logging.console" ], dataDirName="log", includePersonal=True)
     plugins.configureLogging(allPaths[-1]) # Won't have any effect if we've already got a log file
     if options.unordered:

@@ -45,7 +45,7 @@ class BuildDocument:
             try :
                 return cls(xmlFile)
             except:
-                print("WARNING: Error while parsing XML file:" + xmlFile)
+                print "WARNING: Error while parsing XML file:" + xmlFile
 
     def __init__(self, xmlFile):
         self.document = parse(xmlFile)
@@ -151,7 +151,7 @@ class FingerprintDifferenceFinder:
             return [], bool(fingerprint2)
         differences = []
         updatedHashes = {}
-        for artefact, value in list(fingerprint2.items()):
+        for artefact, value in fingerprint2.items():
             if isinstance(value, tuple):
                 hash2 = value[0]
                 file2 = value[1]
@@ -172,13 +172,13 @@ class FingerprintDifferenceFinder:
                 differences.append((artefact, hash1, hash2))
 
         if updatedHashes:
-            print("WARNING: incorrect hashes found!")
-            print("This is probably due to fingerprint data being wrongly updated from artefacts produced during the build")
-            print("Storing a cached file of corrected versions. The following were changed:")
-            for artefact, hash in list(updatedHashes.items()):
-                print(artefact, fingerprint2.get(artefact)[0], hash)
+            print "WARNING: incorrect hashes found!"
+            print "This is probably due to fingerprint data being wrongly updated from artefacts produced during the build"
+            print "Storing a cached file of corrected versions. The following were changed:"
+            for artefact, hash in updatedHashes.items():
+                print artefact, fingerprint2.get(artefact)[0], hash
 
-            for artefact, (hash2, file2) in list(fingerprint2.items()):
+            for artefact, (hash2, file2) in fingerprint2.items():
                 if artefact not in updatedHashes:
                     updatedHashes[artefact] = hash2
             self.verifier.writeCache(jobName, build2, updatedHashes)
@@ -192,10 +192,10 @@ class FingerprintDifferenceFinder:
                 return self.getFingerprint(*args)
             except FingerprintNotReadyException:
                 if i % 10 == 0:
-                    print("No Jenkins fingerprints available yet, sleeping...")
+                    print "No Jenkins fingerprints available yet, sleeping..."
                 time.sleep(1)
 
-        print("Giving up waiting for fingerprints.")
+        print "Giving up waiting for fingerprints."
         raise JobStillRunningException()
 
     def getFingerprint(self, buildsDir, jobName, buildName):
@@ -217,7 +217,7 @@ class FingerprintDifferenceFinder:
                     raise JobStillRunningException()
             # No result means aborted (hard) if we're checking a previous run, otherwise it means we haven't finished yet
             elif result == "ABORTED" or (result is None and document is not None):
-                raise AbortedException("Aborted in Jenkins")
+                raise AbortedException, "Aborted in Jenkins"
         return fingerprint
 
 
@@ -288,12 +288,12 @@ class ChangeSetFinder:
         else:
             try:
                withoutEmail = withoutEmail.encode("ascii", "xmlcharrefreplace")
-            except UnicodeDecodeError as exception:
-                print("FAILED to encode name '" + withoutEmail + "' (repr: " + repr(withoutEmail) + ", " \
+            except UnicodeDecodeError, exception:
+                print "FAILED to encode name '" + withoutEmail + "' (repr: " + repr(withoutEmail) + ", " \
                       + str(type(withoutEmail)) + ", default encoding: '" \
                       + sys.getdefaultencoding() + "', default locale: " \
                       + str(locale.getdefaultlocale()) + ") due to:\n", \
-                      exception, "\nIgnoring this entry")
+                      exception, "\nIgnoring this entry"
                 return None
             return withoutEmail
 
@@ -304,9 +304,9 @@ class ChangeSetFinder:
 
     def getBugs(self, msg):
         bugs = []
-        for systemName, location in list(self.bugSystemData.items()):
+        for systemName, location in self.bugSystemData.items():
             try:
-                exec("from texttestlib.default.knownbugs." + systemName + " import getBugsFromText")
+                exec "from texttestlib.default.knownbugs." + systemName + " import getBugsFromText"
                 self.addUnique(bugs, getBugsFromText(msg, location)) #@UndefinedVariable
             except ImportError:
                 pass
@@ -380,14 +380,14 @@ class ProjectData:
             document = parse(configFile)
             for subDir in document.getElementsByTagName("subdir"):
                 return subDir.childNodes[0].nodeValue
-        except ExpatError as exception:
-            print("WARNING: Corrupt config file:\n ", os.path.abspath(configFile), "\n Collection of Jenkins data will be incomplete.")
+        except ExpatError, exception:
+            print "WARNING: Corrupt config file:\n ", os.path.abspath(configFile), "\n Collection of Jenkins data will be incomplete."
         return ""
 
     def getProjects(self, artefact):
         currProjArtefact = None
         currProjects = []
-        for projArtefact, projects in list(self.data.items()):
+        for projArtefact, projects in self.data.items():
             if currProjArtefact is None or len(projArtefact) > len(currProjArtefact):
                 if artefact.startswith(projArtefact):
                     currProjArtefact = artefact
@@ -414,10 +414,10 @@ class ChangeFinder:
         try:
             markedChanges, projectChanges, fingerprintsFound = self.getChangesRecursively(self.jobName, build1, build2)
             if not fingerprintsFound:
-                print("WARNING: tried to find Jenkins changes, but no fingerprints found for", self.jobName, "build", build2)
+                print "WARNING: tried to find Jenkins changes, but no fingerprints found for", self.jobName, "build", build2
                 if os.getenv("BUILD_ID") == "none" and os.getenv("BUILD_NUMBER") == build2:
-                    print("(build is ongoing, so should have waited for results)")
-        except AbortedException as e:
+                    print "(build is ongoing, so should have waited for results)"
+        except AbortedException, e:
             # If it was aborted, say this
             return [(str(e), "", [])]
 
@@ -467,7 +467,7 @@ class ChangeFinder:
     def getProjectChanges(self, differencesByProject):
         projectChanges = []
         recursiveChanges = []
-        for project, diffs in list(differencesByProject.items()):
+        for project, diffs in differencesByProject.items():
             buildsDir = getBuildsDir(self.jobRoot, project)
             if buildsDir is None:
                 continue
@@ -513,7 +513,7 @@ class ChangeFinder:
         elif version2:
             return projectNameForDisplay + " " + version2, "", []
         else:
-            print("WARNING: Artefact version not found for: " + projectName + " build: " + build2)
+            print "WARNING: Artefact version not found for: " + projectName + " build: " + build2
             return "Artefact version not found", "", []
 
 

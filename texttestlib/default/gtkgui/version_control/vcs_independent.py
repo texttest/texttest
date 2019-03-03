@@ -54,7 +54,7 @@ class VersionControlInterface:
         try:
             process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, **kwargs)
         except OSError:
-            raise plugins.TextTestError("Could not run " + self.name + ": make sure you have it installed locally")
+            raise plugins.TextTestError, "Could not run " + self.name + ": make sure you have it installed locally"
 
         stdout, stderr = process.communicate()
         return process.returncode, stdout, stderr
@@ -401,9 +401,9 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
             # Leave out new ones
             return test.state.changedResults + test.state.correctResults + test.state.missingResults
         except AttributeError:
-            raise plugins.TextTestError("Cannot establish which files should be compared as no comparison information exists.\n" + \
+            raise plugins.TextTestError, "Cannot establish which files should be compared as no comparison information exists.\n" + \
                   "To create this information, perform 'recompute status' (press '" + \
-                         guiutils.guiConfig.getCompositeValue("gui_accelerators", "recompute_status") + "') and try again.")
+                         guiutils.guiConfig.getCompositeValue("gui_accelerators", "recompute_status") + "') and try again."
 
     def isModal(self):
         return False
@@ -849,8 +849,7 @@ class StatusGUI(VersionControlDialogGUI):
             end = markedUpStatus.rfind("<")
             return markedUpStatus[start + 1:end]
     
-    def setVisibility(self, model, path, iter, xxx_todo_changeme):
-        (actionName, actionState) = xxx_todo_changeme
+    def setVisibility(self, model, path, iter, (actionName, actionState)):
         if model.iter_parent(iter) is not None and (actionName == "" or self.getStatus(iter) == actionName):
             model.set_value(iter, 4, actionState)
             parentIter = model.iter_parent(iter)
@@ -1016,7 +1015,7 @@ class InteractiveActionConfig(guiplugins.InteractiveActionConfig):
         global vcs, annotateClass, basicDiffClasses
         vcs = vcsClass(controlDir)
         annotateClass = self.annotateClasses()[0]
-        basicDiffClasses = [c for c in self.diffClasses() if not c.recursive]
+        basicDiffClasses = filter(lambda c: not c.recursive, self.diffClasses())
 
     def getMenuNames(self):
         return [ vcs.name ]

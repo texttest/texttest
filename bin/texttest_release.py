@@ -26,7 +26,7 @@ def getSfUser():
         
 
 def system(args):
-    print(" ".join(args))
+    print " ".join(args)
     subprocess.call(args)
 
 def getBzrLocation(product, artefact):
@@ -65,7 +65,7 @@ def updateVersionFile(versionFile, releaseName):
 def getCommandLine():
     options, leftovers = getopt(sys.argv[1:], "d:v:t:x")
     optDict = dict(options)
-    return optDict.get("-d", os.getcwd()), optDict.get("-v", "current"), optDict.get("-t", ""), "-x" in optDict
+    return optDict.get("-d", os.getcwd()), optDict.get("-v", "current"), optDict.get("-t", ""), optDict.has_key("-x")
 
 def readmeUpdated(readme):
     if not os.path.isfile(readme):
@@ -81,7 +81,7 @@ if __name__ == "__main__":
     devRelease = "dev" in releaseName
     readme = os.path.join(rootDir, "readme.txt")
     if not devRelease and not readmeUpdated(readme):
-        print("Cannot make external release, readme file at", readme, "has not been updated recently.")
+        print "Cannot make external release, readme file at", readme, "has not been updated recently."
         sys.exit(1)
     reldir = "texttest-" + releaseName
     actualRoot = os.path.join(rootDir, reldir)
@@ -96,6 +96,6 @@ if __name__ == "__main__":
         tarball = os.path.join(actualRoot, "dist", "TextTest-" + releaseName + ".tar.gz")
         target = os.path.join("/home/frs/project/texttest/texttest", releaseName)
         args = [ "rsync", "-av", "--rsh=ssh", tarball, readme, getSfUser() + "@web.sourceforge.net:" + target ]
-        print(" ".join(args))
+        print " ".join(args)
         if not debug:
             subprocess.call(args)

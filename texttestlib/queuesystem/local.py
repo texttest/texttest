@@ -2,7 +2,7 @@
 """ Base class for all the queue system implementations """
 
 import subprocess, os, signal
-from . import abstractqueuesystem
+import abstractqueuesystem
 from multiprocessing import cpu_count
 from texttestlib import plugins
 
@@ -19,7 +19,7 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
                                        cwd=logDir, env=self.getSlaveEnvironment(slaveEnv), 
                                        startupinfo=plugins.getHideStartUpInfo())
             errorMessage = None
-        except OSError as e:
+        except OSError, e:
             errorMessage = "Failed to start slave process : " + str(e)
         if errorMessage:
             return None, self.getFullSubmitError(errorMessage, cmdArgs, jobType)
@@ -53,7 +53,7 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
     
     def getStatusForAllJobs(self):
         statusDict = {}
-        for procId, process in list(self.processes.items()):
+        for procId, process in self.processes.items():
             if process.poll() is None:
                 statusDict[procId] = "RUN", "Running"
         return statusDict

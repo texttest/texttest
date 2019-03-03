@@ -44,8 +44,8 @@ populate the TableLite container object.
 """
 
 import string, re, time, os
-import collections, copy
-from .imgsize import imgsize
+import UserList, copy
+from imgsize import imgsize
 
 __author__ = 'Robin Friedrich   friedrich@pythonpros.com'
 __version__ = '2.2.2'
@@ -54,7 +54,7 @@ StringType = type('s')
 IntType    = type(3)
 ListType   = type([1])
 TupleType  = type((1,2))
-InstanceType = type(collections.UserList())
+InstanceType = type(UserList.UserList())
 CONTYPE = 'Content-Type: text/html\n\n'
 DOCTYPE = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">\n<HTML>\n'
 XHTML_DOCTYPE = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">\n<HTML>\n'
@@ -102,7 +102,7 @@ class BasicDocument:
     
     def __init__(self, *args, **kw):
         self.contents = list(args)
-        for name, value in list(kw.items()):
+        for name, value in kw.items():
             setattr(self, name, value)
 
     def __str__(self):
@@ -195,7 +195,7 @@ class BasicDocument:
             f = open(mpath(filename), 'w')
             f.write(str(self))
             f.close()
-            if PRINTECHO: print('wrote: "'+filename+'"')
+            if PRINTECHO: print 'wrote: "'+filename+'"'
         else:
             import sys
             sys.stdout.write(str(self))
@@ -257,8 +257,8 @@ class SimpleDocument(BasicDocument):
     def __init__(self, resource = None, **kw):
         self.contents = []
         # Read attributes from resource file into instance namespace
-        if resource: exec(compile(open(mpath(resource)).read(), mpath(resource), 'exec'), self.__dict__)
-        for name, value in list(kw.items()):
+        if resource: execfile(mpath(resource), self.__dict__)
+        for name, value in kw.items():
             setattr(self, name, value)
 
     def __str__(self):
@@ -417,7 +417,7 @@ class SeriesDocument(SimpleDocument):
             elif bannertype == InstanceType:
                 s.append(str(self.banner) + '<BR>\n')
             else:
-                raise TypeError('banner must be either a tuple, instance, or string.')
+                raise TypeError, 'banner must be either a tuple, instance, or string.'
         if self.place_nav_buttons:
             s.append(self.nav_buttons())
         s.append(str(Heading(3,self.title)))
@@ -442,7 +442,7 @@ class SeriesDocument(SimpleDocument):
             #btn = Image(self.blank)
             s.append('<span style="width: 60px"></span> \n')
         if self.gonext: # place an image button for next page
-            btn = Image(self.__next__, border=0, alt='Next')
+            btn = Image(self.next, border=0, alt='Next')
             link = Href(self.gonext, str(btn))
             s.append(str(link) + ' \n')
         else: # place a blank gif as spacer
@@ -523,7 +523,7 @@ class StringTemplate:
         if len(self.delimiters) != 2:
             raise ValueError("delimiter argument must be a pair of strings")
         self.delimiter_width = len(self.delimiters[0])
-        delimiters = list(map(re.escape, self.delimiters))
+        delimiters = map(re.escape, self.delimiters)
         self.subpatstr = delimiters[0] + "[\w_]+" + delimiters[1]
         self.subpat = re.compile(self.subpatstr)
         self.substitutions = substitutions or {}
@@ -533,7 +533,7 @@ class StringTemplate:
         self.source = template
     
     def keys(self):
-        return list(self.substitutions.keys())
+        return self.substitutions.keys()
 
     def __setitem__(self, name, value):
         self.substitutions[name] = value
@@ -582,14 +582,14 @@ class StringTemplate:
                     f = open(filename, 'w')
                     f.write(str(self))
                     f.close()
-                    if PRINTECHO: print('wrote: "'+filename+'"')
+                    if PRINTECHO: print 'wrote: "'+filename+'"'
                 else:
-                    if PRINTECHO: print('file unchanged: "'+filename+'"')
+                    if PRINTECHO: print 'file unchanged: "'+filename+'"'
             else:
                 f = open(filename, 'w')
                 f.write(str(self))
                 f.close()
-                if PRINTECHO: print('wrote: "'+filename+'"')
+                if PRINTECHO: print 'wrote: "'+filename+'"'
         else:
             import sys
             sys.stdout.write(str(self))
@@ -740,7 +740,7 @@ class Container:
 
     def __init__(self, *args, **kw):
         self.contents = list(args)
-        for name, value in list(kw.items()):
+        for name, value in kw.items():
             setattr(self, name, value)
 
     def __str__(self):
@@ -813,7 +813,7 @@ class Meta:
         self.name  = ''
         self.content = 'python,HTMLgen'
         self.url = ''
-        for item in list(kw.keys()):
+        for item in kw.keys():
             self.__dict__[item] = kw[item]
 
     def __str__(self):
@@ -837,7 +837,7 @@ class Map:
     def __init__(self, areas = None, **kw):
         self.areas = areas or []
         self.name = ''
-        for item in list(kw.keys()):
+        for item in kw.keys():
             self.__dict__[item] = kw[item]
 
     def __str__(self):
@@ -872,11 +872,11 @@ class Href:
         self.style = None
         self.url = url
         self.text = text
-        for item in list(kw.keys()):
-            if item in self.__dict__:
+        for item in kw.keys():
+            if self.__dict__.has_key(item):
                 self.__dict__[item] = kw[item]
             else:
-                raise KeyError(repr(item)+' not a valid parameter for this class.')
+                raise KeyError, `item`+' not a valid parameter for this class.'
 
     def __str__(self):
         s = ['<A HREF="%s"' % self.url]
@@ -926,7 +926,7 @@ class MailTo:
         """Process a string with HTML encodings to defeat address spiders.
         """
         from random import choice
-        buffer = list(address)
+        buffer = map(None, address)
         for i in range(0, len(address), choice((2,3,4))):
             buffer[i] = '&#%d;' % ord(buffer[i])
         return string.join(buffer,'')
@@ -940,7 +940,7 @@ class P:
 
 # List constructs
 
-class List(collections.UserList):
+class List(UserList.UserList):
     """Will generate a bulleted list given a list argument.
 
     Now supports rendering a list into multiple columns by setting the
@@ -985,7 +985,7 @@ class List(collections.UserList):
                 self.data[:] = list
             else:
                 self.data[:] = list.data[:]
-        for item in list(kw.keys()):
+        for item in kw.keys():
             self.__dict__[string.lower(item)] = kw[item]
 
     def __getslice__(self, i, j):
@@ -1248,11 +1248,11 @@ def overlay_values(obj, dict):
     exists such a key. Raises KeyError if you try to update the value
     of non-existing keys.
     """
-    for key in list(dict.keys()):
+    for key in dict.keys():
         if hasattr(obj, key):
             obj.__dict__[key] = dict[key]
         else:
-            raise KeyError(repr(key) + ' not a keyword for ' + obj.__class__.__name__)
+            raise KeyError(`key` + ' not a keyword for ' + obj.__class__.__name__)
 
 
 class Input:
@@ -1300,13 +1300,13 @@ class Input:
         self.onSelect = ''
         self.border = None
         self.align = ''
-        for item in list(kw.keys()):
-            if item in self.__dict__:
+        for item in kw.keys():
+            if self.__dict__.has_key(item):
                 self.__dict__[item] = kw[item]
             else:
-                raise KeyError(repr(item)+' not a valid parameter of the Input class.')
+                raise KeyError, `item`+' not a valid parameter of the Input class.'
         if Input.re_type.search(self.type) is None:
-            raise KeyError(repr(self.type)+' not a valid type of Input class.')
+            raise KeyError, `self.type`+' not a valid type of Input class.'
 
     def __str__(self):
         s = []
@@ -1330,7 +1330,7 @@ class Input:
         return string.join(s, '')
 
 
-class Select(collections.UserList):
+class Select(UserList.UserList):
     """Used to define a list widget or option widget.
     
     Pass a list of strings to show a list with those values. Alternatively
@@ -1350,7 +1350,7 @@ class Select(collections.UserList):
         onFocus -- script, which is executed, when the field receives focus
     """
     def __init__(self, data=None, **kw):
-        collections.UserList.__init__(self, data)
+        UserList.UserList.__init__(self, data)
         self.name = ''
         self.size = 1
         self.multiple = None
@@ -1358,11 +1358,11 @@ class Select(collections.UserList):
         self.onBlur = ''
         self.onChange = ''
         self.onFocus = ''
-        for item in list(kw.keys()):
-            if item in self.__dict__:
+        for item in kw.keys():
+            if self.__dict__.has_key(item):
                 self.__dict__[item] = kw[item]
             else:
-                raise KeyError(repr(item)+' not a valid parameter of the Select class.')
+                raise KeyError, `item`+' not a valid parameter of the Select class.'
 
     def __str__(self):
         s = ['<SELECT NAME="%s"' % self.name]
@@ -1414,11 +1414,11 @@ class Textarea:
         self.onChange = ''
         self.onFocus = ''
         self.onSelect = ''
-        for item in list(kw.keys()):
-            if item in self.__dict__:
+        for item in kw.keys():
+            if self.__dict__.has_key(item):
                 self.__dict__[item] = kw[item]
             else:
-                raise KeyError(repr(item)+' not a valid parameter of the Textarea class.')
+                raise KeyError, `item`+' not a valid parameter of the Textarea class.'
 
     def __str__(self):
         s = ['<TEXTAREA NAME="%s" ROWS=%s COLS=%s' % (self.name, self.rows, self.cols)]
@@ -1450,11 +1450,11 @@ class Script:
         self.src = ''
         self.code = ''
         # Now overlay the keyword arguments from caller
-        for k in list(kw.keys()):
-            if k in self.__dict__:
+        for k in kw.keys():
+            if self.__dict__.has_key(k):
                 self.__dict__[k] = kw[k]
             else:
-                print(repr(k), "isn't a valid parameter for this class.")
+                print `k`, "isn't a valid parameter for this class."
 
     def __str__(self):
         s = ['<SCRIPT LANGUAGE="%s" ' % self.language]
@@ -1533,11 +1533,11 @@ class Table:
         self.body_color= None
         self.heading_color=None
         # Now overlay the keyword arguments from caller
-        for k in list(kw.keys()):
-            if k in self.__dict__:
+        for k in kw.keys():
+            if self.__dict__.has_key(k):
                 self.__dict__[k] = kw[k]
             else:
-                print(repr(k), "isn't a valid parameter for this class.")
+                print `k`, "isn't a valid parameter for this class."
 
     def __str__(self):
         """Generates the html for the entire table.
@@ -1650,7 +1650,7 @@ class AbstractTagSingle:
     def __init__(self, *args, **kw):
         self.__dict__['attr_dict'] = copy.copy(self.__class__.attr_dict)
         self.args = args
-        for name, value in list(kw.items()):
+        for name, value in kw.items():
             name = string.lower(name)
             setattr(self, name, value)
 
@@ -1703,7 +1703,7 @@ class Image(AbstractTagSingle):
     attr_template , attr_dict = _make_attr_inits(attrs)
 
     def __init__(self, *args, **kw):
-        AbstractTagSingle.__init__(*(self,) + args, **kw)
+        apply(AbstractTagSingle.__init__, (self,) + args, kw)
         self.prefix = None
         self.absolute = None
         if self.args:
@@ -1819,7 +1819,7 @@ class AbstractTag:
         self.__dict__['attr_dict'] = copy.copy(self.__class__.attr_dict)
         for item in contents:
             self.contents.append(item)
-        for name, value in list(kw.items()):
+        for name, value in kw.items():
             name = string.lower(name)
             setattr(self, name, value)
 
@@ -1870,7 +1870,7 @@ class AbstractTag:
             self.contents = self.contents + other
             return self
         else:
-            raise TypeError('can only add lists to this object')
+            raise TypeError, 'can only add lists to this object'
             
     def append(self, *items):
         """Append one or more items to the end of the container.
@@ -1925,7 +1925,7 @@ class AbstractTag:
         Returns the number of matching text groups.
         """
         collapse = 0
-        if 'collapse' in kw: collapse = kw['collapse']
+        if kw.has_key('collapse'): collapse = kw['collapse']
         text = string.join(map(str, self.contents))
         newtext, count = markup_re(text, rex, marker, collapse)
         if count:
@@ -1978,7 +1978,7 @@ class NoFrames(AbstractTag):
     def __init__(self, *contents, **kw):
 	AbstractTag.__init__(self)
 	for content in contents: self.append(content)
-	for name, value in list(kw.items()): self.__setattr__(name,value)
+	for name, value in kw.items(): self.__setattr__(name,value)
 	if len(contents) == 0:
 	    self.append(Heading(2,'Frame ALERT!',align='center'),
 			Para("""This document is designed to be viewed using Netscape's
@@ -2052,7 +2052,7 @@ class Heading(AbstractTag):
     def __str__(self):
         if not self.tagname:
             if self.contents[0] not in (1,2,3,4,5,6):
-                raise AttributeError("First arg of Heading must be int from 1 to 6.")
+                raise AttributeError, "First arg of Heading must be int from 1 to 6."
             self.tagname = 'H%d' % self.contents[0]
             del self.contents[0]
         return AbstractTag.__str__(self)
@@ -2461,8 +2461,8 @@ class URL:
         self.url = url
         self.parse(url)
     def parse(self, url):
-        import urllib.parse
-        self.unparse = urllib.parse.urlunparse
+        import urlparse
+        self.unparse = urlparse.urlunparse
         self.proto, self.node, self.path, self.params, self.query, self.fragment = \
                     urlparse(url)
         self.dir, self.file = self.split(self.path)
@@ -2549,7 +2549,7 @@ def relpath(path1, path2):
 
     dirs1 = string.split(path1, os.sep) # list of directory components below
                                         # the common path
-    dirs1 = [x for x in dirs1 if x]  # filter out empty elements
+    dirs1 = filter(lambda x: x, dirs1)  # filter out empty elements
     rel = (os.pardir+os.sep)*len(dirs1) # construct the relative path to the
                                         # common point
     return rel+path2

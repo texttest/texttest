@@ -2,9 +2,9 @@
 
 import os, sys, time, shutil, datetime, testoverview, logging, re, tarfile, stat
 from texttestlib import plugins
-from .summarypages import GenerateSummaryPage, GenerateGraphs # only so they become package level entities
+from summarypages import GenerateSummaryPage, GenerateGraphs # only so they become package level entities
 from ordereddict import OrderedDict
-from .batchutils import getBatchRunName, BatchVersionFilter, parseFileName, convertToUrl
+from batchutils import getBatchRunName, BatchVersionFilter, parseFileName, convertToUrl
 import subprocess
 from glob import glob
 
@@ -26,7 +26,7 @@ class BatchCategory(plugins.Filter):
     def size(self):
         return len(self.tests)
     def acceptsTestCase(self, test):
-        return test.getRelPath() in self.tests
+        return self.tests.has_key(test.getRelPath())
     def acceptsTestSuiteContents(self, suite):
         return not suite.isEmpty()
     def describeBrief(self, app):
@@ -62,10 +62,10 @@ class BatchCategory(plugins.Filter):
         for test in self.getAllTests():
             freeText = test.state.freeText
             if freeText:
-                if freeText not in data:
+                if not data.has_key(freeText):
                     data[freeText] = []
                 data[freeText].append(test)
-        return list(data.items())
+        return data.items()
     def testOutput(self, test):
         return repr(test) + " (under " + test.getRelPath() + ")"
     def getFullDescription(self):
@@ -95,7 +95,7 @@ class BatchApplicationData:
         self.successCategories = []
     def storeCategory(self, test):
         category = test.state.category
-        if category not in self.categories:
+        if not self.categories.has_key(category):
             batchCategory = BatchCategory(test.state)
             if not test.state.hasResults():
                 self.errorCategories.append(batchCategory)
@@ -148,7 +148,7 @@ class EmailResponder(plugins.Responder):
 
     def notifyComplete(self, test):
         if test.app.emailEnabled():
-            if test.app not in self.batchAppData:
+            if not self.batchAppData.has_key(test.app):
                 self.addApplication(test)
             self.batchAppData[test.app].storeCategory(test)
 
@@ -166,8 +166,8 @@ class EmailResponder(plugins.Responder):
 
     def notifyAllComplete(self):
         mailSender = MailSender(self.runId)
-        for appList in list(self.allApps.values()):
-            batchDataList = list(map(self.batchAppData.get, appList))
+        for appList in self.allApps.values():
+            batchDataList = map(self.batchAppData.get, appList)
             mailSender.send(batchDataList)
 
 
@@ -349,12 +349,12 @@ class MailSender:
     def getCategoryCount(self, categoryName, batchDataList):
         total = 0
         for resp in batchDataList:
-            if categoryName in resp.categories:
+            if resp.categories.has_key(categoryName):
                 total += resp.categories[categoryName].size()
         return total
     def getBriefDescription(self, categoryName, batchDataList):
         for resp in batchDataList:
-            if categoryName in resp.categories:
+            if resp.categories.has_key(categoryName):
                 return resp.categories[categoryName].briefDescription
     def getVersionString(self, versions):
         if len(versions) > 0:
@@ -456,7 +456,7 @@ class SaveState(plugins.Responder):
     def notifyComplete(self, test):
         if test.state.isComplete(): # might look weird but this notification also comes in scripts, e.g collecting
             test.saveState()
-            if test.app in self.repositories:
+            if self.repositories.has_key(test.app):
                 self.diag.info("Saving " + repr(test) + " to repository")
                 self.saveToRepository(test)
             else:
@@ -530,8 +530,8 @@ class SaveState(plugins.Responder):
             repository = os.path.expanduser(app.getBatchConfigValue("batch_result_repository"))
             runFile = self.getRunFileName(repository)
             if os.path.isfile(runFile) and self.runAlreadyExists(runFile, app):
-                raise plugins.TextTestError("ERROR: Cannot run batch tests with run name '" + self.runPostfix + "', name has already been used for a different run\n" + \
-                    "See file at " + runFile + ", which contains the entry '" + repr(app) + "'")
+                raise plugins.TextTestError, "ERROR: Cannot run batch tests with run name '" + self.runPostfix + "', name has already been used for a different run\n" + \
+                    "See file at " + runFile + ", which contains the entry '" + repr(app) + "'"
 
 
 class MigrateBatchRepository(plugins.Action):
@@ -560,10 +560,10 @@ class MigrateBatchRepository(plugins.Action):
         if suite.parent is None:
             resources = suite.app.getBatchConfigValue("historical_report_resources")
             if len(resources) > 0:
-                raise plugins.TextTestError("Cannot migrate repository: historical_report_sources set to '" + ", ".join(resources) + "' - these require the full format")
+                raise plugins.TextTestError, "Cannot migrate repository: historical_report_sources set to '" + ", ".join(resources) + "' - these require the full format"
             repository = getBatchRepository(suite)
             if not os.path.isdir(repository):
-                raise plugins.TextTestError("Batch result repository " + repository + " does not exist")
+                raise plugins.TextTestError, "Batch result repository " + repository + " does not exist"
             self.migrate(repository)
 
 
@@ -575,7 +575,7 @@ class ArchiveScript(plugins.ScriptWithArgs):
         self.descriptors.sort()
         self.repository = None
         if len(argDict) == 0:
-            raise plugins.TextTestError("Cannot archive the entire repository - give cutoff dates or run names!")
+            raise plugins.TextTestError, "Cannot archive the entire repository - give cutoff dates or run names!"
 
     def parseDate(self, dict, key):
         return self.extractArg(dict, key, isDate=True)
@@ -633,7 +633,7 @@ class ArchiveScript(plugins.ScriptWithArgs):
             repository = self.getRepository(suite)
             self.repository = os.path.join(repository, suite.app.name)
             if not os.path.isdir(self.repository):
-                raise plugins.TextTestError("Batch result repository " + self.repository + " does not exist")
+                raise plugins.TextTestError, "Batch result repository " + self.repository + " does not exist"
             self.archiveFiles(suite)
             if os.name == "posix":
                 self.makeTarArchive(suite, repository)
@@ -644,7 +644,7 @@ class ArchiveScript(plugins.ScriptWithArgs):
         try:
             os.rename(fullPath, targetPath)
             return True
-        except EnvironmentError as e:
+        except EnvironmentError, e:
             plugins.log.info("Rename failed: " + fullPath + " " + targetPath)
             plugins.log.info("Error was " + str(e))
             return False
@@ -677,9 +677,9 @@ class ArchiveRepository(ArchiveScript):
         return getBatchRepository(suite)
 
     def getWeekDays(self, suite):
-        weekdayNameLists = list(suite.getConfigValue("historical_report_subpage_weekdays").values())
+        weekdayNameLists = suite.getConfigValue("historical_report_subpage_weekdays").values()
         weekdayNames = sum(weekdayNameLists, [])
-        return list(map(plugins.weekdays.index, weekdayNames))
+        return map(plugins.weekdays.index, weekdayNames)
 
     def archiveFiles(self, suite):
         weekdays = self.getWeekDays(suite)
@@ -865,7 +865,7 @@ class WebPageResponder(plugins.Responder):
                 self.extraApps += suite.app.extras
                 if self.archiveExtractor is not None:
                     self.extractFromArchive()
-            except (plugins.TextTestError, plugins.TextTestWarning) as e:
+            except (plugins.TextTestError, plugins.TextTestWarning), e:
                 plugins.log.info("Not generating web page for " + suite.app.description() + " : " + str(e))
 
     def notifyAllRead(self, *args):
@@ -877,7 +877,7 @@ class WebPageResponder(plugins.Responder):
     def notifyAllComplete(self):
         appInfo = self.getAppRepositoryInfo()
         plugins.log.info("Generating web pages...")
-        for pageTitle, pageInfo in list(appInfo.items()):
+        for pageTitle, pageInfo in appInfo.items():
             plugins.log.info("Generating page for " + pageTitle)
             if len(pageInfo) == 1:
                 self.generatePagePerApp(pageTitle, pageInfo)
@@ -1057,7 +1057,7 @@ class WebPageResponder(plugins.Responder):
 
     def findMatchingExtraVersion(self, dirVersions, extraVersions):
         # Check all tails that this is not an extraVersion
-        for pos in range(len(dirVersions)):
+        for pos in xrange(len(dirVersions)):
             versionToCheck = ".".join(dirVersions[pos:])
             if versionToCheck in extraVersions:
                 return versionToCheck
@@ -1222,7 +1222,7 @@ class CollectFilesResponder(plugins.Responder):
         try:
             for value in catValues:
                 catName, count = value.split("=")
-                if catName not in totalValues:
+                if not totalValues.has_key(catName):
                     totalValues[catName] = 0
                 totalValues[catName] += int(count)
         except ValueError:
@@ -1230,13 +1230,13 @@ class CollectFilesResponder(plugins.Responder):
     def getTitle(self, app, totalValues):
         title = self.mailSender.getMailHeader(app, [])
         total = 0
-        for value in list(totalValues.values()):
+        for value in totalValues.values():
             total += value
         title += str(total) + " tests ran"
-        if len(list(totalValues.keys())) == 1:
-            return title + ", all " + list(totalValues.keys())[0]
+        if len(totalValues.keys()) == 1:
+            return title + ", all " + totalValues.keys()[0]
         title += " :"
-        for catName, count in list(totalValues.items()):
+        for catName, count in totalValues.items():
             title += self.mailSender.briefText(count, catName)
         # Lose trailing comma
         return title[:-1]

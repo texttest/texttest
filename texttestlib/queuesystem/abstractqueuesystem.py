@@ -81,7 +81,7 @@ class QueueSystem(object):
     
     def makeSlaveEnvironment(self, env):
         newEnv = plugins.copyEnvironment(ignoreVars=self.getSlaveVarsToBlock())
-        for var, value in list(env.items()):
+        for var, value in env.items():
             newEnv[var] = value
         return newEnv
     

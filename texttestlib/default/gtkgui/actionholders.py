@@ -26,7 +26,7 @@ class MenuBarGUI(guiutils.SubGUI):
 
     def getLoadedModules(self):
         if not self.loadedModules:
-            self.loadedModules = set((module.split(".")[-1] for module in list(sys.modules.keys())))
+            self.loadedModules = set((module.split(".")[-1] for module in sys.modules.keys()))
         return self.loadedModules
     
     def shouldHide(self, name):
@@ -67,8 +67,8 @@ class MenuBarGUI(guiutils.SubGUI):
             try:
                 self.diag.info("Reading UI from file " + file)
                 self.uiManager.add_ui_from_file(file)
-            except Exception as e:
-                raise plugins.TextTestError("Failed to parse GUI description file '" + file + "': " + str(e))
+            except Exception, e:
+                raise plugins.TextTestError, "Failed to parse GUI description file '" + file + "': " + str(e)
         self.uiManager.ensure_update()
         self.widget = self.uiManager.get_widget("/MainMenuBar")
         return self.widget
@@ -83,7 +83,7 @@ class MenuBarGUI(guiutils.SubGUI):
 
     def getGUIDescriptionFileNames(self):
         # Pick up all GUI descriptions corresponding to modules we've loaded
-        loadFiles = list(filter(self.shouldLoad, self.allFiles))
+        loadFiles = filter(self.shouldLoad, self.allFiles)
         loadFiles.sort(self.cmpDescFiles)
         return loadFiles
 
@@ -131,11 +131,11 @@ class MenuBarGUI(guiutils.SubGUI):
         return True
 
     def haveSet(self, val):
-        if type(val) == dict:
+        if type(val) == types.DictType:
             if len(val) == 1:
-                if "" in val:
+                if val.has_key(""):
                     return val[""]
-                elif "default" in val:
+                elif val.has_key("default"):
                     return False # Not set if we only have a default key...
             else:
                 return True
@@ -214,7 +214,7 @@ class NotebookGUI(guiutils.SubGUI):
     def __init__(self, tabInfo):
         guiutils.SubGUI.__init__(self)
         self.diag = logging.getLogger("GUI notebook")
-        self.tabInfo = [tabGUI for tabGUI in tabInfo if tabGUI.shouldShow()]
+        self.tabInfo = filter(lambda tabGUI: tabGUI.shouldShow(), tabInfo)
         self.notebook = None
         self.currentTabGUI = self.findInitialCurrentTab()
         self.diag.info("Current page set to '" + self.currentTabGUI.getTabTitle() + "'")
@@ -250,7 +250,7 @@ class NotebookGUI(guiutils.SubGUI):
         for page in self.notebook.get_children():
             if page.get_property("visible"):
                 pageNum = self.notebook.page_num(page)
-                if pageNum not in pagesRemoved:
+                if not pagesRemoved.has_key(pageNum):
                     return pageNum
 
     def showNewPages(self, *args):
@@ -291,13 +291,13 @@ class NotebookGUI(guiutils.SubGUI):
         if len(pagesToHide) == 0:
             return False
 
-        if self.notebook.get_current_page() in pagesToHide:
+        if pagesToHide.has_key(self.notebook.get_current_page()):
             newCurrentPageNum = self.findFirstRemaining(pagesToHide)
             if newCurrentPageNum is not None:
                 self.notebook.set_current_page(newCurrentPageNum)
 
         # remove from the back, so we don't momentarily view them all if removing everything
-        for page in reversed(list(pagesToHide.values())):
+        for page in reversed(pagesToHide.values()):
             self.diag.info("Hiding page " + self.notebook.get_tab_label_text(page))
             page.hide()
         return True

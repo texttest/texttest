@@ -169,7 +169,7 @@ class GenerateTestSummary(guiplugins.ActionDialogGUI):
         fileName = self.getFileName()
         for test in self.currTestSelection:
             if test.state.isComplete():
-                if test.app not in self.batchAppData:
+                if not self.batchAppData.has_key(test.app):
                     self.addApplication(test)
                 self.batchAppData[test.app].storeCategory(test)
         self.writeTextSummary(fileName)
@@ -177,16 +177,16 @@ class GenerateTestSummary(guiplugins.ActionDialogGUI):
     def writeTextSummary(self, fileName):
         mailSender = MailSender()
         with open(fileName, "w") as f:
-            for appList in list(self.allApps.values()):
-                batchDataList = list(map(self.batchAppData.get, appList))
+            for appList in self.allApps.values():
+                batchDataList = map(self.batchAppData.get, appList)
                 f.write(mailSender.makeContents(batchDataList, False))
 
     def getFileName(self):
         fileName = self.optionGroup.getOptionValue("generate")
         if not fileName:
-            raise plugins.TextTestError("Cannot save selection - no file name specified")
+            raise plugins.TextTestError, "Cannot save selection - no file name specified"
         elif os.path.isdir(fileName):
-            raise plugins.TextTestError("Cannot save selection - existing directory specified")
+            raise plugins.TextTestError, "Cannot save selection - existing directory specified"
         else:
             return fileName
 

@@ -5,7 +5,7 @@ import os
 import fpdiff, logging, shutil
 from texttestlib import plugins
 from optparse import OptionParser
-from io import StringIO
+from StringIO import StringIO
 
 class Filtering(plugins.TestState):
     def __init__(self, name, **kw):
@@ -435,7 +435,7 @@ class LineFilter:
     def createTrigger(self, matcherString, text, parameter):
         if matcherString == "{LINE ":
             return LineNumberTrigger(int(parameter))
-        elif matcherString == "{INTERNAL " and parameter in self.internalExpressions:
+        elif matcherString == "{INTERNAL " and self.internalExpressions.has_key(parameter):
             return self.makeRegexTrigger(parameter)
         elif matcherString ==  "{MATCH ":
             return MatchNumberTrigger(text, int(parameter))

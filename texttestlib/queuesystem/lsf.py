@@ -1,6 +1,6 @@
 
 import os
-from . import gridqueuesystem
+import gridqueuesystem
 
 # Used by the master to submit, monitor and delete jobs...
 class QueueSystem(gridqueuesystem.QueueSystem):
@@ -69,7 +69,7 @@ class QueueSystem(gridqueuesystem.QueueSystem):
             if line.find("is submitted") != -1:
                 return self.getJobId(line)
             else:
-                print("Unexpected output from bsub :", line.strip())
+                print "Unexpected output from bsub :", line.strip()
         return "" #pragma : no cover, should never happen... 
     def getResourceArg(self, submissionRules):
         resourceList = submissionRules.findResourceList()
@@ -118,7 +118,7 @@ class MachineInfo:
         return machines
     def findRunningJobs(self, machine):
         jobs = []
-        for line in os.popen("bjobs -m " + machine + " -u all -w 2>&1 | grep RUN"):
+        for line in os.popen("bjobs -m " + machine + " -u all -w 2>&1 | grep RUN").xreadlines():
             fields = line.split()
             jobId = fields[0]
             user = fields[1]
@@ -135,7 +135,7 @@ def getUserSignalKillInfo(userSignalNumber, explicitKillMethod):
         
 # Need to get all hosts for parallel
 def getExecutionMachines():
-    if "LSB_HOSTS" in os.environ:
+    if os.environ.has_key("LSB_HOSTS"):
         hosts = os.environ["LSB_HOSTS"].split()
         return [ host.split(".")[0] for host in hosts ]
     else:

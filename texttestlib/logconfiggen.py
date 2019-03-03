@@ -3,7 +3,7 @@ import os, sys
 
 def findLoggerNames(fileName, keyText="Logger"):
     result = []
-    for line in open(fileName):
+    for line in open(fileName).xreadlines():
         if keyText in line:
             words = line.split('"')
             for i, word in enumerate(words):
@@ -42,7 +42,7 @@ class PythonLoggingGenerator:
                 fileStem = loggerInfo
             enabled.append((loggerName, fileStem))
             all.append(loggerName)
-        disabled = [l for l in allLoggerNames if l not in all]
+        disabled = filter(lambda l:l not in all, allLoggerNames)
         all += disabled
         return enabled, disabled, all
 

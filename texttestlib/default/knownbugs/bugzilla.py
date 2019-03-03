@@ -9,7 +9,7 @@
 # comment. But at least it's officially part of bugzilla so will hopefully hang around for longer than
 # bugcli did, and there are clearly plans to move it forward.
 
-import xmlrpc.client
+import xmlrpclib
 
 def getEntry(dict, key):
     return dict.get(key, "UNKNOWN")
@@ -17,7 +17,7 @@ def getEntry(dict, key):
 def filterInternals(internals, alreadyMentioned):
     accepted = []
     boringValues = [ 0, "", "---", "all", "All", "unspecified" ] + alreadyMentioned
-    for key, value in list(internals.items()):
+    for key, value in internals.items():
         if key.find("accessible") == -1 and value not in boringValues:
             accepted.append((key.replace("_", " ").capitalize(), value))
     accepted.sort()
@@ -47,11 +47,11 @@ def parseReply(reply, location, id):
     
 def findBugInfo(bugId, location, *args):
     scriptLocation = location + "/xmlrpc.cgi"
-    proxy = xmlrpc.client.ServerProxy(scriptLocation)
+    proxy = xmlrpclib.ServerProxy(scriptLocation)
     try:
         return parseReply(proxy.Bug.get_bugs({ "ids" : [ bugId ]}), location, bugId)
-    except xmlrpc.client.Fault as e:
+    except xmlrpclib.Fault, e:
         return "NONEXISTENT", e.faultString, False, bugId
-    except Exception as e:
+    except Exception, e:
         message = "Failed to communicate with '" + scriptLocation + "': " + str(e) + ".\n\nPlease make sure that the configuration entry 'bug_system_location' points to a correct location of a Bugzilla version 3.x installation. The current value is '" + location + "'."
         return "BAD SCRIPT", message, False, bugId

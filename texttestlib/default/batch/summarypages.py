@@ -2,12 +2,11 @@
 
 import testoverview, logging, os, shutil, time, operator, sys
 from texttestlib import plugins
-from html.parser import HTMLParser
+from HTMLParser import HTMLParser
 from ordereddict import OrderedDict
 from glob import glob
-from .batchutils import BatchVersionFilter, parseFileName, convertToUrl, getEnvironmentFromRunFiles
+from batchutils import BatchVersionFilter, parseFileName, convertToUrl, getEnvironmentFromRunFiles
 import datetime
-from functools import reduce
 
 class GenerateFromSummaryData(plugins.ScriptWithArgs):
     locationApps = OrderedDict()
@@ -15,9 +14,9 @@ class GenerateFromSummaryData(plugins.ScriptWithArgs):
     basePath = ""
     def __init__(self, args=[""]):
         argDict = self.parseArguments(args, [ "basepath", "file" ])
-        if "basepath" in argDict:
+        if argDict.has_key("basepath"):
             GenerateFromSummaryData.basePath = argDict["basepath"]
-        if "file" in argDict:
+        if argDict.has_key("file"):
             GenerateFromSummaryData.summaryFileName = argDict["file"]
 
     def setUpApplication(self, app):
@@ -38,7 +37,7 @@ class GenerateFromSummaryData(plugins.ScriptWithArgs):
 
     @classmethod
     def finalise(cls, predicate=None):
-        for location, apps in list(cls.locationApps.items()):
+        for location, apps in cls.locationApps.items():
             if predicate is None or predicate(apps):
                 if not all((rejected for app, usePie, rejected in apps)):
                     defaultUsePie = all((usePie for app, usePie, rejected in apps))
@@ -69,8 +68,8 @@ class GenerateGraphs(GenerateFromSummaryData):
     scriptDoc = "Generate standalone graphs along the lines of the ones that appear in the HTML report"
     @classmethod
     def generate(cls, dataFinder, appsWithVersions, *args):
-        from .resultgraphs import GraphGenerator
-        for appName, versions in list(appsWithVersions.items()):
+        from resultgraphs import GraphGenerator
+        for appName, versions in appsWithVersions.items():
             for version in versions:
                 results = dataFinder.getAllSummaries(appName, version)
                 if len(results) > 1:
@@ -182,11 +181,11 @@ class SummaryDataFinder:
 
     def getAppsWithVersions(self):
         appsWithVersions = OrderedDict()
-        for appName, appDir in list(self.appDirs.items()):
+        for appName, appDir in self.appDirs.items():
             versionInfo = self.getVersionInfoFor(appDir)
             if versionInfo:
                 self.appVersionInfo[appName] = versionInfo
-                appsWithVersions[appName] = list(versionInfo.keys())
+                appsWithVersions[appName] = versionInfo.keys()
         return appsWithVersions
 
     def getShortAppName(self, fullName):
@@ -226,14 +225,14 @@ class SummaryDataFinder:
 
     def getMostRecentDateAndTags(self):
         allInfo = {}
-        for appName, appInfo in list(self.appVersionInfo.items()):
-            for version, versionData in list(appInfo.items()):
-                lastInfoPerEnv = self.getLastInfoPerEnvironment(list(versionData.keys()), self.getAppRunDirectory(appName))
+        for appName, appInfo in self.appVersionInfo.items():
+            for version, versionData in appInfo.items():
+                lastInfoPerEnv = self.getLastInfoPerEnvironment(versionData.keys(), self.getAppRunDirectory(appName))
                 for envData, lastInfo in lastInfoPerEnv:
                     allInfo.setdefault(envData, []).append(lastInfo[0])
                 self.diag.info("Most recent date for " + appName + " version " + version + " = " + repr(lastInfoPerEnv))
         mostRecent = set()
-        for envData, lastInfoList in list(allInfo.items()):
+        for envData, lastInfoList in allInfo.items():
             mostRecent.add(max(lastInfoList, key=self.getDateTagKey))
         return sorted(mostRecent, key=self.getDateTagKey)
 
@@ -243,9 +242,9 @@ class SummaryDataFinder:
     def usePieChart(self, appName):
         if self.appUsePie.get(appName):
             try:
-                from .resultgraphs import PieGraph #@UnusedImport
+                from resultgraphs import PieGraph #@UnusedImport
                 return True
-            except Exception as e:
+            except Exception, e:
                 sys.stderr.write("Not producing pie charts for index pages: " + str(e) + "\n")
                 self.appUsePie = {}
                 return False # if matplotlib isn't installed or is too old
@@ -276,7 +275,7 @@ class SummaryDataFinder:
         mostRecentDate = self.toDate(max(allTags, key=self.getDateTagKey)[0])
         oneDay = datetime.timedelta(days=1)
         allLastInfo = {}
-        for envData, tags in list(groupedData.items()):
+        for envData, tags in groupedData.items():
             last = self.extractLast(tags, count)
             lastDate = self.toDate(last[-1][0])
             if last and mostRecentDate - lastDate <= oneDay:
@@ -285,7 +284,7 @@ class SummaryDataFinder:
         if len(allLastInfo) > 1 and (None, None) in allLastInfo:
             del allLastInfo[(None, None)]
 
-        return list(allLastInfo.items())
+        return allLastInfo.items()
 
     def toDate(self, timeStruct):
         return datetime.date.fromtimestamp(time.mktime(timeStruct))
@@ -300,7 +299,7 @@ class SummaryDataFinder:
     def getLatestSummaries(self, appName, version):
         versionData = self.appVersionInfo[appName][version]
         summary, prevSummary = OrderedDict(), OrderedDict()
-        infoPerEnv = self.getLastInfoPerEnvironment(list(versionData.keys()), self.getAppRunDirectory(appName), count=2)
+        infoPerEnv = self.getLastInfoPerEnvironment(versionData.keys(), self.getAppRunDirectory(appName), count=2)
         lastInfo, nextLastInfo = None, None
         for envData, lastInfoList in infoPerEnv:
             lastInfo = lastInfoList[-1]
@@ -319,7 +318,7 @@ class SummaryDataFinder:
 
     def getAllSummaries(self, appName, version):
         versionData = self.appVersionInfo[appName][version]
-        allDates = list(versionData.keys())
+        allDates = versionData.keys()
         allDates.sort(key=self.getDateTagKey)
         summaries = [ (time.strftime("%d%b%Y", currInfo[0]), self.extractSummary(versionData[currInfo], OrderedDict())) for currInfo in allDates ]
         self.diag.info("All Summaries = " + repr(summaries))
@@ -329,7 +328,7 @@ class SummaryDataFinder:
         for line in open(datedFile):
             if line.strip().startswith("<H2>"):
                 text = line.strip()[4:-5] # drop the tags
-                for cat, num in list(self.parseSummaryText(text).items()):
+                for cat, num in self.parseSummaryText(text).items():
                     if cat in summary:
                         summary[cat] += num
                     else:
@@ -518,7 +517,7 @@ class SummaryGenerator:
                 self.diag.info("Index = " + repr(index) + " but min index = " + repr(minIndex))
                 newVersions.append("")
                 index += 1
-            while index in columnVersions and columnVersions[index] != version:
+            while columnVersions.has_key(index) and columnVersions[index] != version:
                 newVersions.append("")
                 index += 1
             newVersions.append(version)
@@ -529,22 +528,22 @@ class SummaryGenerator:
         # We find the maximum column number a version has on any row,
         # which is equal to the minimum value it should be given in a particular row
         versionIndices = {}
-        for rowInfo in list(pageInfo.values()):
+        for rowInfo in pageInfo.values():
             for index, version in enumerate(self.getOrderedVersions(versionOrder, rowInfo)):
-                if version not in versionIndices or index > versionIndices[version]:
+                if not versionIndices.has_key(version) or index > versionIndices[version]:
                     versionIndices[version] = index
         return versionIndices
 
     def getVersionsWithColumns(self, pageInfo):
-        allVersions = reduce(operator.add, list(pageInfo.values()), [])
-        return set([v for v in allVersions if allVersions.count(v) > 1])
+        allVersions = reduce(operator.add, pageInfo.values(), [])
+        return set(filter(lambda v: allVersions.count(v) > 1, allVersions))
 
     def createPieChart(self, dataFinder, resultSummary, summaryGraphName, version, lastInfo, oldResults):
-        from .resultgraphs import PieGraph
+        from resultgraphs import PieGraph
         fracs = []
         colours = []
         tests = 0
-        for colourKey, count in list(resultSummary.items()):
+        for colourKey, count in resultSummary.items():
             if count:
                 colour = dataFinder.getColour(colourKey)
                 fracs.append(count)
@@ -587,7 +586,7 @@ class SummaryGenerator:
 
     def getTooltipForPrevious(self, prevSummary, prevTag):
         text = "Comparing to " + prevTag + " :\n"
-        for colourKey, count in list(prevSummary.items()):
+        for colourKey, count in prevSummary.items():
             if count:
                 text += colourKey + "=" + str(count) + "\n"
         return text
@@ -627,7 +626,7 @@ class SummaryGenerator:
                         file.write('    <td><a href="' + fileToLink + '"><img border=\"0\" src=\"' + summaryGraphName + '\"></a></td>\n')
                     else:
                         file.write('    <td><h3><a href="' + fileToLink + '">' + version + '</a></h3></td>\n')
-                        for colourKey, count in list(resultSummary.items()):
+                        for colourKey, count in resultSummary.items():
                             if count:
                                 file.write('    <td ' + self.getColourAttribute(colourKey, cssColours, dataFinder) + '><h3>')
                                 if oldResults:

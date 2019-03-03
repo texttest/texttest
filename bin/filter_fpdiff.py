@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import optparse, os, sys, io
+import optparse, os, sys, StringIO
 
 def fixSysPath(fileName):
     install_root = os.path.dirname(os.path.dirname(fileName))
@@ -36,7 +36,7 @@ def main():
         fpfilter(fromlines, tolines, out, options.tolerance, options.relative)
         out.close()
     else: # pragma: no cover - not production code
-        out = io.StringIO()
+        out = StringIO.StringIO()
         fpfilter(fromlines, tolines, out, options.tolerance, options.relative)
         out.seek(0)
         tolines = out.readlines()

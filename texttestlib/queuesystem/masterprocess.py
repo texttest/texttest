@@ -351,6 +351,9 @@ class QueueSystemServer(BaseActionRunner):
     def notifyAllComplete(self):
         BaseActionRunner.notifyAllComplete(self)
         self.cleanup(final=True)
+        if self.reuseOnly: # could still be hanging waiting for this, make sure we terminate
+            self.submitTerminators()
+
         errors = {}
         errorFiles = []
         for logDir in self.slaveLogDirs:

@@ -1666,17 +1666,17 @@ class MultiEntryDictionary(OrderedDict):
         return currentList
 
     def insertEntry(self, entryName, entry, currDict):
-        currType = type(currDict[entryName])
-        if currType == list:
+        currEntry = currDict[entryName]
+        if isinstance(currEntry, list):
             currDict[entryName] = self.getListValue(entry, currDict[entryName])
-        elif currType == dict:
+        elif isinstance(currEntry, dict):
             newCurrDict = self.getSectionInfo(entryName)[0]
             if "default" in newCurrDict:
                 self.insertEntry("default", entry, newCurrDict)
             else:
                 self.warn("Config entry name '" + entryName + "' is only valid as a section marker.")
         else:
-            currDict[entryName] = currType(entry)
+            currDict[entryName] = type(currEntry)(entry)
 
     def getSingle(self, key, expandVars=True, envMapping=os.environ):
         value = self.get(key)

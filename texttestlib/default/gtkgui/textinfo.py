@@ -97,7 +97,7 @@ class TextViewGUI(guiutils.SubGUI):
     # Links can be activated by clicking. Low-level code lifted from Maik Hertha's
     # GTK hypertext demo
     def event_after(self, text_view, event):  # pragma : no cover - external code and untested browser code
-        if event.type != Gdk.BUTTON_RELEASE:
+        if event.type != Gdk.EventType.BUTTON_RELEASE:
             return False
         if event.button != 1:
             return False

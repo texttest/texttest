@@ -85,7 +85,8 @@ class ReconnectConfig:
     def findAppDirUnder(self, app, runDir):
         # Don't pay attention to dated versions here...
         appVersions = frozenset(app.versions).difference(self.datedVersions)
-        self.diag.info("Looking for directory with versions " + repr(appVersions))
+        self.diag.info("Looking for directory with versions "
+                       + repr(sorted(appVersions)))
         for f in os.listdir(runDir):
             versionSet = self.getVersionSetSubDir(f, app.name)
             if versionSet == appVersions:
@@ -171,7 +172,8 @@ class ReconnectConfig:
     def getVersionsFromDirs(self, app, dirs, givenExtras):
         versions = []
         allGivenExtras = self.expandExtraVersions(givenExtras)
-        self.diag.info("Getting extra versions from directories, versions from config = " + repr(allGivenExtras))
+        self.diag.info("Getting extra versions from directories, versions from config = "
+                       + repr(sorted(allGivenExtras)))
         appVersions = frozenset(app.versions)
         for versionLists, groupDirIter in groupby(dirs, self.getVersionListsTopDir):
             groupDirs = list(groupDirIter)

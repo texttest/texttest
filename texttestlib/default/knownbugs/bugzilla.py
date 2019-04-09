@@ -10,7 +10,7 @@
 # bugcli did, and there are clearly plans to move it forward.
 
 import xmlrpc.client
-
+from collections import OrderedDict
 
 def getEntry(dict, key):
     return dict.get(key, "UNKNOWN")
@@ -42,14 +42,20 @@ def parseReply(reply, location, id):
         ruler = "*" * 30 + "\n"
         message = ruler + "Summary: " + summary + "\nBug Status: " + status + "\n\n"
         for fieldName, value in internals:
-            message += fieldName + ": " + str(value) + "\n"
+            message += fieldName + ": "
+            if type(value) == dict:
+                message += str(OrderedDict(sorted(value.items())))
+            else:
+                message += str(value)
+            message += "\n"
         message += ruler
         message += "\nView bug " + str(bugId) + " using bugzilla URL=" + location + \
             "/show_bug.cgi?id=" + str(bugId) + "\n"
         return status, message, isResolved(status), id
     except (IndexError, KeyError):
-        message = "Could not parse reply from bugzilla's web service, maybe incompatible interface. Text of reply follows : \n" + \
-            str(reply)
+        message = ("Could not parse reply from bugzilla's web service, "
+                   "maybe incompatible interface. Text of reply follows : \n"
+                   + str(reply))
         return "BAD SCRIPT", message, False, id
 
 
@@ -61,6 +67,10 @@ def findBugInfo(bugId, location, *args):
     except xmlrpc.client.Fault as e:
         return "NONEXISTENT", e.faultString, False, bugId
     except Exception as e:
-        message = "Failed to communicate with '" + scriptLocation + "': " + \
-            str(e) + ".\n\nPlease make sure that the configuration entry 'bug_system_location' points to a correct location of a Bugzilla version 3.x installation. The current value is '" + location + "'."
+        message = ("Failed to communicate with '" + scriptLocation + "': "
+                   + str(e)
+                   + ".\n\nPlease make sure that the configuration entry "
+                   "'bug_system_location' points to a correct location of a "
+                   "Bugzilla version 3.x installation. The current value is '"
+                   + location + "'.")
         return "BAD SCRIPT", message, False, bugId

@@ -419,7 +419,7 @@ class FileComparison:
 
         if self.stdFile != targetFile and os.path.isfile(self.stdFile):
             # Create a "versioned-missing" file
-            newFile = open(targetFile, "w")
+            newFile = open(targetFile, "wb")
             newFile.write(autoGenText)
             newFile.close()
         self.stdFile = None

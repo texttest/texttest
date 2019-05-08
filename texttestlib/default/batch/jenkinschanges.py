@@ -284,7 +284,7 @@ class ChangeSetFinder:
             if os.path.isfile(xmlFile):
                 authors, bugs = self.parseChangeLog(xmlFile)
                 if authors:
-                    fullUrl = os.path.join(self.jenkinsUrl, "job", project, build, "changes")
+                    fullUrl = "/".join([self.jenkinsUrl.rstrip("/"), "job", project, build, "changes"])
                     changes.append((",".join(authors), fullUrl, bugs))
         return changes
 

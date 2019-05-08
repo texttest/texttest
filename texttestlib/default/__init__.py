@@ -1697,7 +1697,7 @@ class TestRelPathFilter(plugins.TextFilter):
         return [text.replace(" ", "/") for text in plugins.commasplit(filterText)]
 
     def acceptsTestCase(self, test):
-        return self.stringContainsText(test.getRelPath())
+        return self.stringContainsText(test.getRelPath().replace(os.sep, "/"))
 
 
 class GrepFilter(plugins.TextFilter):

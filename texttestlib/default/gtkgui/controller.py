@@ -13,7 +13,7 @@ from functools import reduce
 def raiseException(msg):
     from texttestlib.plugins import TextTestError
     raise TextTestError("Could not start TextTest " + texttest_version.version +
-                        " GUI due to PyGTK GUI library problems :\n" + msg)
+                        " GUI due to PyGI/PyGObject GUI library problems :\n" + msg)
 
 
 try:
@@ -21,7 +21,7 @@ try:
     gi.require_version('Gtk', '3.0')
     from gi.repository import Gtk
 except Exception as e:
-    raiseException("Unable to import module 'gtk' - " + str(e))
+    raiseException("Unable to import PyGI module 'Gtk' - " + str(e))
 
 pygtkVersion = (Gtk.get_major_version(), Gtk.get_minor_version(), Gtk.get_micro_version())
 requiredPygtkVersion = texttest_version.required_pygtk_version

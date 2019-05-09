@@ -434,16 +434,14 @@ class TestEnvironmentCreator:
         vars, props = [], []
         self.diag.info("Creating environment for " + repr(self.test))
         if self.topLevel():
-            # Full path to the root directory for each test application
-            vars.append(("TEXTTEST_ROOT", self.test.app.getDirectory()))
+            vars.append(("TEXTTEST_ROOT", self.test.app.getDirectory())) # Full path to the root directory for each test application
             checkout = self.test.app.checkout
             if checkout:
                 vars.append(("TEXTTEST_CHECKOUT", checkout))  # Full path to the checkout directory
             localCheckout = self.test.app.getCheckout()
             if localCheckout and localCheckout != checkout:
                 vars.append(("TEXTTEST_CHECKOUT_NAME", localCheckout))  # Local name of the checkout directory
-            # Full path to the sandbox root directory
-            vars.append(("TEXTTEST_SANDBOX_ROOT", self.test.app.localWriteDirectory))
+            vars.append(("TEXTTEST_SANDBOX_ROOT", self.test.app.localWriteDirectory)) # Full path to the sandbox root directory
             if self.test.getConfigValue("use_case_record_mode") == "GUI":
                 usecaseRecorder = self.test.getConfigValue("use_case_recorder")
                 # Mostly to make sure StoryText's own tests have a chance of working
@@ -544,8 +542,7 @@ class TestEnvironmentCreator:
 
             screenshot = "screenshot" in self.optionMap
             if screenshot:
-                # Whether to take screenshots between each action in GUI tests
-                vars.append(("USECASE_REPLAY_SCREENSHOTS", "1"))
+                vars.append(("USECASE_REPLAY_SCREENSHOTS", "1")) # Whether to take screenshots between each action in GUI tests
         if usecaseFile or self.isRecording():
             # Re-record if recorded files are already present or recording explicitly requested
             vars.append(self.getRecordScriptVariable(self.test.makeTmpFileName("usecase")))

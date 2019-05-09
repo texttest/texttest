@@ -2147,15 +2147,11 @@ class OptionFinder(plugins.OptionFinder):
         # Note: the comments in this method will be extracted for documenting environment variables!
         plugins.OptionFinder.__init__(self, sys.argv[1:])
         self.setPathFromOptionsOrEnv("TEXTTEST_HOME", ".", "d")  # Alias for TEXTTEST_PATH
-        textTestPath = self.getPathFromOptionsOrEnv(
-            "TEXTTEST_PATH", "$TEXTTEST_HOME")  # Root directories of the test suite
+        textTestPath = self.getPathFromOptionsOrEnv("TEXTTEST_PATH", "$TEXTTEST_HOME")  # Root directories of the test suite
         self.rootDirectories = textTestPath.split(os.pathsep)
-        # Location to store shortcuts from the GUI
-        self.setPathFromOptionsOrEnv("STORYTEXT_HOME", "$TEXTTEST_HOME/storytext")
-
+        self.setPathFromOptionsOrEnv("STORYTEXT_HOME", "$TEXTTEST_HOME/storytext") # Location to store shortcuts from the GUI
         self.setPathFromOptionsOrEnv("TEXTTEST_PERSONAL_CONFIG", "~/.texttest")  # Location of personal configuration
-        self.diagWriteDir = self.setPathFromOptionsOrEnv(
-            "TEXTTEST_PERSONAL_LOG", "$TEXTTEST_PERSONAL_CONFIG/log", "xw")  # Location to write TextTest's internal logs
+        self.diagWriteDir = self.setPathFromOptionsOrEnv("TEXTTEST_PERSONAL_LOG", "$TEXTTEST_PERSONAL_CONFIG/log", "xw")  # Location to write TextTest's internal logs
         self.diagConfigFile = None
         if "x" in self:  # This is just a fast-track to make sure we can set up diags for the setup
             self.diagConfigFile = self.normalisePath(self.get("xr", os.path.join(self.diagWriteDir, "logging.debug")))

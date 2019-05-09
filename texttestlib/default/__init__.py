@@ -468,14 +468,11 @@ class Config:
             return self.hasWritePermission(os.path.dirname(path))
 
     def getWriteDirectories(self, app):
-        rootDir = self.optionMap.setPathFromOptionsOrEnv("TEXTTEST_TMP", app.getConfigValue(
-            "default_texttest_tmp"))  # Location of temporary files from test runs
+        rootDir = self.optionMap.setPathFromOptionsOrEnv("TEXTTEST_TMP", app.getConfigValue("default_texttest_tmp"))  # Location of temporary files from test runs
         if not os.path.isdir(rootDir) and not self.hasWritePermission(os.path.dirname(rootDir)):
             rootDir = self.optionMap.setPathFromOptionsOrEnv("", "$TEXTTEST_PERSONAL_CONFIG/tmp")
         writeDir = os.path.join(rootDir, self.getWriteDirectoryName(app))
-        # Location of temporary files on local disk from test runs. Defaults to value of TEXTTEST_TMP
-        localRootDir = self.optionMap.getPathFromOptionsOrEnv(
-            "TEXTTEST_LOCAL_TMP", app.getConfigValue("default_texttest_local_tmp"))
+        localRootDir = self.optionMap.getPathFromOptionsOrEnv("TEXTTEST_LOCAL_TMP", app.getConfigValue("default_texttest_local_tmp")) # Location of temporary files on local disk from test runs. Defaults to value of TEXTTEST_TMP
         if localRootDir:
             return writeDir, os.path.join(localRootDir, self.getLocalWriteDirectoryName(app))
         else:

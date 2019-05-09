@@ -130,7 +130,7 @@ class DocumentConfig(plugins.ScriptWithArgs):
         if "entries" in argDict:
             self.onlyEntries = argDict["entries"].split(",")
         self.overrideOs = argDict.get("os") if "os" in argDict else None
-
+        
     def getEntriesToUse(self, app):
         if len(self.onlyEntries) > 0:
             return self.onlyEntries
@@ -158,6 +158,10 @@ class DocumentConfig(plugins.ScriptWithArgs):
 
     def interpretArgument(self, arg):
         argStr = pformat(arg, width=1000) if isinstance(arg, dict) else str(arg)
+        if os.sep == "\\":
+            # in python strings get double backslashes, handle this
+            doubleBackslashRoot = plugins.installationRoots[0].replace("\\", "\\\\")
+            argStr = argStr.replace(doubleBackslashRoot, "<source library>")
         return argStr.replace(plugins.installationRoots[0], "<source library>")
 
 
@@ -222,8 +226,7 @@ class DocumentEnvironment(plugins.Action):
         app = FakeApp()  # @UnusedVariable
         try:
             argTuple = eval(argStr)
-            from types import TupleType
-            if type(argTuple) == TupleType:
+            if type(argTuple) == tuple:
                 allArgs = list(eval(argStr))
                 return [self.interpretArgument(str(allArgs[1]))]
             else:

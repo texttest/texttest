@@ -1157,7 +1157,7 @@ def readListWithComments(filename, filterMethod=None):
     currComment = ""
     emptyLineSymbol = "__EMPTYLINE__"
 
-    for longline in open(filename).readlines():
+    for longline in open(filename, encoding=getpreferredencoding()).readlines():
         line = longline.strip()
         if len(line) == 0:
             if currComment:

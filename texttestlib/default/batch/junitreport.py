@@ -68,7 +68,7 @@ class JUnitApplicationData:
         else:
             self._failure(test, result)
 
-        self.testResults[test.getRelPath().replace("/", ".")] = result
+        self.testResults[test.getRelPath().replace(os.sep, ".")] = result
 
     def getResults(self):
         return self.testResults
@@ -79,7 +79,7 @@ class JUnitApplicationData:
 
     def _fullTestName(self, test):
         relpath = test.getRelPath()
-        return test.app.fullName() + "." + relpath.replace("/", ".")
+        return test.app.fullName() + "." + relpath.replace(os.sep, ".")
 
     def _error(self, test, result):
         result["error"] = True

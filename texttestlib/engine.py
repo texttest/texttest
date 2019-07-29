@@ -369,9 +369,10 @@ class TextTest(plugins.Responder, plugins.Observable):
         # Can get called several times, protect against this...
         if len(self.appSuites) > 0:
             self.notify("Status", "Removing all temporary files ...")
-            for app, testSuite in list(self.appSuites.items()):
+            for app, testSuite in self.appSuites.items():
                 self.notify("ActionProgress")
                 app.cleanWriteDirectory(testSuite)
+            self.notify("Status", "Removed all temporary files ...")
             self.appSuites = []
 
     def notifyComplete(self, test):
@@ -382,6 +383,7 @@ class TextTest(plugins.Responder, plugins.Observable):
     def run(self):
         try:
             self._run()
+            self.diag.info("Exiting with exit code " + str(self.exitCode))
             sys.exit(self.exitCode)
         except plugins.TextTestError as e:
             sys.stderr.write(str(e) + "\n")

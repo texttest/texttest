@@ -104,8 +104,7 @@ class BasicRunningAction:
             return filterFileOverride
 
     def getInterpreterArgs(self):
-        # Alternative interpreter for the dynamic GUI : mostly useful for coverage / testing
-        interpreterArg = os.getenv("TEXTTEST_DYNAMIC_GUI_INTERPRETER", "")
+        interpreterArg = os.getenv("TEXTTEST_DYNAMIC_GUI_INTERPRETER", "") # Alternative interpreter for the dynamic GUI : mostly useful for coverage / testing
         if interpreterArg:
             return plugins.splitcmd(interpreterArg.replace("ttpython", sys.executable))
         else:  # pragma: no cover - cannot test without StoryText on dynamic GUI

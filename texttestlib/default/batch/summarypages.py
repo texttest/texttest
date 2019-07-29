@@ -209,7 +209,7 @@ class SummaryDataFinder:
 
     def getVersionInfoFor(self, appDir):
         versionDates = {}
-        for path in glob(os.path.join(appDir, "test_*.html")):
+        for path in sorted(glob(os.path.join(appDir, "test_*.html"))):
             fileName = os.path.basename(path)
             version, date, tag = parseFileName(fileName, self.diag)
             if version:

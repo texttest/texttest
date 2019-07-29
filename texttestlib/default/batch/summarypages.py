@@ -195,7 +195,8 @@ class SummaryDataFinder:
 
     def getAppsWithVersions(self):
         appsWithVersions = OrderedDict()
-        for appName, appDir in list(self.appDirs.items()):
+        for appName, appDir in self.appDirs.items():
+            self.diag.info("adding app " + appName + " with dir " + appDir)
             versionInfo = self.getVersionInfoFor(appDir)
             if versionInfo:
                 self.appVersionInfo[appName] = versionInfo
@@ -238,10 +239,9 @@ class SummaryDataFinder:
 
     def getMostRecentDateAndTags(self):
         allInfo = {}
-        for appName, appInfo in list(self.appVersionInfo.items()):
-            for version, versionData in list(appInfo.items()):
-                lastInfoPerEnv = self.getLastInfoPerEnvironment(
-                    list(versionData.keys()), self.getAppRunDirectory(appName))
+        for appName, appInfo in self.appVersionInfo.items():
+            for version, versionData in appInfo.items():
+                lastInfoPerEnv = self.getLastInfoPerEnvironment(list(versionData.keys()), self.getAppRunDirectory(appName))
                 for envData, lastInfo in lastInfoPerEnv:
                     allInfo.setdefault(envData, []).append(lastInfo[0])
                 self.diag.info("Most recent date for " + appName + " version " + version + " = " + repr(lastInfoPerEnv))
@@ -290,7 +290,7 @@ class SummaryDataFinder:
         mostRecentDate = self.toDate(max(allTags, key=self.getDateTagKey)[0])
         oneDay = datetime.timedelta(days=1)
         allLastInfo = {}
-        for envData, tags in list(groupedData.items()):
+        for envData, tags in groupedData.items():
             last = self.extractLast(tags, count)
             lastDate = self.toDate(last[-1][0])
             if last and mostRecentDate - lastDate <= oneDay:

@@ -1514,8 +1514,9 @@ class Config:
             diag = logging.getLogger("remote commands")
             proc = subprocess.Popen(allArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             output = proc.communicate()[0]
-            diag.info("Running remote command " + repr(allArgs) + ", output was:\n" + output)
-            return searchStr not in output  # Return an "exit code" which is 0 when we succeed!
+            outputStr = str(output, getpreferredencoding())
+            diag.info("Running remote command " + repr(allArgs) + ", output was:\n" + outputStr)
+            return searchStr not in outputStr  # Return an "exit code" which is 0 when we succeed!
         else:
             return subprocess.call(allArgs, stdin=open(os.devnull), stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
 

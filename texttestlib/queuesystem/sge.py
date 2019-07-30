@@ -5,6 +5,7 @@ import subprocess
 from . import gridqueuesystem
 from texttestlib.plugins import gethostname, log, TextTestError
 from time import sleep
+from locale import getpreferredencoding
 
 # Used by master process for submitting, deleting and monitoring slave jobs
 
@@ -77,14 +78,14 @@ class QueueSystem(gridqueuesystem.QueueSystem):
         return stderr.strip().splitlines()[0]
 
     def killJob(self, jobId):
-        proc = subprocess.Popen(["qdel", jobId], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        proc = subprocess.Popen(["qdel", jobId], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding=getpreferredencoding())
         self.qdelOutput = proc.communicate()[0]
         return self.qdelOutput.find("has registered the job") != -1 or self.qdelOutput.find("has deleted job") != -1
 
     def setSuspendState(self, jobId, newState):
         arg = "-sj" if newState else "-usj"
         cmdArgs = ["qmod", arg, jobId]
-        proc = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        proc = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding=getpreferredencoding())
         output = proc.communicate()[0]
         # unsuspend always provides return code 1, even when it works (bug in SGE)
         if newState and proc.returncode > 0:
@@ -105,7 +106,7 @@ class QueueSystem(gridqueuesystem.QueueSystem):
 
     def getStatusForAllJobs(self):
         statusDict = {}
-        proc = subprocess.Popen(["qstat"], stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        proc = subprocess.Popen(["qstat"], stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding=getpreferredencoding())
         outMsg = proc.communicate()[0]
         if proc.returncode > 0:
             # SGE unavailable for the moment, don't update the job status
@@ -139,7 +140,7 @@ class QueueSystem(gridqueuesystem.QueueSystem):
             return self.getStatusLetter(words, statusIndex + 1)
 
     def getErrorReason(self, jobId):
-        proc = subprocess.Popen(["qstat", "-j", jobId], stdin=open(os.devnull),
+        proc = subprocess.Popen(["qstat", "-j", jobId], stdin=open(os.devnull), encoding=getpreferredencoding(),
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         outMsg = proc.communicate()[0]
         for line in outMsg.splitlines():
@@ -182,7 +183,7 @@ class QueueSystem(gridqueuesystem.QueueSystem):
 
     def getAccountInfo(self, jobId, extraArgs=[]):
         cmdArgs = ["qacct", "-j", jobId] + extraArgs
-        proc = subprocess.Popen(cmdArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        proc = subprocess.Popen(cmdArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding=getpreferredencoding())
         outMsg, errMsg = proc.communicate()
         notFoundMsg = "error: job id " + jobId + " not found"
         if len(errMsg) == 0 or notFoundMsg not in errMsg:

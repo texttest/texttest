@@ -138,22 +138,22 @@ class QueueSystemServer(BaseActionRunner):
         self.allRead = True
 
     def run(self):  # picked up by core to indicate running in a thread
-        self.runAllTests()
-        if len(self.jobs):
-            self.diag.info("All jobs submitted, polling the queue system now.")
-            if self.canPoll():
-                self.pollQueueSystem()
-
-        self.diag.info("No jobs left to poll, exiting thread")
+        try:
+            self.runAllTests()
+            if len(self.jobs):
+                self.diag.info("All jobs submitted, polling the queue system now.")
+                if self.canPoll():
+                    self.pollQueueSystem()
+            self.diag.info("No jobs left to poll, exiting thread")
+        except:
+            self.diag.info("Submit thread exited with exception!")
+            plugins.printException()
 
     def pollQueueSystem(self):
         # Start by polling after 5 seconds, ever after try every 15
-        # Amount of time to wait between checks for exit/completion when polling grid/cloud
-        interval = float(os.getenv("TEXTTEST_QS_POLL_INTERVAL", "0.5"))
-        # Amount of time to wait before initiating polling of grid/cloud
-        attempts = int(float(os.getenv("TEXTTEST_QS_POLL_WAIT", "5")) / interval)
-        # Amount of time to wait before subsequent polling of grid/cloud
-        subsequentAttempts = int(float(os.getenv("TEXTTEST_QS_POLL_SUBSEQUENT_WAIT", "15")) / interval)
+        interval = float(os.getenv("TEXTTEST_QS_POLL_INTERVAL", "0.5"))         # Amount of time to wait between checks for exit/completion when polling grid/cloud
+        attempts = int(float(os.getenv("TEXTTEST_QS_POLL_WAIT", "5")) / interval) # Amount of time to wait before initiating polling of grid/cloud
+        subsequentAttempts = int(float(os.getenv("TEXTTEST_QS_POLL_SUBSEQUENT_WAIT", "15")) / interval) # Amount of time to wait before subsequent polling of grid/cloud
         if attempts >= 0:
             while True:
                 for _ in range(attempts):
@@ -506,8 +506,7 @@ class QueueSystemServer(BaseActionRunner):
         if proxyArgs:
             cmdArgs[1:1] = ["-sync", "y", "-V"]  # must sychronise in the proxy
             # Proxy likes to set environment variables, make sure they get forwarded
-            # Exact command arguments to run TextTest slave, for use by proxy
-            slaveEnv["TEXTTEST_SUBMIT_COMMAND_ARGS"] = repr(cmdArgs)
+            slaveEnv["TEXTTEST_SUBMIT_COMMAND_ARGS"] = repr(cmdArgs) # Exact command arguments to run TextTest slave, for use by proxy
             return proxyArgs
         else:
             return cmdArgs
@@ -839,24 +838,21 @@ class TestSubmissionRules(SubmissionRules):
     def getConfigResources(self, test):
         if "reconnect" not in self.optionMap:
             configSettings = test.getConfigValue("queue_system_resource")
-            # Deprecated. See "queue_system_resource" in config file docs
-            envSetting = os.path.expandvars(test.getEnvironment("QUEUE_SYSTEM_RESOURCE", ""))
+            envSetting = os.path.expandvars(test.getEnvironment("QUEUE_SYSTEM_RESOURCE", "")) # Deprecated. See "queue_system_resource" in config file docs
             return configSettings + [envSetting] if envSetting else configSettings
         else:
             return ""
 
     def getProcessesNeeded(self):
         if "reconnect" not in self.optionMap:
-            # Deprecated. See "queue_system_processes" in config file docs
-            envSetting = self.test.getEnvironment("QUEUE_SYSTEM_PROCESSES", "")
+            envSetting = self.test.getEnvironment("QUEUE_SYSTEM_PROCESSES", "")  # Deprecated. See "queue_system_processes" in config file docs
             return int(envSetting) if envSetting else self.test.getConfigValue("queue_system_processes")
         else:
             return 1
 
     def getExtraSubmitArgs(self):
         if "reconnect" not in self.optionMap:
-            # Deprecated. See "queue_system_submit_args" in config file docs
-            envSetting = os.path.expandvars(self.test.getEnvironment("QUEUE_SYSTEM_SUBMIT_ARGS", ""))
+            envSetting = os.path.expandvars(self.test.getEnvironment("QUEUE_SYSTEM_SUBMIT_ARGS", ""))  # Deprecated. See "queue_system_submit_args" in config file docs
             argStr = envSetting or self.test.getConfigValue("queue_system_submit_args")
             return plugins.splitcmd(argStr)
         else:

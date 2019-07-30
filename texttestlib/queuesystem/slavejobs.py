@@ -86,13 +86,15 @@ class SocketResponder(plugins.Responder, plugins.Observable):
         return host, int(port)
 
     def connect(self, sendSocket):
-        for _ in range(5):
+        attempts = 5
+        for attempt in range(attempts):
             try:
                 sendSocket.connect(self.serverAddress)
                 return True
             except socket.error:
                 time.sleep(1)
-        sys.stderr.write("Failed to connect to " + repr(self.serverAddress) + " : " + self.exceptionOutput())
+                if attempt == attempts -1:
+                    sys.stderr.write("Failed to connect to " + repr(self.serverAddress) + " : " + self.exceptionOutput())
         return False
 
     def exceptionOutput(self):
@@ -115,7 +117,8 @@ class SocketResponder(plugins.Responder, plugins.Observable):
 
     def notifyLifecycleChange(self, test, state, changeDesc):
         testData = socketSerialise(test)
-        pickleData = dumps(state, protocol=2)
+        protocol = int(os.getenv("TEXTTEST_PICKLE_PROTOCOL", 2)) # Which pickle protocol to use. Useful to set to plain text for self-tests.
+        pickleData = dumps(state, protocol=protocol)
         sendFiles = self.synchFiles and changeDesc == "complete" and (self.transferAll or not test.state.hasSucceeded())
         fullData = self.getProcessIdentifier(test, sendFiles) + os.linesep + testData + os.linesep
         if sendFiles:

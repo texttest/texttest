@@ -1253,6 +1253,7 @@ def printException():
     sys.stderr.write("Description of exception thrown :\n")
     exceptionString = getExceptionString()
     sys.stderr.write(exceptionString)
+    sys.stderr.flush()
     return exceptionString
 
 

@@ -574,10 +574,13 @@ class TextTest(plugins.Responder, plugins.Observable):
 
     def setSignalHandlers(self, handler):
         if os.name == "nt":
-            import ctypes
-            # Must store this, otherwise it gets garbage collected, and a crash results...
-            self.wrapper = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_uint)(handler)
-            ctypes.windll.kernel32.SetConsoleCtrlHandler(self.wrapper, True)
+            try:
+                import ctypes
+                # Must store this, otherwise it gets garbage collected, and a crash results...
+                self.wrapper = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_uint)(handler)
+                ctypes.windll.kernel32.SetConsoleCtrlHandler(self.wrapper, True)
+            except ImportError:
+                pass # probably just documentation
         else:
             for sig in self.getSignals():
                 signal.signal(sig, handler)

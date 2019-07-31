@@ -1405,11 +1405,21 @@ class TextTrigger:
     def reset(self):
         pass
 
+class PatternAggregator:
+    def __init__(self):
+        self.groups = 0
+        self.groupindex = {}
+        
+    def add(self, pattern):
+        self.groups += pattern.groups
+        self.groupindex.update(pattern.groupindex)
+
 
 class MatchAggregator:
     def __init__(self):
         self.match = None
         self.groups = ()
+        self.patternAggregator = PatternAggregator()
 
     def reset(self):
         self.match = None
@@ -1422,12 +1432,13 @@ class MatchAggregator:
         if hasattr(match, "group"):
             self.match = match
             self.groups += match.groups()
+            self.patternAggregator.add(match.re)
 
     def expand(self, template):
         if self.match is not None:
             # ?? This is not documented, but has remained unchanged across many Python versions
             # Better ideas welcome. The match objects are defined in C, the class name isn't public and hence they cannot be subclassed or monkey patched
-            return re._expand(self.match.re, self, template)
+            return re._expand(self.patternAggregator, self, template)
         else:
             return template
 

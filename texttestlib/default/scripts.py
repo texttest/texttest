@@ -300,8 +300,7 @@ class ReplaceText(plugins.ScriptWithArgs):
         if self.newText.endswith("\n") and self.oldText.endswith("\n"):
             self.oldText = self.oldText.rstrip()
         self.newText = self.newText.rstrip()
-        self.trigger = plugins.MultilineTextTrigger(
-            self.oldText, tryAsRegexp, False) if not self.argsReplacement else plugins.TextTrigger(self.oldText, tryAsRegexp, False)
+        self.trigger = plugins.MultilineTextTrigger(self.oldText, tryAsRegexp, False) if not self.argsReplacement else plugins.TextTrigger(self.oldText, tryAsRegexp, False)
         self.newMultiLineText = self.newText.split("\n")
         self.stems = []
         fileStr = argDict.get("file")
@@ -341,8 +340,8 @@ class ReplaceText(plugins.ScriptWithArgs):
         with open(tmpFile, "w") as writeFile:
             with open(stdFile) as readFile:
                 for line in readFile:
-                    writeFile.write(self.trigger.replace(
-                        line, self.newMultiLineText if not self.argsReplacement else self.replaceArgs))
+                    newLine = self.trigger.replace(line, self.newMultiLineText if not self.argsReplacement else self.replaceArgs)
+                    writeFile.write(newLine)
                 if self.oldText[-1] != "\n" and not self.argsReplacement:
                     writeFile.write(self.trigger.getLeftoverText())
 

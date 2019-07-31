@@ -169,7 +169,7 @@ class DocumentEnvironment(plugins.Action):
     def __init__(self, args=[]):
         self.onlyEntries = args
         self.prefixes = ["TEXTTEST_", "USECASE_", "STORYTEXT_"]
-        self.exceptions = ["TEXTTEST_PERSONAL_", "STORYTEXT_HOME_LOCAL"]
+        self.exceptions = ["TEXTTEST_PERSONAL_", "STORYTEXT_HOME_LOCAL", "TEXTTEST_FAKE_USER"]
 
     def getEntriesToUse(self, app):
         rootDir = plugins.installationRoots[0]

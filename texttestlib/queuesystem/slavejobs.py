@@ -172,7 +172,7 @@ class SocketResponder(plugins.Responder, plugins.Observable):
                 plugins.log.info(test.getIndent() + "Fetching required test data at " + repr(path) + " ...")
             data = makeIdentifierLine(str(os.getpid()), getFiles=True) + "\n" + socketSerialise(test) + "\n" + \
                 getUserName() + "@" + getIPAddress([test]) + "\n" + "\n".join(paths)
-            self.sendAndInterpret(data, None)  # Just wait, no response to interpret
+            self.sendAndInterpret(data.encode(getpreferredencoding()), None)  # Just wait, no response to interpret
 
 
 class SlaveActionRunner(ActionRunner):

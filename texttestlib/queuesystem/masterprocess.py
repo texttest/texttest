@@ -981,10 +981,11 @@ class SlaveRequestHandler(StreamRequestHandler):
             return ipAddress
 
     def pushFiles(self, test):
-        userAndHost = str(self.rfile.readline().strip(), getpreferredencoding())
+        encoding = getpreferredencoding()
+        userAndHost = str(self.rfile.readline().strip(), encoding)
         paths = []
         for line in self.rfile:
-            paths.append(line.strip())
+            paths.append(str(line.strip(), encoding))
         self.server.pushFiles(test, userAndHost, paths)
 
     def sendReuseResponse(self, *args):

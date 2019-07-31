@@ -2,9 +2,6 @@
 import socket
 import os
 
-# Method name used by CaptureMock - need to change in tests also if this is renamed!
-
-
 def getPortListenErrorCode(ip, port):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.settimeout(5)
@@ -14,4 +11,4 @@ def getPortListenErrorCode(ip, port):
 
 
 def getUserName():
-    return os.getenv("USER", os.getenv("USERNAME"))
+    return os.getenv("TEXTTEST_FAKE_USER", os.getenv("USER", os.getenv("USERNAME"))) # Fake user id, useful for testing cloud interaction

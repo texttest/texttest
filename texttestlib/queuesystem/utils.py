@@ -105,17 +105,18 @@ def directorySerialise(dirName, ignoreLinks=False):
 def directoryUnserialise(rootDir, f):
     currFile = None
     for line in f:
+        lineStr = str(line, getpreferredencoding())
         if currFile is not None:
-            if line.startswith(endPrefix + fileText):
+            if lineStr.startswith(endPrefix + fileText):
                 currFile.close()
                 currFile = None
             else:
-                currFile.write(line)
+                currFile.write(lineStr)
         else:
-            if line.startswith(fileText):
-                fn = line.strip().split()[-1]
+            if lineStr.startswith(fileText):
+                fn = lineStr.strip().split()[-1]
                 path = os.path.join(rootDir, fn)
                 plugins.ensureDirExistsForFile(path)
                 currFile = open(path, "w")
-            elif line.startswith(endPrefix + dirText):
+            elif lineStr.startswith(endPrefix + dirText):
                 break

@@ -407,6 +407,7 @@ class FileComparison:
             else:
                 self.saveResults(tmpFile, self.stdFile)
         else:
+            self.diag.info("Failed to save, no file at " + tmpFile)
             raise plugins.TextTestError(
                 "The following file seems to have been removed since it was created:\n" + repr(tmpFile))
         self.differenceCache = self.APPROVED

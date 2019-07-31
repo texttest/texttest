@@ -11,6 +11,7 @@ from texttestlib import plugins
 from texttestlib.jobprocess import killSubProcessAndChildren
 from time import sleep
 from threading import Lock, Timer
+from locale import getpreferredencoding
 
 plugins.addCategory("killed", "killed", "were terminated before completion")
 
@@ -296,29 +297,32 @@ class RunTest(plugins.Action):
     def quoteLocalArg(self, arg):
         return arg if "$" in arg else pipes.quote(arg)
 
+    def writeScriptLine(self, scriptFile, line):
+        scriptFile.write(line.encode(getpreferredencoding()) + b"\n")
+
     def getRemoteExecuteCmdArgs(self, test, runMachine, localArgs, postfix):
         scriptFileName = test.makeTmpFileName("run_test" + postfix + ".sh", forComparison=0)
-        openType = "w" if os.name == "posix" else "wb"  # the 'b' is necessary so we don't get \r\n written when we just want \n
-        scriptFile = open(scriptFileName, openType)
-        scriptFile.write("#!/bin/sh\n\n")
+        scriptFile = open(scriptFileName, "wb")
+        self.writeScriptLine(scriptFile, "#!/bin/sh")
+        self.writeScriptLine(scriptFile, "")
 
         # Need to change working directory remotely
         tmpDir = self.getTmpDirectory(test)
-        scriptFile.write("cd " + plugins.quote(tmpDir) + "\n")
+        self.writeScriptLine(scriptFile, "cd " + plugins.quote(tmpDir))
 
         # Must set the environment remotely
         remoteTmp = test.app.getRemoteTmpDirectory()[1]
         for arg, value in self.getEnvironmentArgs(test, remoteTmp, postfix):
             # Two step export process for compatibility with CYGWIN and older versions of 'sh'
-            scriptFile.write(arg + "=" + value + "\n")
-            scriptFile.write("export " + arg + "\n")
+            self.writeScriptLine(scriptFile, arg + "=" + value)
+            self.writeScriptLine(scriptFile, "export " + arg)
         if test.app.getConfigValue("remote_shell_program") == "ssh":
             # SSH doesn't kill remote processes, create a kill script
-            scriptFile.write('echo "kill $$" > kill_test.sh\n')
+            self.writeScriptLine(scriptFile, 'echo "kill $$" > kill_test.sh')
         cmdString = " ".join(map(self.quoteLocalArg, localArgs))
         if remoteTmp:
             cmdString = cmdString.replace(test.app.writeDirectory, remoteTmp)
-        scriptFile.write("exec " + cmdString + "\n")
+        self.writeScriptLine(scriptFile, "exec " + cmdString)
         scriptFile.close()
         os.chmod(scriptFileName, 0o775)  # make executable
         remoteTmp = test.app.getRemoteTestTmpDir(test)[1]

@@ -1685,7 +1685,7 @@ class Application(object):
             if isinstance(err, ImportError):
                 if plugins.isModuleMissing(str(err), moduleName):
                     raise BadConfigError("could not find config_module " + repr(moduleName))
-                elif str(err) == "cannot import name 'getConfig'":  # @UndefinedVariable
+                elif "cannot import name 'getConfig'" in str(err):  # @UndefinedVariable
                     raise BadConfigError("module " + repr(moduleName) + " is not intended for use as a config_module")
             plugins.printException()
             raise BadConfigError("config_module " + repr(moduleName) + " contained errors and could not be imported")

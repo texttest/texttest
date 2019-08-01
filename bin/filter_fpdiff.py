@@ -33,8 +33,8 @@ def main():
     if len(args) != 2:  # pragma: no cover - not production code
         parser.error("need to specify both a fromfile and tofile")
     fromfile, tofile = args
-    fromlines = open(fromfile, 'U').readlines()
-    tolines = open(tofile, 'U').readlines()
+    fromlines = open(fromfile).readlines()
+    tolines = open(tofile).readlines()
     if options.output:
         out = open(options.output, 'w')
         fpfilter(fromlines, tolines, out, options.tolerance, options.relative)

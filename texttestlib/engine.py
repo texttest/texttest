@@ -599,7 +599,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         else:
             return signalText
 
-    def handleSignalWhileStarting(self, sig):
+    def handleSignalWhileStarting(self, sig, *args):
         signalText = self.handleSignal(sig)
         if os.name != "nt":
             raise KeyboardInterrupt(signalText)

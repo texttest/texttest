@@ -84,7 +84,7 @@ class IdleHandlerManager:
             return GObject.PRIORITY_DEFAULT_IDLE + 20
 
     def enableHandler(self):
-        if not plugins.Observable.threadedNotificationHandler.idleHandler is None:
+        if plugins.Observable.threadedNotificationHandler.idleHandler is None:
             plugins.Observable.threadedNotificationHandler.enablePoll(GObject.idle_add, priority=self.getIdlePriority())
             self.diag.info("Adding idle handler")
 

@@ -583,7 +583,7 @@ class ThreadedNotificationHandler:
     def transfer(self, observable, *args, **kwargs):
         with self.mutex:
             self.workQueue.put((observable, args, kwargs))
-            if self.active and self.source is None:
+            if self.active and self.source is None and self.idleHandler is not None:
                 self.source = self.idleHandler()
 
 

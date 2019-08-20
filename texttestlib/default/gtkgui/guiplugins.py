@@ -1166,7 +1166,7 @@ class ActionDialogGUI(OptionGroupGUI):
             return Gtk.FileChooserAction.SAVE
 
     def createFileChooser(self, option):
-        fileChooser = Gtk.FileChooserWidget(self.getFileChooserFlag(option))
+        fileChooser = Gtk.FileChooserWidget.new(self.getFileChooserFlag(option))
         fileChooser.set_name("File Chooser for '" + self.getTooltip() + "'")
         # The following line has no effect until this GTK bug is fixed...
         # https://bugzilla.gnome.org/show_bug.cgi?id=440667

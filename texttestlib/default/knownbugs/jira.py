@@ -1,146 +1,112 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
-# Plugin for Jira as per the instructions at http://confluence.atlassian.com/pages/viewpage.action?pageId=9623
+import requests
+import re
 
-# Sample returned value from getIssue
-
-"""
-{'affectsVersions': [],
- 'assignee': 'geoff',
- 'components': [{'name': 'The Component Name', 'id': '10551'}],
- 'created': '2009-04-20 16:31:08.0',
- 'customFieldValues': [],
- 'description': 'A long string \nwith lots of linebreaks\n',
- 'fixVersions': [],
- 'id': '22693',
- 'key': 'JIR-470',
- 'priority': '3',
- 'project': 'JIR',
- 'reporter': 'geoff',
- 'status': '1',
- 'summary': 'Sample issue',
- 'type': '4',
- 'updated': '2009-09-25 13:16:21.0',
- 'votes': '0'}
-"""
-
-import xmlrpclib, re, urllib
-from ordereddict import OrderedDict
-
-def convertToString(value):
-    if type(value) in (str, unicode):
-        ret = value.replace("\r", "") # Get given Windows line endings but Python doesn't use them internally
-        if type(ret) == unicode:
-            import locale
-            encoding = locale.getdefaultlocale()[1] or "utf-8"
-            return ret.encode(encoding, "replace")
-        else:
-            return ret
-    else:
-        return ", ".join(map(convertDictToString, value))
-
-def convertDictToString(dict):
-    if dict.has_key("name"):
-        return dict["name"]
-    elif dict.has_key("values"):
-        return dict["values"]
-    else:
-        return "No value defined"
-
-def transfer(oldDict, newDict, key, postfix=""):
-    if oldDict.has_key(key):
-        newDict[key] = convertToString(oldDict[key]) + postfix
-
-def findId(info, currId):
-    for item in info:
-        if item["id"] == currId:
-            return item["name"]
-
-def isInteresting(value):
-    return value and value != "0"
-
-def filterReply(bugInfo, statuses, resolutions):
-    ignoreFields = [ "id", "type", "description", "project" ]
-    newBugInfo = OrderedDict()
-    transfer(bugInfo, newBugInfo, "key")
-    transfer(bugInfo, newBugInfo, "summary")
-    newBugInfo["status"] = findId(statuses, bugInfo["status"])
-    if bugInfo.has_key("resolution"):
-        newBugInfo["resolution"] = findId(resolutions, bugInfo["resolution"]) + "\n"
-    else:
-        transfer(bugInfo, newBugInfo, "assignee", "\n")
-    newBugInfo["components"] = convertToString(bugInfo["components"])
-    priorityStr = convertToString(bugInfo["priority"])
-    priorityStr = str(int(priorityStr) -1) if priorityStr.isdigit() else priorityStr
-    remainder = filter(lambda k: k not in ignoreFields and (k not in newBugInfo or k == "priority") and isInteresting(bugInfo[k]), bugInfo.keys())
-    remainder.sort()
-    for key in remainder:
-        if key == "priority":
-            newBugInfo["priority"] = str(priorityStr)
-        else:
-            transfer(bugInfo, newBugInfo, key)
-    return newBugInfo
-    
-def makeURL(location, bugText):
+def _makeURL(location, bugText):
     return location + "/browse/" + bugText
-    
-def parseReply(bugInfo, statuses, resolutions, location, id):
-    try:
-        newBugInfo = filterReply(bugInfo, statuses, resolutions)
-        ruler = "*" * 50 + "\n"
-        message = ruler
-        for fieldName, value in newBugInfo.items():
-            message += fieldName.capitalize() + ": " + str(value) + "\n"
-        message += ruler + "\n"
-        bugId = newBugInfo['key']
-        message += "View bug " + bugId + " using Jira URL=" + makeURL(location, str(bugId)) + "\n\n"
-        message += convertToString(bugInfo.get("description", ""))
-        isResolved = newBugInfo.has_key("resolution")
-        statusText = newBugInfo["resolution"].strip() if isResolved else newBugInfo['status']
-        return statusText, message, isResolved, id
-    except (IndexError, KeyError):
-        message = "Could not parse reply from Jira's web service, maybe incompatible interface. Text of reply follows : \n" + str(bugInfo)
-        return "BAD SCRIPT", message, False, id
-    
+
+def _getEntry(key, fields, secondaryKey="name", secondaryEntryList=False):
+    entry = fields[key]
+    if secondaryEntryList:
+        result = []
+        for item in entry:
+            result.append(item[secondaryKey])
+        if not result:
+            entry = "N/A"
+        else:
+            entry = ", ".join(map(_encodeString, result))
+    elif secondaryKey:
+        entry = _encodeString(entry[secondaryKey])
+
+    return key.capitalize() + ": " + _encodeString(entry)
+
+def _parseReply(json_dict, location):
+    bugId = _encodeString(json_dict["key"])
+    fields = json_dict["fields"]
+
+    ruler = "*" * 50
+    message_rows = [ "\n" + ruler,
+                     bugId,
+                     _getEntry("summary", fields, None),
+                     _getEntry("status", fields),
+                     _getEntry("assignee", fields),
+                     _getEntry("reporter", fields),
+                     _getEntry(key="components",
+                               fields=fields,
+                               secondaryEntryList=True),
+                     _getEntry("created", fields, None),
+                     _getEntry("updated", fields, None),
+                     _getEntry("priority", fields),
+                     ruler,
+                     "\nView bug " + bugId + " using Jira URL=" \
+                     + _makeURL(location, str(bugId)) + "\n",
+                     _encodeString(fields["description"]) + "\n"]
+
+    status = _encodeString(fields["status"]["name"])
+
+    message = "\n".join(message_rows)
+    isResolved = fields["resolution"]
+    return status, message, isResolved, bugId
+
+def _interpretRequestError(exception_message):
+    error_template = "40{0} Client Error"
+    if error_template.format("1") in exception_message:
+        return "Unauthorized action, possibly issues with user name and/or password."
+    if error_template.format("4") in exception_message:
+        return ("Something is wrong in the address. If 'bug_system_location' is"
+                " correct, this might indicate that the jira REST api changed.")
+    return ""
+
+def _encodeString(value):
+    # Get given Windows line endings but Python doesn't use them internally
+    ret = value.replace("\r", "")
+    if type(ret) == unicode:
+        import locale
+        encoding = locale.getdefaultlocale()[1] or "utf-8"
+        result = ret.encode(encoding, "replace")
+        return result
+    else:
+        return ret
+
 def findBugInfo(bugId, location, username, password):
-    scriptLocation = location + "/rpc/xmlrpc"
-    proxy = xmlrpclib.ServerProxy(scriptLocation)
-    try:
-        auth = proxy.jira1.login(username, password)
-    except xmlrpclib.Fault, e:
-        return "LOGIN FAILED", e.faultString, False, bugId
-    except Exception, e:
-        message = "Failed to log in to '" + scriptLocation + "': " + str(e) + ".\n\nPlease make sure that the configuration entry 'bug_system_location' points to a correct location of a Jira version 3.x installation. The current value is '" + location + "'."
-        return "BAD SCRIPT", message, False, bugId
+    fields_to_fetch = ["assignee",
+                       "components",
+                       "created",
+                       "description",
+                       "priority",
+                       "reporter",
+                       "resolution",
+                       "status",
+                       "updated",
+                       "summary"]
+    rest_url = location + "/rest/api/2/issue/" + bugId \
+        + "?fields=" + ",".join(fields_to_fetch)
 
     try:
-        bugInfo = proxy.jira1.getIssue(auth, bugId)
-        statuses = proxy.jira1.getStatuses(auth)
-        if bugInfo.has_key("resolution"):
-            resolutions = proxy.jira1.getResolutions(auth)
-        else:
-            resolutions = []
-        return parseReply(bugInfo, statuses, resolutions, location, bugId)
-    except xmlrpclib.Fault, e:
-        renamedBug = getRenamedBug(bugId, location)
-        if renamedBug:
-            return findBugInfo(renamedBug, location, username, password)
-        else:
-            return "NONEXISTENT", e.faultString, True, bugId
+        response = requests.get(rest_url, auth=(username, password))
+        response.raise_for_status()
     except Exception, e:
-        message = "Failed to fetch data from '" + scriptLocation + "': " + str(e)
-        return "BAD SCRIPT", message, False, bugId
+        exception_message = str(e)
+        internal_error = False
+        try:
+            json_dict = response.json()
+            error_key = "errorMessages"
+            if error_key in json_dict:
+                exception_message += " " + " ".join(json_dict[error_key])
+                internal_error = True
+        except:
+            exception_message += "\n" + _interpretRequestError(exception_message)
 
-def getRenamedBug(bugId, location):
+        message = "Failed to access '" + rest_url + "': " + exception_message  + "\n"
+        return "JIRA ERROR", message, internal_error, bugId
+
     try:
-        url = urllib.urlopen(makeURL(location, bugId))
-    except IOError:
-        return None
-    bugs = getBugsFromText(urllib.url2pathname(url.geturl()), "")
-    if len(bugs) == 1:
-        renamed, _ = bugs[0]
-        if renamed != bugId:
-            return renamed
+        return _parseReply(response.json(), location)
+    except Exception, e:
+        message = "Failed to parse reply from '" + rest_url + "': " + str(e) + "\n"
+        return "PARSE ERROR", message, False, bugId
+
 
 # Used by Jenkins plugin
 def getBugsFromText(text, location):
@@ -148,6 +114,5 @@ def getBugsFromText(text, location):
     bugs = []
     for match in bugRegex.finditer(text):
         bugText = match.group(0)
-        bugs.append((bugText, makeURL(location, bugText)))
+        bugs.append((bugText, _makeURL(location, bugText)))
     return bugs
-    

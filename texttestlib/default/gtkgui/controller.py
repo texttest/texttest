@@ -47,7 +47,6 @@ from texttestlib.default.gtkgui.guiplugins import CloseWindowCancelException
 
 class IdleHandlerManager:
     def __init__(self):
-        self.sourceId = -1
         self.diag = logging.getLogger("Idle Handlers")
 
     def notifyActionStart(self, lock=True):
@@ -61,7 +60,7 @@ class IdleHandlerManager:
         return True  # nothing to show, but we need to observe...
 
     def notifyActionProgress(self, *args):
-        if self.sourceId >= 0:
+        if plugins.Observable.threadedNotificationHandler.idleHandler is not None:
             raise plugins.TextTestError("No Action currently exists to have progress on!")
 
     def notifyActionStop(self, *args):
@@ -85,19 +84,17 @@ class IdleHandlerManager:
             return GObject.PRIORITY_DEFAULT_IDLE + 20
 
     def enableHandler(self):
-        if self.sourceId == -1:
-            self.sourceId = plugins.Observable.threadedNotificationHandler.enablePoll(GObject.idle_add,
-                                                                                      priority=self.getIdlePriority())
+        if plugins.Observable.threadedNotificationHandler.idleHandler is None:
+            plugins.Observable.threadedNotificationHandler.enablePoll(GObject.idle_add, priority=self.getIdlePriority())
             self.diag.info("Adding idle handler")
 
     def disableHandler(self):
-        if self.sourceId >= 0:
+        if plugins.Observable.threadedNotificationHandler.idleHandler is not None:
             self.diag.info("Removing idle handler")
-            GObject.source_remove(self.sourceId)
-            self.sourceId = -1
+            plugins.Observable.threadedNotificationHandler.disablePoll(GObject.source_remove)
 
     def notifyWindowClosed(self):
-        if self.sourceId >= 0:
+        if plugins.Observable.threadedNotificationHandler.idleHandler is not None:
             plugins.Observable.threadedNotificationHandler.blockEventsExcept(["Complete", "AllComplete"])
 
     def notifyExit(self):

@@ -14,7 +14,7 @@ import fnmatch
 import subprocess
 from collections import OrderedDict
 from traceback import format_exception
-from threading import currentThread
+from threading import currentThread, Lock
 from queue import Queue, Empty
 from glob import glob
 from datetime import datetime
@@ -548,29 +548,43 @@ def addCategory(name, briefDesc, longDesc=""):
 class ThreadedNotificationHandler:
     def __init__(self):
         self.workQueue = Queue()
+        self.mutex = Lock()
         self.active = False
         self.allowedEvents = []
+        self.idleHandler = None
+        self.source = None
 
     def blockEventsExcept(self, allowedEvents):
         self.allowedEvents = allowedEvents
 
     def enablePoll(self, idleHandleMethod, **kwargs):
         self.active = True
-        return idleHandleMethod(self.pollQueue, **kwargs)
+        self.idleHandler = lambda : idleHandleMethod(self.pollQueue, **kwargs)
+
+    def disablePoll(self, idleHandleRemover):
+        with self.mutex:
+            if self.source is not None:
+                idleHandleRemover(self.source)
+                self.source = None
+            self.idleHandler = None
 
     def pollQueue(self):
-        try:
-            observable, args, kwargs = self.workQueue.get_nowait()
-            if len(self.allowedEvents) == 0 or args[0] in self.allowedEvents:
-                observable.diagnoseObs("From work queue", *args, **kwargs)
-                observable.performNotify(*args, **kwargs)
-        except Empty:
-            # Idle handler. We must sleep for a bit if we don't do anything, or we use the whole CPU (busy-wait)
-            time.sleep(0.1)
-        return self.active
+        with self.mutex:
+            try:
+                observable, args, kwargs = self.workQueue.get_nowait()
+                if len(self.allowedEvents) == 0 or args[0] in self.allowedEvents:
+                    observable.diagnoseObs("From work queue", *args, **kwargs)
+                    observable.performNotify(*args, **kwargs)
+            except Empty:
+                self.source = None
+                return False
+            return True
 
     def transfer(self, observable, *args, **kwargs):
-        self.workQueue.put((observable, args, kwargs))
+        with self.mutex:
+            self.workQueue.put((observable, args, kwargs))
+            if self.active and self.source is None and self.idleHandler is not None:
+                self.source = self.idleHandler()
 
 
 class Observable:
@@ -1408,7 +1422,7 @@ class PatternAggregator:
     def __init__(self):
         self.groups = 0
         self.groupindex = {}
-        
+
     def add(self, pattern):
         self.groups += pattern.groups
         self.groupindex.update(pattern.groupindex)

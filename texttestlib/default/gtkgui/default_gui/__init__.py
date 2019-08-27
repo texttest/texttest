@@ -45,7 +45,7 @@ class InteractiveActionConfig(BaseInteractiveActionConfig):
         dict = {}
         dict["quit"] = "<control>q"
         dict["select"] = "<control><alt>f"
-        dict["filter"] = "<control>f"
+        dict["filter"] = "<control><shift>f"
         dict["approve"] = "<control>s"
         dict["approve_as"] = "<control><alt>s"
         dict["copy"] = "<control>c"

@@ -44,8 +44,8 @@ class BuildDocument:
             # Error handling due to parsing problems caused last power loss
             try :
                 return cls(xmlFile)
-            except:
-                print "WARNING: Error while parsing XML file:" + xmlFile
+            except Exception, e:
+                print "WARNING: Error while parsing XML file:" + xmlFile, e
 
     def __init__(self, xmlFile):
         self.document = parse(xmlFile)
@@ -256,7 +256,7 @@ class ChangeSetFinder:
                     if author and (author not in authors):
                         authors.append(author)
                 if line.startswith(" "):
-                    self.addUnique(bugs, self.getBugs(line.encode("ascii")))
+                    self.addUnique(bugs, self.getBugs(line.encode("utf-8")))
         return authors, bugs
 
     def parseChangeLog(self, xmlFile):
@@ -287,7 +287,7 @@ class ChangeSetFinder:
             return " ".join([ part.capitalize() for part in withoutEmail.split(".") ])
         else:
             try:
-               withoutEmail = withoutEmail.encode("ascii", "xmlcharrefreplace")
+                withoutEmail = withoutEmail.encode("ascii", "xmlcharrefreplace")
             except UnicodeDecodeError, exception:
                 print "FAILED to encode name '" + withoutEmail + "' (repr: " + repr(withoutEmail) + ", " \
                       + str(type(withoutEmail)) + ", default encoding: '" \
@@ -409,7 +409,7 @@ class ChangeFinder:
         self.markedArtefacts = markedArtefacts
         self.changeSetFinder = ChangeSetFinder(self.jobRoot, os.getenv("JENKINS_URL"), bugSystemData)
         self.diffFinder = FingerprintDifferenceFinder(self.jobRoot, *args)
-
+        self.handledProjects = []
     def findChanges(self, build1, build2):
         try:
             markedChanges, projectChanges, fingerprintsFound = self.getChangesRecursively(self.jobName, build1, build2)
@@ -436,8 +436,9 @@ class ChangeFinder:
         markedChanges, differencesByProject = self.organiseByProject(differences)
         # For each project, find out which builds were affected
         projectChanges, recursiveChanges = self.getProjectChanges(differencesByProject)
+        self.handledProjects.append(jobName)
         for subProj, subBuild1, subBuild2 in recursiveChanges:
-            if subProj != jobName:
+            if not subProj in self.handledProjects:
                 subMarkedChanges, subProjectChanges, _ = self.getChangesRecursively(subProj, subBuild1, subBuild2)
                 for subMarkChange in subMarkedChanges:
                     if subMarkChange not in markedChanges:

@@ -215,9 +215,9 @@ class MailSender:
         collFile = os.path.join(app.writeDirectory, localFileName)
         self.diag.info("Adding mail report contents to " + collFile)
 
-        file = plugins.openForWrite(collFile)
-        file.write(mailContents)
-        file.close()
+        with plugins.openForWrite(collFile) as collateFile:
+            collateFile.write(mailContents)
+            collateFile.close()
 
     def sendOrStoreMail(self, app, mailContents, useCollection=False, isAllSuccess=False):
         plugins.log.info("Creating batch report for application " + app.fullName() + " ...")

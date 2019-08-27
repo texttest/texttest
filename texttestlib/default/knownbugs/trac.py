@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Interface to trac version >= 0.11. Not tested on earlier versions.
 

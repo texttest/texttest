@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 import plugins, os, sys, testmodel, signal, operator, logging
 from threading import Thread

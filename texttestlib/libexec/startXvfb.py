@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Wrapper for Xvfb. Works on UNIX only. Main points are as follows :
 # - Provide a unique display ID by using our own process ID

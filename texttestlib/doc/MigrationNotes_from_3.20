@@ -57,7 +57,7 @@ There are two ways to fix this. The first, and most obvious, is to simply re-rec
 traffic files, when this will happen automatically. If that isn't possible, the next best option is
 to modify them via the ModifyTraffic script. Paste the following onto your PATH somewhere
 
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 ### migrate_traffic_from_3.20.py
 

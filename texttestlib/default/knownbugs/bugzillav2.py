@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Older interface to bugzilla version 2.x. Will not work on 3.x and later versions.
 # Relies on "bugcli", an open source program that appears to be abandoned, which was

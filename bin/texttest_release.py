@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # texttest_release.py : makes a release from Bazaar source control. Can do so from a local setup using the
 # environment variable BZRROOT (modelled on the layout at Jeppesen), or directly from Launchpad.

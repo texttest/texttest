@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # Majority credit to Sorin Sbarnea @ StackOverflow http://stackoverflow.com/questions/384076/how-can-i-make-the-python-logging-output-to-be-colored
 import logging
 

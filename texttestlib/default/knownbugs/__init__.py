@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 import os, string, shutil, sys, logging, glob, re
 from texttestlib import plugins

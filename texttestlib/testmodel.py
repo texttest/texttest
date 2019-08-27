@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 import os, sys, types, string, plugins, exceptions, shutil, operator, logging, glob, fnmatch
 from multiprocessing import cpu_count
 from ordereddict import OrderedDict

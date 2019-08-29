@@ -1,0 +1,24 @@
+environment:
+  matrix:
+    - MSYS2_ARCH: x86_64
+      MSYSTEM: MINGW64
+    - MSYS2_ARCH: i686
+      MSYSTEM: MINGW32
+
+install:
+    - git clone https://gitlab.gnome.org/GNOME/meld
+    - set MELD=%CD%\meld
+    - set PATH=C:\msys64\%MSYSTEM%\bin;C:\msys64\usr\bin;%PATH%
+    - pacman --noconfirm -S --refresh --sysupgrade --needed mingw-w64-%MSYS2_ARCH%-python3-cx_Freeze mingw-w64-%MSYS2_ARCH%-python3-gobject mingw-w64-%MSYS2_ARCH%-python3-pytest mingw-w64-%MSYS2_ARCH%-gtksourceview4 mingw-w64-%MSYS2_ARCH%-gsettings-desktop-schemas glib2-devel intltool
+
+build_script:
+    - cd %MELD%
+    - cp -a %APPVEYOR_BUILD_FOLDER%/texttestlib %APPVEYOR_BUILD_FOLDER%/setup_win32.py .
+    - cp %APPVEYOR_BUILD_FOLDER%/bin/* bin
+    - cp %APPVEYOR_BUILD_FOLDER%/wininstall/*.ico data/icons
+    - glib-compile-schemas data
+    - python3 setup_win32.py bdist_dumb --bdist-dir build\bdist.mingw\msi --keep-temp bdist_msi --keep-temp
+    - mv dist %APPVEYOR_BUILD_FOLDER%
+
+artifacts:
+    - path: dist

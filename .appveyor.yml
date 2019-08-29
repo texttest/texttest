@@ -21,4 +21,5 @@ build_script:
     - mv dist %APPVEYOR_BUILD_FOLDER%
 
 artifacts:
-    - path: dist
+    - path: dist\*.zip
+    - path: dist\*.msi

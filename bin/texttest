@@ -16,14 +16,19 @@ def fixSysPath(fileName):
             sys.path.append(libDir)
 
 
-try:
-    # If there is a separate script "texttest", want to use the local tree
-    fixSysPath(os.path.abspath(__file__))
+if getattr(sys, 'frozen', False):
+    # cx_Freeze sets sys.stdout and stderr to None leading to exceptions in print()
+    sys.stdout = sys.stderr = open(os.devnull, "w")
     from texttestlib import texttest_version
-except ImportError:
-    # For RPMs etc, want to be able to have a link "texttest" somewhere totally different, i.e. /usr/bin
-    fixSysPath(os.path.realpath(__file__))
-    from texttestlib import texttest_version
+else:
+    try:
+        # If there is a separate script "texttest", want to use the local tree
+        fixSysPath(os.path.abspath(__file__))
+        from texttestlib import texttest_version
+    except ImportError:
+        # For RPMs etc, want to be able to have a link "texttest" somewhere totally different, i.e. /usr/bin
+        fixSysPath(os.path.realpath(__file__))
+        from texttestlib import texttest_version
 
 major, minor, micro = sys.version_info[:3]
 reqMajor, reqMinor, reqMicro = texttest_version.required_python_version

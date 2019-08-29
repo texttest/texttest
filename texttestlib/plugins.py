@@ -78,7 +78,7 @@ def startTimeString(format=datetimeFormat):
 
 def importAndCall(moduleName, callableName, *args):
     module = importlib.import_module("texttestlib." + moduleName)
-    getattr(module, callableName)(*args)
+    return getattr(module, callableName)(*args)
 
 
 def installationDir(name):

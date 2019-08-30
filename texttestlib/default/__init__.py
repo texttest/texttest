@@ -1405,17 +1405,25 @@ class Config:
         if os.name == "posix":
             return os.getenv("EDITOR", "emacs")
         else:
-            if homeOS == "posix":
-                # Notepad cannot handle UNIX line-endings: for cross platform suites use wordpad by default...
-                return "wordpad"
-            else:
-                return "notepad"
+            # Notepad cannot handle UNIX line-endings: so check for alternatives by default...
+            for editor in (r'Notepad++\notepad++.exe', r'Windows NT\Accessories\wordpad.exe'):
+                for prefix in (r"C:\Program Files", r"C:\Program Files (x86)"):
+                    path = os.path.join(prefix, editor)
+                    if os.path.exists(path):
+                        return path
+            return "notepad"
 
     def defaultFollowProgram(self):
         if os.name == "posix":
             return "xterm -bg white -T $TEXTTEST_FOLLOW_FILE_TITLE -e tail -f"
         else:
             return "baretail"
+
+    def defaultDiffProgram(self):
+        if getattr(sys, 'frozen', False):
+            return os.path.join(os.path.dirname(sys.executable), "Meld.exe")
+        else:
+            return "tkdiff"
 
     def setExternalToolDefaults(self, app, homeOS):
         app.setConfigDefault("text_diff_program", "diff",
@@ -1428,7 +1436,7 @@ class Config:
                              "default": "-1"}, "The maximum file size to load into external programs, in bytes. -1 means no limit.")
         app.setConfigDefault("text_diff_program_filters", {"default": [], "diff": [
                              "^<", "^>"]}, "Filters that should be applied for particular diff tools to aid with grouping in dynamic GUI")
-        app.setConfigDefault("diff_program", {"default": "tkdiff"},
+        app.setConfigDefault("diff_program", {"default": self.defaultDiffProgram()},
                              "External program to use for graphical file comparison")
         app.setConfigDefault("view_program", {"default": self.defaultViewProgram(homeOS)},
                              "External program(s) to use for viewing and editing text files")

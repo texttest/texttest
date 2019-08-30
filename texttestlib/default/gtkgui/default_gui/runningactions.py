@@ -104,6 +104,8 @@ class BasicRunningAction:
             return filterFileOverride
 
     def getInterpreterArgs(self):
+        if getattr(sys, 'frozen', False):
+            return []
         interpreterArg = os.getenv("TEXTTEST_DYNAMIC_GUI_INTERPRETER", "") # Alternative interpreter for the dynamic GUI : mostly useful for coverage / testing
         if interpreterArg:
             return plugins.splitcmd(interpreterArg.replace("ttpython", sys.executable))

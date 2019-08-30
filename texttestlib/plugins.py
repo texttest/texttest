@@ -43,7 +43,10 @@ class Callable:
 
 def findInstallationRoots():
     packageDir = os.path.dirname(__file__)
-    roots = [packageDir]
+    if getattr(sys, 'frozen', False):
+        roots = glob(os.path.join(os.path.dirname(sys.executable), "lib", "python*", "site-packages", "texttestlib"))
+    else:
+        roots = [packageDir]
     installationRoot = os.path.dirname(packageDir)
     if os.path.basename(installationRoot) == "generic":
         siteRoot = os.path.dirname(installationRoot)
@@ -52,8 +55,6 @@ def findInstallationRoots():
         siteDir = os.path.join(installationRoot, "site")
         if os.path.isdir(siteDir):
             roots.append(siteDir)
-    if getattr(sys, 'frozen', False):
-        roots += glob(os.path.join(os.path.dirname(sys.executable), "lib", "python*", "site-packages", "texttestlib"))
     return roots
 
 

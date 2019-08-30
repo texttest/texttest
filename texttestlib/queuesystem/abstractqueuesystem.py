@@ -80,7 +80,9 @@ class QueueSystem(object):
 
     def getTextTestArgs(self):
         texttest = plugins.getTextTestProgram()
-        return [self.getWindowsExecutable(), texttest] if os.name == "nt" else [texttest]
+        if os.name != "nt" or getattr(sys, 'frozen', False):
+            return [texttest]
+        return [self.getWindowsExecutable(), texttest]
 
     def makeSlaveEnvironment(self, env):
         newEnv = plugins.copyEnvironment(ignoreVars=self.getSlaveVarsToBlock())

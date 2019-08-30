@@ -69,6 +69,8 @@ for data_dir in gtk_data_dirs:
 # add libgdk_pixbuf-2.0-0.dll manually to forbid auto-pulling of gdiplus.dll
 manually_added_libs = {
     "libgdk_pixbuf-2.0-0.dll": os.path.join(sys.prefix, 'bin'),
+    "librsvg-2-2.dll": os.path.join(sys.prefix, 'bin'),
+    "libcroco-2-2.dll": os.path.join(sys.prefix, 'bin'),
     }
 
 for lib, possible_path in manually_added_libs.items():

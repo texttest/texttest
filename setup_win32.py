@@ -51,7 +51,7 @@ gtk_data_dirs = [
     'lib/girepository-1.0',
     'share/fontconfig',
     'share/glib-2.0',
-    'share/gtksourceview-4.0',
+    'share/gtksourceview-4',
     'share/icons',
 ]
 
@@ -122,17 +122,27 @@ texttest_executable_options = {
     "icon": "data/icons/texttest-icon.ico",
 }
 
+texttestc_executable_options = {
+    "script": "bin/texttest",
+    "icon": "data/icons/texttest-icon.ico",
+}
+
 if 'mingw' in sysconfig.get_platform():
     executable_options.update({
-         "base": "Win32GUI",  # comment to build cosole version to see stderr
+         "base": "Win32GUI",  # comment to build console version to see stderr
          "targetName": "Meld.exe",
          "shortcutName": "Meld",
          "shortcutDir": "ProgramMenuFolder",
     })
     texttest_executable_options.update({
-         "base": "Win32GUI",  # comment to build cosole version to see stderr
+         "base": "Win32GUI",
          "targetName": "texttest.exe",
          "shortcutName": "Texttest",
+         "shortcutDir": "ProgramMenuFolder",
+    })
+    texttestc_executable_options.update({
+         "targetName": "texttestc.exe",
+         "shortcutName": "Texttestc",
          "shortcutDir": "ProgramMenuFolder",
     })
 
@@ -166,6 +176,7 @@ setup(
     executables=[
         Executable(**executable_options),
         Executable(**texttest_executable_options),
+        Executable(**texttestc_executable_options),
     ],
     packages=[
         'meld',

@@ -16,9 +16,10 @@ def fixSysPath(fileName):
             sys.path.append(libDir)
 
 
-if getattr(sys, 'frozen', False):
+if sys.executable.endswith("pythonw.exe") or sys.stdout is None:
     # cx_Freeze sets sys.stdout and stderr to None leading to exceptions in print()
     sys.stdout = sys.stderr = open(os.devnull, "w")
+if getattr(sys, 'frozen', False):
     from texttestlib import texttest_version
 else:
     try:

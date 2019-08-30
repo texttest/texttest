@@ -12,7 +12,6 @@ import shlex
 import types
 import fnmatch
 import subprocess
-import importlib
 from collections import OrderedDict
 from traceback import format_exception
 from threading import currentThread, Lock
@@ -44,16 +43,18 @@ class Callable:
 
 def findInstallationRoots():
     packageDir = os.path.dirname(__file__)
+    roots = [packageDir]
     installationRoot = os.path.dirname(packageDir)
     if os.path.basename(installationRoot) == "generic":
         siteRoot = os.path.dirname(installationRoot)
-        return [packageDir, siteRoot]
+        roots.append(siteRoot)
     else:
         siteDir = os.path.join(installationRoot, "site")
         if os.path.isdir(siteDir):
-            return [packageDir, siteDir]
-        else:
-            return [packageDir]
+            roots.append(siteDir)
+    if getattr(sys, 'frozen', False):
+        roots += glob(os.path.join(os.path.dirname(sys.executable), "lib", "python*", "site-packages", "texttestlib"))
+    return roots
 
 
 globalStartTime = datetime.now()
@@ -76,9 +77,35 @@ def startTimeString(format=datetimeFormat):
     return globalStartTime.strftime(format)
 
 
+def isModuleMissing(errorString, moduleName):
+    if not errorString.startswith("No module named"):
+        return False
+
+    moduleMissing = errorString.split()[-1][1:-1]
+    return moduleName.startswith(moduleMissing)
+
+
 def importAndCall(moduleName, callableName, *args):
-    module = importlib.import_module("texttestlib." + moduleName)
-    return getattr(module, callableName)(*args)
+    command = "from " + moduleName + " import " + callableName + " as _callable"
+    namespace = {}
+    try:
+        exec(command, globals(), namespace)
+    except ImportError as err:
+        # try resolve import by prepending 'texttestlib.' (python3)
+        if isModuleMissing(str(err), moduleName):
+            moduleName = "texttestlib." + moduleName
+            command = "from " + moduleName + " import " + callableName + " as _callable"
+            try:
+                exec(command, globals(), namespace)
+            except ImportError as err2:
+                if isModuleMissing(str(err2), moduleName):
+                    raise err
+                else:
+                    raise err2
+        else:
+            raise
+
+    return namespace["_callable"](*args)
 
 
 def installationDir(name):

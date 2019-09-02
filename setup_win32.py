@@ -81,7 +81,7 @@ for lib, possible_path in manually_added_libs.items():
 build_exe_options = {
     "includes": ["gi"],
     "excludes": ["tkinter"],
-    "packages": ["gi", "weakref", "filecmp", "cgi", "texttestlib"],
+    "packages": ["gi", "weakref", "filecmp", "cgi", "texttestlib", "capturemock"],
     "include_files": get_non_python_libs(),
     "bin_excludes": list(manually_added_libs.keys()),
     "zip_exclude_packages": [],
@@ -129,6 +129,10 @@ texttestc_executable_options = {
     "icon": "data/icons/texttest-icon.ico",
 }
 
+capturemock_executable_options = {
+    "script": "bin/capturemock",
+}
+
 if 'mingw' in sysconfig.get_platform():
     executable_options.update({
          "base": "Win32GUI",  # comment to build console version to see stderr
@@ -145,6 +149,11 @@ if 'mingw' in sysconfig.get_platform():
     texttestc_executable_options.update({
          "targetName": "texttestc.exe",
          "shortcutName": "Texttestc",
+         "shortcutDir": "ProgramMenuFolder",
+    })
+    capturemock_executable_options.update({
+         "targetName": "capturemock.exe",
+         "shortcutName": "CaptureMock",
          "shortcutDir": "ProgramMenuFolder",
     })
 
@@ -179,6 +188,7 @@ setup(
         Executable(**executable_options),
         Executable(**texttest_executable_options),
         Executable(**texttestc_executable_options),
+        Executable(**capturemock_executable_options),
     ],
     packages=[
         'meld',
@@ -187,15 +197,17 @@ setup(
         'meld.vc',
         "texttestlib", "texttestlib.default", "texttestlib.queuesystem",
             "texttestlib.default.batch", "texttestlib.default.gtkgui", "texttestlib.default.knownbugs",
-            "texttestlib.default.gtkgui.default_gui", "texttestlib.default.gtkgui.version_control"
+            "texttestlib.default.gtkgui.default_gui", "texttestlib.default.gtkgui.version_control",
+            "capturemock"
     ],
     package_data={
         'meld': ['README', 'COPYING', 'NEWS'],
         "texttestlib": ["doc/ChangeLog", "doc/quick_start.txt", "doc/CREDITS.txt", "doc/MigrationNotes*", "doc/LICENSE.txt",
                                 "etc/*", "etc/.*", "libexec/*", "log/*", "images/*.*", "images/retro/*"],
-        "texttestlib.default.batch": ["testoverview_javascript/*"]
+        "texttestlib.default.batch": ["testoverview_javascript/*"],
+        "capturemock" : [ "capturemock_intercept.exe" ]
     },
-    scripts=['bin/meld', "bin/texttest", "bin/filter_rundependent.py", "bin/filter_fpdiff.py"],
+    scripts=['bin/meld', "bin/texttest", "bin/filter_rundependent.py", "bin/filter_fpdiff.py", "bin/capturemock"],
     data_files=[
         ('share/man/man1',
          ['meld.1']

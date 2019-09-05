@@ -115,10 +115,14 @@ def installationDir(name):
 
 
 def getTextTestProgram():
-    slaveCmd = os.getenv("TEXTTEST_SLAVE_CMD", os.path.abspath(sys.argv[0])) # TextTest start-script for starting subsequent processes
+    if getattr(sys, 'frozen', False):
+        executable = sys.executable
+    else:
+        executable = os.path.abspath(sys.argv[0])
+    slaveCmd = os.getenv("TEXTTEST_SLAVE_CMD", executable) # TextTest start-script for starting subsequent processes
     if not slaveCmd:
         # To allow it to be reset, the above form is for documentation...
-        slaveCmd = os.path.abspath(sys.argv[0])
+        slaveCmd = executable
     return slaveCmd
 
 

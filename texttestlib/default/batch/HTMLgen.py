@@ -1669,7 +1669,7 @@ class Table:
                 if type(self.body[i][j]) == StringType:
                     # process cell contents to insert breaks for \n char.
                     if self.cell_line_breaks:
-                        self.body[i][j] = string.replace(self.body[i][j], '\n', '<br>')
+                        self.body[i][j] = self.body[i][j].replace('\n', '<br>')
                     else:
                         self.body[i][j] = Text(self.body[i][j])
 

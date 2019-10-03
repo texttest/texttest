@@ -8,7 +8,9 @@ import shutil
 import operator
 import logging
 import glob
+import functools
 import fnmatch
+
 from multiprocessing import cpu_count
 from collections import OrderedDict
 from pickle import Pickler, Unpickler, UnpicklingError
@@ -1943,7 +1945,8 @@ class Application(object):
             if versionsToUse != self.versions:
                 # Don't get implied base versions here, we don't want them to be the default save version
                 saveableVersions = self.getSaveableVersions(baseVersionKey="default")
-                saveableVersions.sort(lambda v1, v2: self.compareForPriority(set(v1.split(".")), set(v2.split("."))))
+                prioKey=functools.cmp_to_key(self.compareForPriority)
+                saveableVersions.sort(key=lambda x: prioKey(set(x.split("."))))
                 self.diag.info("Saveable versions = " + repr(saveableVersions))
                 if len(saveableVersions) == 0:
                     return ""

@@ -1676,9 +1676,10 @@ class Application(object):
 
     def makeConfigObject(self):
         moduleName = self.getConfigValue("config_module")
-        if self.dircache.exists("texttest_config_modules"):
-            # Allow config modules to be stored under the test suite
-            sys.path.insert(0, self.dircache.pathName("texttest_config_modules"))
+        for dircache in self.getAllDirCaches("config", [ self.dircache ], includeRoot=True):
+            if dircache.exists("texttest_config_modules"):
+                # Allow config modules to be stored under the test suite
+                sys.path.insert(0, dircache.pathName("texttest_config_modules"))
         try:
             return plugins.importAndCall(moduleName, "getConfig", self.inputOptions)
         except Exception as err:

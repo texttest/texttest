@@ -6,9 +6,6 @@
 # server. Tested on bugzilla 2.16.
 
 import urllib.request
-import urllib.error
-import urllib.parse
-
 
 def findBugInfo(bugId, location, *args):
     bugzillaRequest = location + "/cli.cgi?bug=" + bugId

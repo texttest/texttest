@@ -3,9 +3,6 @@
 # Interface to trac version >= 0.11. Not tested on earlier versions.
 
 import urllib.request
-import urllib.error
-import urllib.parse
-
 
 def findBugInfo(bugId, location, *args):
     if location and location[-1] != '/':

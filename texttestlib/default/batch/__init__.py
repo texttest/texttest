@@ -1089,6 +1089,10 @@ class WebPageResponder(plugins.Responder):
     def copyJavaScript(self, pageTopDir, pageDir):
         jsDir = os.path.join(pageTopDir, "javascript")
         srcDir = os.path.join(os.path.dirname(__file__), "testoverview_javascript")
+        if not os.path.isdir(srcDir): # for example when zipped, use the installation structure
+            moduleParts = self.__class__.__module__.split(".")
+            pathParts = moduleParts[1:] +  [ "testoverview_javascript" ] # drop texttestlib at the start, installation is under that
+            srcDir = plugins.installationPath(*pathParts)
         plugins.ensureDirectoryExists(jsDir)
         plugins.ensureDirectoryExists(pageDir)
         for fn in sorted(os.listdir(srcDir)):

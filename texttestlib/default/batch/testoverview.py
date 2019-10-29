@@ -3,7 +3,7 @@
 
 import os
 import time
-import cgi
+import html
 import sys
 import logging
 import locale
@@ -625,7 +625,7 @@ class TestTable:
         return HTMLgen.TR(columnHeader)
 
     def escapeForHtml(self, text):
-        text = cgi.escape(text, True)
+        text = html.escape(text, True)
         localeEncoding = locale.getdefaultlocale()[1] or "utf-8"
         return str(text.encode("ascii", "xmlcharrefreplace"), localeEncoding)
 

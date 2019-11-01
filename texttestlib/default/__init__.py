@@ -1283,6 +1283,7 @@ class Config:
                              "Mapping of result files to which order they should be shown in the text info window.")
         app.setConfigDefault("floating_point_tolerance", { "default" : 0.0 }, "Which tolerance to apply when comparing floating point values in output")
         app.setConfigDefault("relative_float_tolerance", { "default" : 0.0 }, "Which relative tolerance to apply when comparing floating point values")
+        app.setConfigDefault("float_diff_model", { "default" : 0 }, "Which model to apply when comparing floating point values")
 
         app.setConfigDefault("collate_file", self.getDefaultCollations(), "Mapping of result file names to paths to collect them from")
         app.setConfigDefault("collate_script", self.getDefaultCollateScripts(), "Mapping of result file names to scripts which turn them into suitable text")

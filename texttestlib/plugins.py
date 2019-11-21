@@ -1032,7 +1032,7 @@ def splitcmd(s):
         if "Program Files" in s: # such a common case on Windows, don't mess up
             return [ s ]
         else:
-            return shlex.split(s, posix=False)
+            return shlex.split(s.replace("\\", "\\\\"))
 
 # portable version of os.path.samefile
 

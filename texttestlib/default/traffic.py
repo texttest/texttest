@@ -140,9 +140,13 @@ class ModifyTraffic(plugins.ScriptWithArgs):
 
     def getModified(self, fullLine, dir):
         trafficType = fullLine[2:5]
+        args = [self.script, fullLine[6:]]
+        if os.name == "nt":
+            interpreter = plugins.getInterpreter(self.script)
+            if interpreter:
+                args = [interpreter] + args
         if trafficType in self.trafficTypes:
-            proc = subprocess.Popen([self.script, fullLine[6:]], cwd=dir,
-                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=os.name == "nt")
+            proc = subprocess.Popen(args, cwd=dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             stdout, stderr = proc.communicate()
             if len(stderr) > 0:
                 raise plugins.TextTestError("Couldn't modify traffic :\n " + str(stderr, getpreferredencoding()))

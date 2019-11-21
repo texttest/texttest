@@ -287,10 +287,14 @@ class RunTest(plugins.Action):
         for signum in [signal.SIGQUIT, signal.SIGUSR1, signal.SIGUSR2, signal.SIGXCPU]:
             signal.signal(signum, signal.SIG_IGN)
 
-    def getInterpreterArgs(self, test, interpreter):
+    @classmethod
+    def getInterpreterArgs(cls, test, interpreter):
         args = plugins.splitcmd(interpreter)
         if len(args) > 0 and args[0] == "ttpython":  # interpreted to mean "whatever python TextTest runs with"
-            return [sys.executable, "-u"] + args[1:]
+            basename = os.path.basename(sys.executable).lower()
+            python = sys.executable if "python" in basename else "python"
+            # 'Native launcher' on Windows, such as via Windows installer. Don't know what Python it used
+            return [ python, "-u" ] + args[1:]
         else:
             return args
 

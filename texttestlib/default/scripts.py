@@ -228,17 +228,14 @@ class DocumentEnvironment(plugins.Action):
             argTuple = eval(argStr)
             if type(argTuple) == tuple:
                 allArgs = list(eval(argStr))
-                return [self.interpretArgument(str(allArgs[1]))]
+                return [ str(allArgs[1]) ]
             else:
                 return []
         except Exception:  # could be anything at all
-            return []
-
-    def interpretArgument(self, arg):
-        if os.path.isfile(arg) and os.path.basename(arg) in ["texttest", "texttestc.py"]:
-            return "<source directory>/bin/texttest"
-        else:
-            return arg
+            if argStr.endswith("executable)"):
+                return [ "<source directory>/bin/texttest" ]
+            else:
+                return []
 
     def isRelevant(self, var, vars, prefixes):
         if var in self.exceptions or var in prefixes or "SLEEP" in var or "SELFTEST" in var or \

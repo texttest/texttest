@@ -1656,8 +1656,12 @@ class Application(object):
         dirCacheNames.reverse()  # lowest-priority comes first, so it can be overridden
         if includeRoot:
             dirCacheNames += self.inputOptions.rootDirectories
+        
         dirCaches = []
         for dirName in dirCacheNames:
+            if any(( c.dir == dirName for c in caches )):
+                continue
+            
             if dirName in self.extraDirCaches:
                 cached = self.extraDirCaches.get(dirName)
                 if cached:

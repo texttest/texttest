@@ -7,7 +7,7 @@ environment:
 
 install:
     - git clone https://gitlab.gnome.org/GNOME/meld
-    - cd meld & set MELD=%CD% & git checkout 3.20.1
+    - cd meld & set MELD=%CD% & git checkout 3.20.1 & cd ..
     - git clone https://github.com/texttest/capturemock
     - cp -a capturemock/capturemock meld
     - cp capturemock/bin/* meld/bin

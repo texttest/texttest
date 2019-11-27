@@ -29,7 +29,7 @@ def get_non_python_libs():
 
     if 'mingw' in sysconfig.get_platform():
         # dll imported by dll dependencies expected to be auto-resolved later
-        inst_root = [os.path.join(local_bin, 'libgtksourceview-3-0-1.dll')]
+        inst_root = [os.path.join(local_bin, 'libgtksourceview-3.0-1.dll')]
 
         # gspawn-helper is needed for Gtk.show_uri function
         if platform.architecture()[0] == '32bit':

@@ -1420,10 +1420,21 @@ class Config:
             return "baretail"
 
     def defaultDiffProgram(self):
+        if os.name == "posix":
+            for diff in ('tkdiff', 'kdiff3', 'meld'):
+                for prefix in ("/usr/bin", "/usr/local/bin"):
+                    path = os.path.join(prefix, diff)
+                    if os.path.exists(path):
+                        return path
+        else:
+            for diff in (r'TkDiff\tkdiff.exe', r'TortoiseSVN\bin\TortoiseMerge.exe', r'TortoiseGit\bin\TortoiseGitMerge.exe'):
+                for prefix in (r"C:\Program Files", r"C:\Program Files (x86)"):
+                    path = os.path.join(prefix, diff)
+                    if os.path.exists(path):
+                        return path
         if getattr(sys, 'frozen', False):
             return os.path.join(os.path.dirname(sys.executable), "Meld.exe")
-        else:
-            return "tkdiff"
+        return "tkdiff"
 
     def setExternalToolDefaults(self, app, homeOS):
         app.setConfigDefault("text_diff_program", "diff",

@@ -152,12 +152,10 @@ if 'mingw' in sysconfig.get_platform():
     texttestc_executable_options.update({
          "targetName": "texttestc.exe",
          "shortcutName": "Texttestc",
-         "shortcutDir": "ProgramMenuFolder",
     })
     capturemock_executable_options.update({
          "targetName": "capturemock.exe",
          "shortcutName": "CaptureMock",
-         "shortcutDir": "ProgramMenuFolder",
     })
 
 setup(
@@ -186,9 +184,9 @@ setup(
         "install_lib": {"compile": False},
     },
     executables=[
-        Executable(**executable_options),
         Executable(**texttest_executable_options),
         Executable(**texttestc_executable_options),
+        Executable(**executable_options),
         Executable(**capturemock_executable_options),
     ],
     packages=[

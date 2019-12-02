@@ -161,23 +161,21 @@ if 'mingw' in sysconfig.get_platform():
     })
 
 setup(
-    name="TextTest+Meld",
-    version=meld.conf.__version__,
-    description='Visual diff and merge tool',
-    author='The Meld project',
-    author_email='meld-list@gnome.org',
-    maintainer='Kai Willadsen',
-    url='http://meldmerge.org',
+    name="TextTest",
+    version="4.0.0",
+    description='Text-based functional testing tool including the Meld diff and merge tool',
+    author='The TextTest project',
+    author_email='texttest-users@lists.sourceforge.net',
+    maintainer='Geoff Bache, Michael Behrisch',
+    url='http://texttest.org',
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Environment :: X11 Applications :: GTK',
         'Intended Audience :: Developers',
-        'Intended Audience :: System Administrators',
-        'License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)',
+        'License :: OSI Approved :: GNU Lesser General Public License v2 or later (LGPLv2+)',
         'Programming Language :: Python',
         'Topic :: Desktop Environment :: Gnome',
         'Topic :: Software Development',
-        'Topic :: Software Development :: Version Control',
     ],
     options={
         "build_exe": build_exe_options,

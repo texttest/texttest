@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Interface to trac version >= 0.11. Not tested on earlier versions.
 
@@ -9,15 +9,16 @@ def findBugInfo(bugId, location, *args):
         location += '/'
     tracRequest = "%sticket/%s?format=tab" % (location, bugId)
     try:
-        reply = urllib.request.urlopen(tracRequest).readlines()
+        reply = urllib.request.urlopen(tracRequest)
+        content = reply.read().decode(reply.headers.get_content_charset()).splitlines()
     except Exception as e:
         message = "Failed to open URL '" + tracRequest + "': " + str(e) + \
                   ".\n\nPlease make sure that bug " + bugId + " exists\n" + \
                   "and that the configuration entry 'bug_system_location' " + \
                   "points to the correct trac instance.\nThe current value is '" + location + "'."
         return "NONEXISTENT", message, False, bugId
-    keys = reply[0].split('\t')
-    values = ("".join(reply[1:])).split('\t')
+    keys = content[0].split('\t')
+    values = ("".join(content[1:])).split('\t')
     if len(keys) == 1 or len(keys) > len(values):
         message = "Could not parse reply from trac, maybe incompatible interface."
         return "BAD SCRIPT", message, False, bugId

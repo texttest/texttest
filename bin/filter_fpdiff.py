@@ -4,6 +4,7 @@ import optparse
 import os
 import sys
 import io
+import difflib
 
 
 def fixSysPath(fileName):
@@ -26,6 +27,8 @@ def main():
                       help='Set relative floating point tolerance')
     parser.add_option("-o", "--output",
                       help='Write filtered tofile to use external diff')
+    parser.add_option("-d", "--difflib", action="store_true", default=False,
+                      help="Use python's difflib")
     (options, args) = parser.parse_args()
     if len(args) == 0:  # pragma: no cover - not production code
         parser.print_help()
@@ -37,11 +40,11 @@ def main():
     tolines = open(tofile).readlines()
     if options.output:
         out = open(options.output, 'w')
-        fpfilter(fromlines, tolines, out, options.tolerance, options.relative)
+        fpfilter(fromlines, tolines, out, options.tolerance, options.relative, options.difflib)
         out.close()
     else:  # pragma: no cover - not production code
         out = io.StringIO()
-        fpfilter(fromlines, tolines, out, options.tolerance, options.relative)
+        fpfilter(fromlines, tolines, out, options.tolerance, options.relative, options.difflib)
         out.seek(0)
         tolines = out.readlines()
         sys.stdout.writelines(difflib.unified_diff(fromlines, tolines, fromfile, tofile))

@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 import sys
 import difflib
 
@@ -7,7 +6,7 @@ def _getNumberAt(l, pos):
     start = pos
     eSeen = False
     dotSeen = False
-    while start > 0 and l[start-1] in "1234567890.eE-":
+    while start > 0 and l[start-1] in "1234567890.eE-+":
         if l[start-1] in "eE":
             if eSeen:
                 break
@@ -18,7 +17,7 @@ def _getNumberAt(l, pos):
             dotSeen = True
         start -= 1
     end = pos
-    while end < len(l) and l[end] in "1234567890.eE-":
+    while end < len(l) and l[end] in "1234567890.eE-+":
         if l[end] in "eE":
             if eSeen:
                 break
@@ -66,7 +65,14 @@ def _fpequal(l1, l2, tolerance, relTolerance):
         return _fpequalAtPos(l1, l2, tolerance, relTolerance, pos)[0]
 
 
-def fpfilter(fromlines, tolines, outlines, tolerance, relTolerance=None):
+def fpfilter(fromlines, tolines, outlines, tolerance, relTolerance=None, useDifflib=False):
+    if not useDifflib:
+        for fromline, toline in zip(fromlines, tolines):
+            if fromline == toline or _fpequal(fromline, toline, tolerance, relTolerance):
+                outlines.write(fromline)
+            else:
+                outlines.write(toline)
+        return
     s = difflib.SequenceMatcher(None, fromlines, tolines)
     for tag, i1, i2, j1, j2 in s.get_opcodes():
         if tag == "replace" and i2 - i1 == j2 - j1:

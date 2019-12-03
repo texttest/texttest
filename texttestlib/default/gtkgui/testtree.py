@@ -249,7 +249,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         self.selectedTests = []
         self.clipboardTests = set()
         self.dynamic = dynamic
-        self.collapseStatic = self.getCollapseStatic()
+        self.collapseStatic = -1 if dynamic else guiutils.guiConfig.getValue("static_collapse_suites")
         self.filteredModel = None
         self.treeView = None
         self.newTestsVisible = guiutils.guiConfig.showCategoryByDefault("not_started")
@@ -265,18 +265,12 @@ class TestTreeGUI(guiutils.ContainerGUI):
         parentIter = self.filteredModel.iter_parent(iter)
         return not parentIter or self.treeView.row_expanded(self.filteredModel.get_path(parentIter))
 
-    def getCollapseStatic(self):
-        if self.dynamic:
-            return False
-        else:
-            return guiutils.guiConfig.getValue("static_collapse_suites")
-
     def notifyAllRead(self, *args):
         if not self.dynamic:
             self.newTestsVisible = True
             self.model.foreach(self.makeRowVisible)
-            if self.collapseStatic:
-                self.expandLevel(self.treeView, self.filteredModel.get_iter_first())
+            if self.collapseStatic != -1:
+                self.expandLevel(self.treeView, self.filteredModel.get_iter_first(), self.collapseStatic)
             else:
                 self.treeView.expand_all()
         self.notify("AllRead")
@@ -357,7 +351,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         return test.classId() == "test-case" or test in user_data.testSuitesWithResults
 
     def rowExpanded(self, treeview, iter, path):
-        self.expandLevel(treeview, self.filteredModel.iter_children(iter), not self.collapseStatic)
+        self.expandLevel(treeview, self.filteredModel.iter_children(iter), self.collapseStatic - len(path))
 
     def userChangedSelection(self, *args):
         if not self.selecting and not hasattr(self.selection, "unseen_changes"):
@@ -545,16 +539,15 @@ class TestTreeGUI(guiutils.ContainerGUI):
         if cellArea.y < 0 or cellArea.y > visibleArea.height:
             treeView.scroll_to_cell(path, use_align=True, row_align=0.1)
 
-    def expandLevel(self, view, iter, recursive=True):
+    def expandLevel(self, view, iter, recurseLevel=-1):
         # Make sure expanding expands everything, better than just one level as default...
         # Avoid using view.expand_row(path, open_all=True), as the open_all flag
         # doesn't seem to send the correct 'row-expanded' signal for all rows ...
         # This way, the signals are generated one at a time and we call back into here.
         model = view.get_model()
-        while (iter != None):
-            if recursive:
+        while iter is not None:
+            if recurseLevel != 0:
                 view.expand_row(model.get_path(iter), open_all=False)
-
             iter = view.get_model().iter_next(iter)
 
     def notifyTestAppearance(self, test, detailText, colour1, colour2, approved):

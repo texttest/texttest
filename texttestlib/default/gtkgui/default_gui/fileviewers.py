@@ -584,7 +584,7 @@ class EditTestDescription(EditTestFileInEditor):
 
     def createTmpFile(self, text):
         tmpFile, fileName = mkstemp()
-        os.write(tmpFile, text)
+        os.write(tmpFile, text.encode())
         os.close(tmpFile)
         return fileName
 

@@ -168,8 +168,8 @@ class GUIConfig:
         return d
 
     def setConfigDefaults(self, colourDict, accelerators):
-        self.setConfigDefault("static_collapse_suites", -1,
-                              "Up to which level the static GUI will show the suites collapsed")
+        self.setConfigDefault("static_collapse_suites", 100,
+                              "Starting at this level the static GUI will show the suites collapsed")
         self.setConfigDefault("test_colours", colourDict, "Colours to use for each test state")
         self.setConfigDefault("file_colours", copy(colourDict), "Colours to use for each file state")
         self.setConfigDefault("window_size", self.getWindowSizeSettings(),

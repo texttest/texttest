@@ -6,10 +6,31 @@ import platform
 import sys
 import sysconfig
 
+import cx_Freeze
 from cx_Freeze import Executable, setup
 
 import meld.build_helpers
 import meld.conf
+
+
+def load_matplotlib(finder, module):
+    """Only to monkey patch cx_Freeze 6.1. Obsolete once https://github.com/anthony-tuininga/cx_Freeze/pull/574 is integrated."""
+    import matplotlib
+    data_path = matplotlib.get_data_path()
+    target_path = os.path.join("lib", module.name, "mpl-data")
+    finder.IncludeFiles(data_path, target_path, copyDependentFiles=False)
+
+def load__ctypes(finder, module):
+    """Only to monkey patch cx_Freeze 6.1. Obsolete once https://github.com/anthony-tuininga/cx_Freeze/pull/565 is integrated."""
+    if sys.platform == "win32" and sys.version_info >= (3, 8):
+        libdir = "lib" if sysconfig.get_platform() == "mingw" else "DLLs"
+        for dll_path in glob.glob(os.path.join(sys.base_prefix, libdir, "libffi-*dll")):
+            finder.IncludeFiles(dll_path, os.path.join("lib", os.path.basename(dll_path)))
+
+
+if cx_Freeze.version == "6.1":
+    cx_Freeze.hooks.load_matplotlib = load_matplotlib
+    cx_Freeze.hooks.load__ctypes = load__ctypes
 
 
 def get_non_python_libs():

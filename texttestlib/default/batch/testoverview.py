@@ -379,7 +379,7 @@ class GenerateWebPages(object):
     def createPage(self):
         style = "body,td {color: #000000;font-size: 11px;font-family: Helvetica;} th {color: #000000;font-size: 13px;font-family: Helvetica;}"
         title = "Test results for " + self.pageTitle
-        return HTMLgen.SimpleDocument(title=title, style=style, xhtml=True)
+        return HTMLgen.SimpleDocument(title=title, style=style, xhtml=True, meta='<meta charset="' + locale.getpreferredencoding() + '">')
 
     def makeTableHeaderCell(self, tableHeader):
         container = HTMLgen.Container()
@@ -452,7 +452,7 @@ class GenerateWebPages(object):
     def writeCommentListPage(self):
         filename = os.path.join(self.pageDir, "commentlist.html")
         plugins.log.info("Writing comment html page at " + filename + "...")
-        doc = HTMLgen.SimpleDocument(title="All Comments", stylesheet="../javascript/commentliststyle.css", xhtml=True)
+        doc = HTMLgen.SimpleDocument(title="All Comments", stylesheet="../javascript/commentliststyle.css", xhtml=True, meta='<meta charset="' + locale.getpreferredencoding() + '">')
         for scriptFile in ["jquery.js", "comment.js", "commentlist.js"]:
             doc.append(HTMLgen.Script(src="../javascript/" + scriptFile))
         doc.write(filename)
@@ -797,7 +797,7 @@ class TestDetails:
     def __init__(self, tag, pageTitle, pageSubTitles):
         tagText = getDisplayText(tag)
         pageDetailTitle = "Detailed test results for " + pageTitle + ": " + tagText
-        self.document = HTMLgen.SimpleDocument(title=TitleWithDateStamp(pageDetailTitle))
+        self.document = HTMLgen.SimpleDocument(title=TitleWithDateStamp(pageDetailTitle), meta='<meta charset="' + locale.getpreferredencoding() + '">')
         headerText = tagText + " - detailed test results for " + pageTitle
         self.document.append(HTMLgen.Heading(1, headerText, align='center'))
         for subTitle, command in pageSubTitles:

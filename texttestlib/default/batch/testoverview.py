@@ -408,7 +408,7 @@ class GenerateWebPages(object):
             graphLink = None
             fullPath = os.path.abspath(os.path.join(graphDirname, graphFileRef))
             if testTable.generateGraph(fullPath, graphHeading):
-                graphLink = self.makeImageLink(graphFileRef)
+                graphLink = self.makeImageLink(graphFileRef.replace("\\", "/"))
                 cells.append(HTMLgen.TD(graphLink))
 
             if len(cells):

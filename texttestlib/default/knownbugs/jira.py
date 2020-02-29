@@ -1,5 +1,3 @@
-# !/usr/bin/env python
-
 import urllib.request
 import base64
 import json

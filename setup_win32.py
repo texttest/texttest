@@ -42,7 +42,10 @@ def get_non_python_libs():
 
     if 'mingw' in sysconfig.get_platform():
         # dll imported by dll dependencies expected to be auto-resolved later
-        inst_root = [os.path.join(local_bin, 'libgtksourceview-3.0-1.dll')]
+        inst_root = [os.path.join(local_bin, 'libgtksourceview-3.0-1.dll'),
+                     os.path.join(local_bin, "diff.exe"),
+                     os.path.join("capturemock", "capturemock_intercept.exe"),
+                    ]
 
         # gspawn-helper is needed for Gtk.show_uri function
         if platform.architecture()[0] == '32bit':
@@ -84,7 +87,6 @@ manually_added_libs = {
     "libgdk_pixbuf-2.0-0.dll": os.path.join(sys.prefix, 'bin'),
     "librsvg-2-2.dll": os.path.join(sys.prefix, 'bin'),
     "libcroco-0.6-3.dll": os.path.join(sys.prefix, 'bin'),
-    "diff.exe": os.path.join(sys.prefix, 'bin'),
     "libsigsegv-2.dll": os.path.join(sys.prefix, 'bin'),
     }
 
@@ -217,8 +219,7 @@ setup(
         'meld': ['README', 'COPYING', 'NEWS'],
         "texttestlib": ["doc/ChangeLog", "doc/quick_start.txt", "doc/CREDITS.txt", "doc/MigrationNotes*", "doc/LICENSE.txt",
                                 "etc/*", "etc/.*", "libexec/*", "log/*", "images/*.*", "images/retro/*"],
-        "texttestlib.default.batch": ["testoverview_javascript/*"],
-        "capturemock" : [ "capturemock_intercept.exe" ]
+        "texttestlib.default.batch": ["testoverview_javascript/*"]
     },
     scripts=['bin/meld', "bin/texttest", "bin/filter_rundependent.py", "bin/filter_fpdiff.py", "bin/capturemock"],
     data_files=[

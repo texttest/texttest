@@ -211,7 +211,7 @@ class TextFileDisplayDialog(guiplugins.ActionResultDialogGUI):
 
     def addContents(self):
         try:
-            file = open(plugins.installationPath("doc", self.fileName))
+            file = open(plugins.installationPath("doc", self.fileName), encoding="utf8")
             text = file.read()
             file.close()
             buffer = Gtk.TextBuffer()

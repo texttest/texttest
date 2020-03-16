@@ -27,6 +27,10 @@ if getattr(sys, 'frozen', False):
     except Exception:
         pass
     from texttestlib import texttest_version
+    # patching matplotlibdata until cx_Freeze has fixed it, see https://github.com/anthony-tuininga/cx_Freeze/pull/574
+    if "MATPLOTLIBDATA" in os.environ:
+        import matplotlib
+        del os.environ["MATPLOTLIBDATA"]
 else:
     try:
         # If there is a separate script "texttest", want to use the local tree

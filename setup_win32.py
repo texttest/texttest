@@ -13,18 +13,6 @@ import meld.build_helpers
 import meld.conf
 
 
-def load_matplotlib(finder, module):
-    """Only to monkey patch cx_Freeze 6.1. Obsolete once https://github.com/anthony-tuininga/cx_Freeze/pull/574 is integrated."""
-    import matplotlib
-    data_path = matplotlib.get_data_path()
-    target_path = os.path.join("lib", module.name, "mpl-data")
-    finder.IncludeFiles(data_path, target_path, copyDependentFiles=False)
-
-
-if cx_Freeze.version == "6.1":
-    cx_Freeze.hooks.load_matplotlib = load_matplotlib
-
-
 def get_non_python_libs():
     """Returns list of tuples containing extra dependencies required to run
     meld on current platform.
@@ -99,6 +87,7 @@ build_exe_options = {
     "includes": ['_sysconfigdata__win32_'] if 'mingw' in sysconfig.get_platform() else [],
     "excludes": ["tkinter"],
     "packages": ["gi", "weakref", "filecmp", "cgi", "texttestlib", "capturemock"],
+    "namespace_packages": ["mpl_toolkits"],
     "include_files": get_non_python_libs(),
     "bin_excludes": list(manually_added_libs.keys()),
     "zip_exclude_packages": [],

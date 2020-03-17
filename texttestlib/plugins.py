@@ -875,11 +875,16 @@ class TestStateUnpickler(Unpickler):
 
 
 def getNewTestStateFromFile(file):
-    encoding = getpreferredencoding()
-    from io import BytesIO
-    unpickler = TestStateUnpickler(BytesIO(file.read().replace(b"\r\n", b"\n")), encoding=encoding, errors="replace")
-    return unpickler.load()
-
+    unpickler = TestStateUnpickler(file)
+    try:
+        return unpickler.load()
+    except Exception:
+        encoding = getpreferredencoding()
+        from io import BytesIO
+        file.seek(0)
+        unpickler = TestStateUnpickler(BytesIO(file.read().replace(b"\r\n", b"\n")), encoding=encoding, errors="replace")
+        return unpickler.load()
+    
 
 log = None
 

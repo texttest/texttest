@@ -141,6 +141,10 @@ capturemock_executable_options = {
     "script": "bin/capturemock",
 }
 
+capturemock_server_executable_options = {
+    "script": "bin/capturemock_server.py",
+}
+
 if 'mingw' in sysconfig.get_platform():
     executable_options.update({
          "base": "Win32GUI",  # comment to build console version to see stderr
@@ -161,6 +165,10 @@ if 'mingw' in sysconfig.get_platform():
     capturemock_executable_options.update({
          "targetName": "capturemock.exe",
          "shortcutName": "CaptureMock",
+    })
+    capturemock_server_executable_options.update({
+         "targetName": "capturemock_server.exe",
+         "shortcutName": "CaptureMockServer",
     })
 
 setup(
@@ -193,6 +201,7 @@ setup(
         Executable(**texttestc_executable_options),
         Executable(**executable_options),
         Executable(**capturemock_executable_options),
+        Executable(**capturemock_server_executable_options),
     ],
     packages=[
         'meld',
@@ -210,7 +219,8 @@ setup(
                                 "etc/*", "etc/.*", "libexec/*", "log/*", "images/*.*", "images/retro/*"],
         "texttestlib.default.batch": ["testoverview_javascript/*"]
     },
-    scripts=['bin/meld', "bin/texttest", "bin/filter_rundependent.py", "bin/filter_fpdiff.py", "bin/capturemock"],
+    scripts=['bin/meld', "bin/texttest", "bin/filter_rundependent.py", "bin/filter_fpdiff.py",
+             "bin/capturemock", "bin/capturemock_server.py"],
     data_files=[
         ('share/man/man1',
          ['meld.1']

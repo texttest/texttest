@@ -32,7 +32,10 @@ if getattr(sys, 'frozen', False):
     if "MATPLOTLIBDATA" in os.environ:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            import matplotlib
+            try:
+                import matplotlib
+            except Exception:  # better safe than sorry
+                pass
         del os.environ["MATPLOTLIBDATA"]
 else:
     try:

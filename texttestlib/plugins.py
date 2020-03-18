@@ -1087,17 +1087,16 @@ def rmtree(dir, attempts=100):
         try:
             shutil.rmtree(realDir)
             return
+        except PermissionError as e:
+            # We own this stuff, don't respect readonly flags set by ourselves, it might just be the SUT doing so...
+            for path in getPaths(realDir):
+                try:
+                    makeWriteable(path)
+                except OSError as e:
+                    log.info("Could not change permissions to be able to remove directory " +
+                             dir + " : - " + str(e))
+                    return
         except Exception as e:
-            if isinstance(e, PermissionError):
-                # We own this stuff, don't respect readonly flags set by ourselves, it might just be the SUT doing so...
-                for path in getPaths(realDir):
-                    try:
-                        makeWriteable(path)
-                    except OSError as e:
-                        log.info("Could not change permissions to be able to remove directory " +
-                                 dir + " : - " + str(e))
-                        return
-                continue
             if os.path.isdir(realDir):
                 if i == attempts - 1:
                     log.info("Unable to remove directory " + dir + " :")

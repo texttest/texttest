@@ -15,14 +15,16 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
 
     def submitSlaveJob(self, cmdArgs, slaveEnv, logDir, submissionRules, jobType):
         outputFile, errorsFile = submissionRules.getJobFiles()
+        stdout = open(os.path.join(logDir, outputFile), "w")
+        stderr = open(os.path.join(logDir, errorsFile), "w")
         try:
-            process = subprocess.Popen(cmdArgs,
-                                       stdout=open(os.path.join(logDir, outputFile), "w"),
-                                       stderr=open(os.path.join(logDir, errorsFile), "w"),
+            process = subprocess.Popen(cmdArgs, stdout=stdout, stderr=stderr,
                                        cwd=logDir, env=self.getSlaveEnvironment(slaveEnv),
                                        startupinfo=plugins.getHideStartUpInfo())
             errorMessage = None
         except OSError as e:
+            stdout.close()
+            stderr.close()
             errorMessage = "Failed to start slave process : " + str(e)
         if errorMessage:
             return None, self.getFullSubmitError(errorMessage, cmdArgs, jobType)

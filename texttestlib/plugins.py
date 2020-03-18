@@ -1088,7 +1088,7 @@ def rmtree(dir, attempts=100):
             shutil.rmtree(realDir)
             return
         except Exception as e:
-            if str(e).find("Permission") != -1 or str(e).find("Access") != -1:
+            if isinstance(e, PermissionError):
                 # We own this stuff, don't respect readonly flags set by ourselves, it might just be the SUT doing so...
                 for path in getPaths(realDir):
                     try:

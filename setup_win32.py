@@ -51,6 +51,7 @@ def get_non_python_libs():
 gtk_data_dirs = [
     'etc/fonts',
     'etc/gtk-3.0',
+    'etc/ssl',
     'lib/gdk-pixbuf-2.0',
     'lib/girepository-1.0',
     'share/fontconfig',
@@ -86,7 +87,7 @@ for lib, possible_path in manually_added_libs.items():
 build_exe_options = {
     "includes": ['_sysconfigdata__win32_'] if 'mingw' in sysconfig.get_platform() else [],
     "excludes": ["tkinter"],
-    "packages": ["gi", "weakref", "filecmp", "cgi", "texttestlib", "capturemock"],
+    "packages": ["gi", "weakref", "filecmp", "cgi", "certifi", "texttestlib", "capturemock"],
     "namespace_packages": ["mpl_toolkits"],
     "include_files": get_non_python_libs(),
     "bin_excludes": list(manually_added_libs.keys()),

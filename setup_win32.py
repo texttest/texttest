@@ -174,7 +174,7 @@ if 'mingw' in sysconfig.get_platform():
 
 setup(
     name="TextTest",
-    version="4.0.0",
+    version="4.0.1",
     description='Text-based functional testing tool including the Meld diff and merge tool',
     author='The TextTest project',
     author_email='texttest-users@lists.sourceforge.net',

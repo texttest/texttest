@@ -5,6 +5,7 @@ import os.path
 import platform
 import sys
 import sysconfig
+import certifi
 
 import cx_Freeze
 from cx_Freeze import Executable, setup
@@ -51,7 +52,6 @@ def get_non_python_libs():
 gtk_data_dirs = [
     'etc/fonts',
     'etc/gtk-3.0',
-    'etc/ssl',
     'lib/gdk-pixbuf-2.0',
     'lib/girepository-1.0',
     'share/fontconfig',
@@ -241,6 +241,9 @@ setup(
          ),
         ('share/meld/ui',
          glob.glob("data/ui/*.ui") + glob.glob("data/ui/*.xml")
+         ),
+        ('etc',
+         [certifi.where()]
          ),
     ] + gtk_data_files,
     cmdclass={

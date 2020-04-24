@@ -14,6 +14,18 @@ import meld.build_helpers
 import meld.conf
 
 
+def load__ctypes(finder, module):
+    """Only to monkey patch cx_Freeze 6.1. Obsolete once https://github.com/anthony-tuininga/cx_Freeze/pull/565 is integrated."""
+    if sys.platform == "win32" and sys.version_info >= (3, 8):
+        libdir = "lib" if sysconfig.get_platform() == "mingw" else "DLLs"
+        for dll_path in glob.glob(os.path.join(sys.base_prefix, libdir, "libffi-*dll")):
+            finder.IncludeFiles(dll_path, os.path.join("lib", os.path.basename(dll_path)))
+
+
+if cx_Freeze.version == "6.1":
+    cx_Freeze.hooks.load__ctypes = load__ctypes
+
+
 def get_non_python_libs():
     """Returns list of tuples containing extra dependencies required to run
     meld on current platform.

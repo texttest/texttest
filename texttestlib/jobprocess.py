@@ -14,6 +14,11 @@ import time
 import subprocess
 import select
 import shlex
+try:
+    import psutil
+    HAVE_PSUTIL = True
+except ImportError:
+    HAVE_PSUTIL = False
 
 
 class WrongOSException(RuntimeError):
@@ -145,8 +150,18 @@ def killArbitaryProcess(pid, sig=None):
             return False
 
 
-def killSubProcessAndChildren(process, sig=None, cmd=None):
-    if not cmd or not runCmd(shlex.split(cmd) + [str(process.pid)]):
+def killSubProcessAndChildren(process, sig=None, cmd=None, timeout=5):
+    assert process.pid != os.getpid(), "won't kill myself"
+    if HAVE_PSUTIL:
+        parent = psutil.Process(process.pid)
+        children = parent.children(recursive=True) + [parent]
+        for p in children:
+            p.send_signal(sig)
+        _, alive = psutil.wait_procs(children, timeout=timeout)
+        if sig == signal.SIGTERM:
+            for p in alive:
+                p.kill()
+    elif not cmd or not runCmd(shlex.split(cmd) + [str(process.pid)]):
         if os.name == "posix":
             killArbitaryProcess(process.pid, sig)
         else:

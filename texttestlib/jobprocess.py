@@ -153,6 +153,8 @@ def killArbitaryProcess(pid, sig=None):
 def killSubProcessAndChildren(process, sig=None, cmd=None, timeout=5):
     assert process.pid != os.getpid(), "won't kill myself"
     if HAVE_PSUTIL:
+        if sig is None:
+            sig = signal.SIGTERM
         parent = psutil.Process(process.pid)
         children = parent.children(recursive=True) + [parent]
         for p in children:

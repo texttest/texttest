@@ -12,6 +12,7 @@ from cx_Freeze import Executable, setup
 
 import meld.build_helpers
 import meld.conf
+from texttestlib.texttest_version import version
 
 
 def load__ctypes(finder, module):
@@ -186,7 +187,7 @@ if 'mingw' in sysconfig.get_platform():
 
 setup(
     name="TextTest",
-    version="4.0.1",
+    version=version,
     description='Text-based functional testing tool including the Meld diff and merge tool',
     author='The TextTest project',
     author_email='texttest-users@lists.sourceforge.net',

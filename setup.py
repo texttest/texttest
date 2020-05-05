@@ -81,5 +81,10 @@ setup(name='TextTest',
                    "Topic :: Software Development :: Testing",
                    "Topic :: Software Development :: Libraries :: Python Modules"],
       scripts=scripts,
-      cmdclass=command_classes
+      cmdclass=command_classes,
+      install_requires=['psutil'],
+      extras_require={
+        'graphs': ['matplotlib']
+      }
+
       )

@@ -153,14 +153,12 @@ def killArbitaryProcess(pid, sig=None):
 def killSubProcessAndChildren(process, sig=None, cmd=None, timeout=5):
     assert process.pid != os.getpid(), "won't kill myself"
     if HAVE_PSUTIL:
-        if sig is None:
-            sig = signal.SIGTERM
         parent = psutil.Process(process.pid)
         children = parent.children(recursive=True) + [parent]
         for p in children:
-            p.send_signal(sig)
+            p.send_signal(signal.SIGTERM if sig is None else sig)
         _, alive = psutil.wait_procs(children, timeout=timeout)
-        if sig == signal.SIGTERM:
+        if sig is None:
             for p in alive:
                 p.kill()
     elif not cmd or not runCmd(shlex.split(cmd) + [str(process.pid)]):

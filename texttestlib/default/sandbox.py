@@ -9,7 +9,7 @@ import difflib
 import time
 import sys
 from texttestlib import plugins
-from texttestlib.jobprocess import killArbitaryProcess, killSubProcessAndChildren
+from texttestlib.jobprocess import killProcessAndChildren
 from .runtest import Killed
 from collections import OrderedDict
 from string import Template
@@ -985,7 +985,7 @@ class CreateCatalogue(plugins.Action):
                 except ValueError:
                     continue
                 self.diag.info("Found process ID " + str(processId))
-                if killArbitaryProcess(processId):
+                if killProcessAndChildren(processId):
                     processes.append(parts[1])
         return processes
 

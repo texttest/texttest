@@ -8,7 +8,7 @@ import sys
 import signal
 import pipes
 from texttestlib import plugins
-from texttestlib.jobprocess import killSubProcessAndChildren
+from texttestlib.jobprocess import killProcessAndChildren
 from time import sleep
 from threading import Lock, Timer
 from locale import getpreferredencoding
@@ -203,7 +203,7 @@ class RunTest(plugins.Action):
         if machine != "localhost" and test.getConfigValue("remote_shell_program") == "ssh":
             self.killRemoteProcess(test, machine)
         self.killDiag.info("Killing running test (process id " + str(self.currentProcess.pid) + ")")
-        killSubProcessAndChildren(self.currentProcess, cmd=test.getConfigValue("kill_command"))
+        killProcessAndChildren(self.currentProcess.pid)
 
     def killRemoteProcess(self, test, machine):
         tmpDir = self.getTmpDirectory(test)

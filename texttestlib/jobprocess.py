@@ -2,10 +2,11 @@
 
 import signal
 import os
+import subprocess
 import psutil
 
 
-def killProcessAndChildren(pid, sig=None, timeout=5):
+def killProcessAndChildren(pid, sig=None, cmd=None, timeout=5):
     assert pid != os.getpid(), "won't kill myself"
     parent = psutil.Process(pid)
     children = parent.children(recursive=True) + [parent]
@@ -14,4 +15,13 @@ def killProcessAndChildren(pid, sig=None, timeout=5):
     _, alive = psutil.wait_procs(children, timeout=timeout)
     if sig is None:
         for p in alive:
-            p.kill()
+            if os.name == "posix":
+                p.send_signal(signal.SIGKILL)
+            else:
+                if cmd is None:
+                    cmd = "taskkill /F /PID"
+                cmd += " " + str(pid)
+                try:
+                    subprocess.call(cmd, stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
+                except OSError:
+                    pass

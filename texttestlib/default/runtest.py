@@ -203,7 +203,7 @@ class RunTest(plugins.Action):
         if machine != "localhost" and test.getConfigValue("remote_shell_program") == "ssh":
             self.killRemoteProcess(test, machine)
         self.killDiag.info("Killing running test (process id " + str(self.currentProcess.pid) + ")")
-        killProcessAndChildren(self.currentProcess.pid)
+        killProcessAndChildren(self.currentProcess.pid, cmd=test.getConfigValue("kill_command"))
 
     def killRemoteProcess(self, test, machine):
         tmpDir = self.getTmpDirectory(test)

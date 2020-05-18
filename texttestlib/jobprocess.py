@@ -8,10 +8,16 @@ import psutil
 
 def killProcessAndChildren(pid, sig=None, cmd=None, timeout=5):
     assert pid != os.getpid(), "won't kill myself"
-    parent = psutil.Process(pid)
+    try:
+        parent = psutil.Process(pid)
+    except psutil.NoSuchProcess:
+        return False
     children = parent.children(recursive=True) + [parent]
     for p in children:
-        p.send_signal(signal.SIGTERM if sig is None else sig)
+        try:
+            p.send_signal(signal.SIGTERM if sig is None else sig)
+        except psutil.NoSuchProcess:
+            pass # if it's terminated by itself already, so much the better
     _, alive = psutil.wait_procs(children, timeout=timeout)
     if sig is None:
         for p in alive:
@@ -25,3 +31,4 @@ def killProcessAndChildren(pid, sig=None, cmd=None, timeout=5):
                     subprocess.call(cmd, stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
                 except OSError:
                     pass
+    return True

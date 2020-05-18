@@ -14,7 +14,7 @@ import fnmatch
 import subprocess
 from collections import OrderedDict
 from traceback import format_exception
-from threading import currentThread, Lock
+from threading import currentThread, RLock
 from queue import Queue, Empty
 from glob import glob
 from datetime import datetime
@@ -555,7 +555,7 @@ def addCategory(name, briefDesc, longDesc=""):
 class ThreadedNotificationHandler:
     def __init__(self):
         self.workQueue = Queue()
-        self.mutex = Lock()
+        self.mutex = RLock()
         self.active = False
         self.allowedEvents = []
         self.idleHandler = None

@@ -163,7 +163,7 @@ class RunTest(plugins.Action):
         test.changeState(Killed(briefText, freeText, test.state))
 
     def getKillInfo(self, test):
-        if self.killSignal is None or self.killSignal == signal.SIGINT:
+        if self.killSignal is None or self.killSignal == signal.SIGINT or (self.killSignal == 0 and os.name == "nt"):
             return self.getExplicitKillInfo()
         elif self.killSignal == "timeout":
             return "TIMEOUT", "exceeded wallclock time limit of " + str(test.getConfigValue("kill_timeout")) + " seconds"

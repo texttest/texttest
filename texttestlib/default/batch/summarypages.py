@@ -344,7 +344,7 @@ class SummaryDataFinder:
         return summaries
 
     def extractSummary(self, datedFile, summary):
-        for line in open(datedFile):
+        for line in open(datedFile, errors="replace"):
             if line.strip().startswith("<H2>"):
                 text = line.strip()[4:-5]  # drop the tags
                 for cat, num in list(self.parseSummaryText(text).items()):

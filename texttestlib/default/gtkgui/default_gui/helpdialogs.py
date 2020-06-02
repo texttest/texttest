@@ -148,9 +148,12 @@ class ShowVersions(guiplugins.ActionResultDialogGUI):
                        ("GTK", (Gtk.get_major_version(), Gtk.get_minor_version(), Gtk.get_micro_version())),
                        ("PyGI", gi.version_info)]
 
-        installationList = [("Test Suite", os.getenv("TEXTTEST_HOME")),
-                            ("TextTest", plugins.installationRoots[0]),
-                            ("Python", sys.executable)]
+        installationList = [("Test Suite", os.getenv("TEXTTEST_HOME"))]
+        if getattr(sys, 'frozen', False):
+            installationList.append(("TextTest (frozen)", sys.executable))
+        else:
+            installationList += [("TextTest", plugins.installationRoots[0]),
+                                 ("Python", sys.executable)]
 
         vbox = Gtk.VBox()
         self.addTable(vbox, "version", versionList, alignRight=True, columnSpacings=0)
@@ -211,7 +214,7 @@ class TextFileDisplayDialog(guiplugins.ActionResultDialogGUI):
 
     def addContents(self):
         try:
-            file = open(plugins.installationPath("doc", self.fileName))
+            file = open(plugins.installationPath("doc", self.fileName), encoding="utf8")
             text = file.read()
             file.close()
             buffer = Gtk.TextBuffer()

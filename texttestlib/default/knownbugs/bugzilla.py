@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # Plugin for bugzilla version 3.x that uses the new webservice interface. Tested for version 3.0.4
 # but tried to make it a bit future-proof. The older "bugcli" interface is discontinued but there is
 # a plugin for it too, see bugzillav2.py. Documentation can be found at e.g.

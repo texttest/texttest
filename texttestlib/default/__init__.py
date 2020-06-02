@@ -1755,7 +1755,7 @@ class GrepFilter(plugins.TextFilter):
         return logFiles
 
     def matches(self, logFile):
-        for line in open(logFile):
+        for line in open(logFile, errors="ignore"):
             if self.stringContainsText(line):
                 return True
         return False

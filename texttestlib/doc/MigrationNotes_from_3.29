@@ -1,0 +1,43 @@
+=========================================================
+COMPULSORY MIGRATION
+=========================================================
+
+(1) Complete change of underlying technology and tooling
+========================================================
+
+We now use Python 3 instead of Python 2, PyGI/PyGObject instead of PyGTK.
+Installation instructions are therefore somewhat different, please check them, 
+particularly on Linux/MacOS. 
+
+The Windows installer has been recreated entirely
+from scratch and will install TextTest under "Program Files". It will no
+longer install tkdiff, storytext and other related programs.
+
+TextTest has been migrated from Bazaar to Git and is now hosted on Github rather
+than Launchpad. We are still using PyPI and Sourceforge for releases as before.
+
+We have tried to minimise functional changes but a lot of underlying code has changed.
+The UI looks a little different in some aspects. Please let us know in Github if you 
+encounter difficulties.
+
+(2) Quoting in path names in config files does not work any more
+================================================================
+
+This is directly caused by it not being supported by Python 3. Previously you could
+write things like
+
+view_program:"C:\Program Files\Sublime Text 3\sublime_text.exe"
+
+in your config file, and the quotes would be discarded. Now they will be read as part
+of the value, and hence this will not work. Remove the quotes.
+They were never necessary, but now they are disallowed.
+
+========================================================
+CHANGE IN ENVIRONMENT
+========================================================
+
+
+=========================================================
+CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
+=========================================================
+

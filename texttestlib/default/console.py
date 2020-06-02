@@ -4,7 +4,7 @@ import os
 import subprocess
 from texttestlib.default import colorer
 from texttestlib import plugins
-from texttestlib.jobprocess import killSubProcessAndChildren
+from texttestlib.jobprocess import killProcessAndChildren
 from time import sleep
 from collections import OrderedDict
 
@@ -184,5 +184,5 @@ class InteractiveResponder(plugins.Responder):
         if process:
             sleep(int(os.getenv("TEXTTEST_KILL_GRAPHICAL_CONSOLE_SLEEP", "0")))
             plugins.log.info("Terminating graphical viewer...")
-            killSubProcessAndChildren(process)
+            killProcessAndChildren(process.pid)
         return 0

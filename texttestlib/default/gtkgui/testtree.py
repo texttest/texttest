@@ -249,7 +249,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         self.selectedTests = []
         self.clipboardTests = set()
         self.dynamic = dynamic
-        self.collapseStatic = -1 if dynamic else guiutils.guiConfig.getValue("static_collapse_suites")
+        self.collapseStatic = 100 if dynamic else guiutils.guiConfig.getValue("static_collapse_suites")
         self.filteredModel = None
         self.treeView = None
         self.newTestsVisible = guiutils.guiConfig.showCategoryByDefault("not_started")
@@ -539,14 +539,14 @@ class TestTreeGUI(guiutils.ContainerGUI):
         if cellArea.y < 0 or cellArea.y > visibleArea.height:
             treeView.scroll_to_cell(path, use_align=True, row_align=0.1)
 
-    def expandLevel(self, view, iter, recurseLevel=-1):
+    def expandLevel(self, view, iter, recurseLevel=100):
         # Make sure expanding expands everything, better than just one level as default...
         # Avoid using view.expand_row(path, open_all=True), as the open_all flag
         # doesn't seem to send the correct 'row-expanded' signal for all rows ...
         # This way, the signals are generated one at a time and we call back into here.
         model = view.get_model()
         while iter is not None:
-            if recurseLevel != 0:
+            if recurseLevel > 0:
                 view.expand_row(model.get_path(iter), open_all=False)
             iter = view.get_model().iter_next(iter)
 

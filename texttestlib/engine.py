@@ -578,6 +578,8 @@ class TextTest(plugins.Responder, plugins.Observable):
                 import ctypes
                 # Must store this, otherwise it gets garbage collected, and a crash results...
                 self.wrapper = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_uint)(handler)
+                # Without this, it will just ignore ctrl-C anyhow
+                ctypes.windll.kernel32.SetConsoleCtrlHandler(None, False)
                 ctypes.windll.kernel32.SetConsoleCtrlHandler(self.wrapper, True)
             except ImportError:
                 pass # probably just documentation

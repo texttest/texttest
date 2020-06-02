@@ -72,6 +72,7 @@ def fpfilter(fromlines, tolines, outlines, tolerance, relTolerance=None, useDiff
                 outlines.write(fromline)
             else:
                 outlines.write(toline)
+        outlines.writelines(tolines[len(fromlines):])
         return
     s = difflib.SequenceMatcher(None, fromlines, tolines)
     for tag, i1, i2, j1, j2 in s.get_opcodes():

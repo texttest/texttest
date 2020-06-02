@@ -15,14 +15,18 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
 
     def submitSlaveJob(self, cmdArgs, slaveEnv, logDir, submissionRules, jobType):
         outputFile, errorsFile = submissionRules.getJobFiles()
+        stdout = open(os.path.join(logDir, outputFile), "w")
+        stderr = open(os.path.join(logDir, errorsFile), "w")
+        createflags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
         try:
-            process = subprocess.Popen(cmdArgs,
-                                       stdout=open(os.path.join(logDir, outputFile), "w"),
-                                       stderr=open(os.path.join(logDir, errorsFile), "w"),
+            process = subprocess.Popen(cmdArgs, stdout=stdout, stderr=stderr,
                                        cwd=logDir, env=self.getSlaveEnvironment(slaveEnv),
-                                       startupinfo=plugins.getHideStartUpInfo())
+                                       startupinfo=plugins.getHideStartUpInfo(),
+                                       creationflags=createflags)
             errorMessage = None
         except OSError as e:
+            stdout.close()
+            stderr.close()
             errorMessage = "Failed to start slave process : " + str(e)
         if errorMessage:
             return None, self.getFullSubmitError(errorMessage, cmdArgs, jobType)
@@ -38,18 +42,13 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
         return " ".join(cmdArgs)
 
     def getSignal(self):
-        return signal.SIGUSR2 if os.name == "posix" else signal.SIGTERM
+        return signal.SIGUSR2 if os.name == "posix" else signal.CTRL_C_EVENT
 
     def killJob(self, jobId):
         proc = self.processes[jobId]
         jobExisted = proc.poll() is None
         if jobExisted:
-            if os.name == "posix":
-                proc.send_signal(self.getSignal())
-            else:
-                # Sometimes Windows decides we can't kill the slave process. Better to kill it hard than not at all then.
-                if not self.runTaskKill(proc):
-                    self.runTaskKill(proc, ["/T", "/F"])
+            proc.send_signal(self.getSignal())
         return jobExisted
 
     def runTaskKill(self, proc, extraArgs=[]):

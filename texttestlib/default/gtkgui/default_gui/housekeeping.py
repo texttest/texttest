@@ -8,7 +8,7 @@ from collections import OrderedDict
 from texttestlib.default.batch import BatchApplicationData, MailSender
 from texttestlib import plugins
 import os
-from texttestlib.jobprocess import killSubProcessAndChildren
+from texttestlib.jobprocess import killProcessAndChildren
 
 
 class Quit(guiplugins.BasicActionGUI):
@@ -259,7 +259,7 @@ class ShowProcesses(guiplugins.ActionResultDialogGUI):
 
         def addSelIter(model, path, iter):
             proc = model.get_value(iter, 0)
-            killSubProcessAndChildren(proc)
+            killProcessAndChildren(proc.pid)
             iters.append(iter)
 
         self.treeView.get_selection().selected_foreach(addSelIter)

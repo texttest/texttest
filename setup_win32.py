@@ -5,11 +5,26 @@ import os.path
 import platform
 import sys
 import sysconfig
+import certifi
 
+import cx_Freeze
 from cx_Freeze import Executable, setup
 
 import meld.build_helpers
 import meld.conf
+from texttestlib.texttest_version import version
+
+
+def load__ctypes(finder, module):
+    """Only to monkey patch cx_Freeze 6.1. Obsolete once https://github.com/anthony-tuininga/cx_Freeze/pull/565 is integrated."""
+    if sys.platform == "win32" and sys.version_info >= (3, 8):
+        libdir = "lib" if sysconfig.get_platform() == "mingw" else "DLLs"
+        for dll_path in glob.glob(os.path.join(sys.base_prefix, libdir, "libffi-*dll")):
+            finder.IncludeFiles(dll_path, os.path.join("lib", os.path.basename(dll_path)))
+
+
+if cx_Freeze.version == "6.1":
+    cx_Freeze.hooks.load__ctypes = load__ctypes
 
 
 def get_non_python_libs():
@@ -29,7 +44,10 @@ def get_non_python_libs():
 
     if 'mingw' in sysconfig.get_platform():
         # dll imported by dll dependencies expected to be auto-resolved later
-        inst_root = [os.path.join(local_bin, 'libgtksourceview-3.0-1.dll')]
+        inst_root = [os.path.join(local_bin, 'libgtksourceview-3.0-1.dll'),
+                     os.path.join(local_bin, "diff.exe"),
+                     os.path.join("capturemock", "capturemock_intercept.exe"),
+                    ]
 
         # gspawn-helper is needed for Gtk.show_uri function
         if platform.architecture()[0] == '32bit':
@@ -71,7 +89,6 @@ manually_added_libs = {
     "libgdk_pixbuf-2.0-0.dll": os.path.join(sys.prefix, 'bin'),
     "librsvg-2-2.dll": os.path.join(sys.prefix, 'bin'),
     "libcroco-0.6-3.dll": os.path.join(sys.prefix, 'bin'),
-    "diff.exe": os.path.join(sys.prefix, 'bin'),
     "libsigsegv-2.dll": os.path.join(sys.prefix, 'bin'),
     }
 
@@ -81,9 +98,10 @@ for lib, possible_path in manually_added_libs.items():
         gtk_data_files.append((os.path.dirname(lib), [local_lib]))
 
 build_exe_options = {
-    "includes": ["gi"],
+    "includes": ['_sysconfigdata__win32_'] if 'mingw' in sysconfig.get_platform() else [],
     "excludes": ["tkinter"],
-    "packages": ["gi", "weakref", "filecmp", "cgi", "texttestlib", "capturemock"],
+    "packages": ["gi", "weakref", "filecmp", "cgi", "certifi", "texttestlib", "capturemock"],
+    "namespace_packages": ["mpl_toolkits"],
     "include_files": get_non_python_libs(),
     "bin_excludes": list(manually_added_libs.keys()),
     "zip_exclude_packages": [],
@@ -114,7 +132,8 @@ msi_data = {
 bdist_msi_options = {
     "upgrade_code": "{1d303789-b4e2-4d6e-9515-c301e155cd50}",
     "data": msi_data,
-    "add_to_path": True
+    "add_to_path": True,
+    "all_users": True
 }
 
 executable_options = {
@@ -134,6 +153,10 @@ texttestc_executable_options = {
 
 capturemock_executable_options = {
     "script": "bin/capturemock",
+}
+
+capturemock_server_executable_options = {
+    "script": "bin/capturemock_server.py",
 }
 
 if 'mingw' in sysconfig.get_platform():
@@ -157,10 +180,14 @@ if 'mingw' in sysconfig.get_platform():
          "targetName": "capturemock.exe",
          "shortcutName": "CaptureMock",
     })
+    capturemock_server_executable_options.update({
+         "targetName": "capturemock_server.exe",
+         "shortcutName": "CaptureMockServer",
+    })
 
 setup(
     name="TextTest",
-    version="4.0.0",
+    version=version,
     description='Text-based functional testing tool including the Meld diff and merge tool',
     author='The TextTest project',
     author_email='texttest-users@lists.sourceforge.net',
@@ -188,6 +215,7 @@ setup(
         Executable(**texttestc_executable_options),
         Executable(**executable_options),
         Executable(**capturemock_executable_options),
+        Executable(**capturemock_server_executable_options),
     ],
     packages=[
         'meld',
@@ -203,10 +231,10 @@ setup(
         'meld': ['README', 'COPYING', 'NEWS'],
         "texttestlib": ["doc/ChangeLog", "doc/quick_start.txt", "doc/CREDITS.txt", "doc/MigrationNotes*", "doc/LICENSE.txt",
                                 "etc/*", "etc/.*", "libexec/*", "log/*", "images/*.*", "images/retro/*"],
-        "texttestlib.default.batch": ["testoverview_javascript/*"],
-        "capturemock" : [ "capturemock_intercept.exe" ]
+        "texttestlib.default.batch": ["testoverview_javascript/*"]
     },
-    scripts=['bin/meld', "bin/texttest", "bin/filter_rundependent.py", "bin/filter_fpdiff.py", "bin/capturemock"],
+    scripts=['bin/meld', "bin/texttest", "bin/filter_rundependent.py", "bin/filter_fpdiff.py",
+             "bin/capturemock", "bin/capturemock_server.py"],
     data_files=[
         ('share/man/man1',
          ['meld.1']
@@ -226,6 +254,9 @@ setup(
          ),
         ('share/meld/ui',
          glob.glob("data/ui/*.ui") + glob.glob("data/ui/*.xml")
+         ),
+        ('etc',
+         [certifi.where()]
          ),
     ] + gtk_data_files,
     cmdclass={

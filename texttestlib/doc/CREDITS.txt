@@ -1,13 +1,16 @@
 Code Maintainers:                                        
 
     Geoff Bache
-    Daniel Galdames
-
+    Michael Behrisch
+    
 Developers:
 
     Geoff Bache
     Daniel Galdames
     Mattias Grönkvist
+    Michael Behrisch
+    Leonhard Lücken
+    Jens Kjerrström
     Johan Ivarsson
     Johan Andersson
 
@@ -19,7 +22,6 @@ Contributors:
     Nicolas Gattario
     Claes Verdoes
     Henning Thornblad
-    Michael Behrisch
     Örjan Råberg
     Matthew Baker
 

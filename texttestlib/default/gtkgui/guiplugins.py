@@ -8,7 +8,7 @@ import sys
 from . import entrycompletion
 from texttestlib import plugins
 from .guiutils import guiConfig, SubGUI, GUIConfig, createApplicationEvent
-from texttestlib.jobprocess import killSubProcessAndChildren
+from texttestlib.jobprocess import killProcessAndChildren
 from collections import OrderedDict
 
 # The purpose of this class is to provide a means to monitor externally
@@ -84,7 +84,7 @@ class ProcessTerminationMonitor(plugins.Observable):
                 self.exitHandlers.pop(pid)  # don't call exit handlers in this case, we're terminating
             self.notify("ActionProgress")
             diag.info("Killing '" + description + "' interactive process")
-            killSubProcessAndChildren(process, sig)
+            killProcessAndChildren(process.pid, sig)
 
 
 processMonitor = ProcessTerminationMonitor()

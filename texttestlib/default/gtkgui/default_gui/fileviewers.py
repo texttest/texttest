@@ -583,7 +583,7 @@ class EditTestDescription(EditTestFileInEditor):
         self.performOnFile(*args)
 
     def createTmpFile(self, text):
-        tmpFile, fileName = mkstemp()
+        tmpFile, fileName = mkstemp(text=True)
         os.write(tmpFile, text.encode())
         os.close(tmpFile)
         return fileName
@@ -600,7 +600,7 @@ class EditTestDescription(EditTestFileInEditor):
 
     def getEditedText(self, fileName):
         text = ""
-        with open(fileName, "r") as f:
+        with open(fileName, "r", encoding="utf8") as f:
             for line in f:
                 text += line
         return text

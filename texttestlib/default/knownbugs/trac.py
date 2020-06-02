@@ -2,6 +2,9 @@
 
 # Interface to trac version >= 0.11. Not tested on earlier versions.
 
+import os
+import sys
+import ssl
 import urllib.request
 
 def findBugInfo(bugId, location, *args):
@@ -9,7 +12,11 @@ def findBugInfo(bugId, location, *args):
         location += '/'
     tracRequest = "%sticket/%s?format=tab" % (location, bugId)
     try:
-        reply = urllib.request.urlopen(tracRequest)
+        if tracRequest.startswith("https") and getattr(sys, 'frozen', False):
+            certs = os.path.join(os.path.dirname(sys.executable), "etc", "cacert.pem")
+            reply = urllib.request.urlopen(tracRequest, context=ssl.create_default_context(cafile=certs))
+        else:
+            reply = urllib.request.urlopen(tracRequest)
         content = reply.read().decode(reply.headers.get_content_charset()).splitlines()
     except Exception as e:
         message = "Failed to open URL '" + tracRequest + "': " + str(e) + \

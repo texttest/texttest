@@ -14,7 +14,7 @@ import fnmatch
 import subprocess
 from collections import OrderedDict
 from traceback import format_exception
-from threading import currentThread, Lock
+from threading import currentThread, RLock
 from queue import Queue, Empty
 from glob import glob
 from datetime import datetime
@@ -555,7 +555,7 @@ def addCategory(name, briefDesc, longDesc=""):
 class ThreadedNotificationHandler:
     def __init__(self):
         self.workQueue = Queue()
-        self.mutex = Lock()
+        self.mutex = RLock()
         self.active = False
         self.allowedEvents = []
         self.idleHandler = None
@@ -875,11 +875,16 @@ class TestStateUnpickler(Unpickler):
 
 
 def getNewTestStateFromFile(file):
-    encoding = getpreferredencoding()
-    from io import BytesIO
-    unpickler = TestStateUnpickler(BytesIO(file.read().replace(b"\r\n", b"\n")), encoding=encoding, errors="replace")
-    return unpickler.load()
-
+    unpickler = TestStateUnpickler(file)
+    try:
+        return unpickler.load()
+    except Exception:
+        encoding = getpreferredencoding()
+        from io import BytesIO
+        file.seek(0)
+        unpickler = TestStateUnpickler(BytesIO(file.read().replace(b"\r\n", b"\n")), encoding=encoding, errors="replace")
+        return unpickler.load()
+    
 
 log = None
 
@@ -1082,17 +1087,16 @@ def rmtree(dir, attempts=100):
         try:
             shutil.rmtree(realDir)
             return
+        except PermissionError as e:
+            # We own this stuff, don't respect readonly flags set by ourselves, it might just be the SUT doing so...
+            for path in getPaths(realDir):
+                try:
+                    makeWriteable(path)
+                except OSError as e:
+                    log.info("Could not change permissions to be able to remove directory " +
+                             dir + " : - " + str(e))
+                    return
         except Exception as e:
-            if str(e).find("Permission") != -1 or str(e).find("Access") != -1:
-                # We own this stuff, don't respect readonly flags set by ourselves, it might just be the SUT doing so...
-                for path in getPaths(realDir):
-                    try:
-                        makeWriteable(path)
-                    except OSError as e:
-                        log.info("Could not change permissions to be able to remove directory " +
-                                 dir + " : - " + str(e))
-                        return
-                continue
             if os.path.isdir(realDir):
                 if i == attempts - 1:
                     log.info("Unable to remove directory " + dir + " :")
@@ -1180,7 +1184,7 @@ def readListWithComments(filename, filterMethod=None):
     currComment = ""
     emptyLineSymbol = "__EMPTYLINE__"
 
-    for longline in open(filename, encoding=getpreferredencoding()).readlines():
+    for longline in open(filename, encoding=getpreferredencoding(), errors="replace").readlines():
         line = longline.strip()
         if len(line) == 0:
             if currComment:

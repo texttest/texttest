@@ -293,13 +293,15 @@ class GUIConfig:
     @staticmethod
     def getWindowSizeSettings():
         d = {}
-        d["maximize"] = 0
+        # Ordering is important - type deduced from first entry
+        # Most common that people vary height_screen and width_screen per mode, so make sure type ends up as float otherwise these will be rejected
+        d["height_screen"] = float(5.0) / 6
+        d["width_screen"] = 0.6
         d["horizontal_separator_position"] = 0.46
         d["vertical_separator_position"] = 0.5
         d["height_pixels"] = "<not set>"
         d["width_pixels"] = "<not set>"
-        d["height_screen"] = float(5.0) / 6
-        d["width_screen"] = 0.6
+        d["maximize"] = 0
         return d
 
     @staticmethod

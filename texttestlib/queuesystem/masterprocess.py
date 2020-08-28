@@ -536,7 +536,9 @@ class QueueSystemServer(BaseActionRunner):
             jobId, errorMessage = queueSystem.submitSlaveJob(cmdArgs, slaveEnv, logDir, submissionRules, jobType)
             if jobId is not None:
                 self.diag.info("Job created with id " + jobId)
-                self.checkQueueCapacity(queueSystem)
+                # if the slaves run elsewhere (e.g. the cloud) then the capacity of the system can change dynamically depending on what is available
+                if queueSystem.slavesOnRemoteSystem():
+                    self.checkQueueCapacity(queueSystem)
                 self.jobs.setdefault(test, []).append((jobId, jobName))
                 self.lockDiag.info("Releasing lock for submission...")
                 return True

@@ -120,4 +120,4 @@ class QueueSystem(object):
     def shellWrapArgs(self, commandArgs):
         # Must use exec so as not to create extra processes: SGE's qdel isn't very clever when
         # it comes to noticing extra shells
-        return ["exec", "$SHELL -c \"exec " + plugins.commandLineString(commandArgs, defaultQuoteChar="'") + "\""]
+        return ["exec", "$SHELL", "-c", "exec {}".format(plugins.commandLineString(commandArgs, defaultQuoteChar="'"))]

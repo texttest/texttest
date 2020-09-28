@@ -77,14 +77,15 @@ class QueueSystemServer(BaseActionRunner):
             # If the slaves run somewhere else, they won't create directories for us
             if queueSystem:
                 self.createDirectories |= queueSystem.slavesOnRemoteSystem()
-            configCapacity = app.getConfigValue("queue_system_max_capacity")
-            for currCap in [queueCapacity, configCapacity]:
-                if currCap is not None and currCap < appCapacity:
-                    appCapacity = currCap
+            if queueCapacity is not None and queueCapacity < appCapacity:
+                appCapacity = queueCapacity
+            if appCapacity > 0:
+                configCapacity = app.getConfigValue("queue_system_max_capacity")
+                if configCapacity < self.maxCapacity: # accept any config capacity that has been set, i.e. is not the same as default
+                    appCapacity = configCapacity
             appCapacities.append(appCapacity)
         if all((c == 0 for c in appCapacities)):
-            raise plugins.TextTestError(
-                "The queue system module is reporting zero capacity.\nEither you have set 'queue_system_max_capacity' to 0 or something is uninstalled or unavailable. Exiting.")
+            raise plugins.TextTestError("The queue system module is reporting zero capacity.\nEither you have set 'queue_system_max_capacity' to 0 or something is uninstalled or unavailable. Exiting.")
 
         self.maxCapacity = min((c for c in appCapacities if c != 0))
         capacityPerSuite = self.maxCapacity / len(allApps)
@@ -535,7 +536,9 @@ class QueueSystemServer(BaseActionRunner):
             jobId, errorMessage = queueSystem.submitSlaveJob(cmdArgs, slaveEnv, logDir, submissionRules, jobType)
             if jobId is not None:
                 self.diag.info("Job created with id " + jobId)
-                self.checkQueueCapacity(queueSystem)
+                # if the slaves run elsewhere (e.g. the cloud) then the capacity of the system can change dynamically depending on what is available
+                if queueSystem.slavesOnRemoteSystem():
+                    self.checkQueueCapacity(queueSystem)
                 self.jobs.setdefault(test, []).append((jobId, jobName))
                 self.lockDiag.info("Releasing lock for submission...")
                 return True

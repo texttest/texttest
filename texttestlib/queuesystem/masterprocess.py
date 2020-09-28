@@ -1,4 +1,3 @@
-
 """
 Code to do with the grid engine master process, i.e. submitting slave jobs and waiting for them to report back
 """
@@ -81,11 +80,17 @@ class QueueSystemServer(BaseActionRunner):
                 appCapacity = queueCapacity
             if appCapacity > 0:
                 configCapacity = app.getConfigValue("queue_system_max_capacity")
-                if configCapacity < self.maxCapacity: # accept any config capacity that has been set, i.e. is not the same as default
+                # Accept any config capacity that has been set, i.e. is not the
+                # same as default.
+                if (configCapacity is not None
+                    and configCapacity < self.maxCapacity):
                     appCapacity = configCapacity
             appCapacities.append(appCapacity)
         if all((c == 0 for c in appCapacities)):
-            raise plugins.TextTestError("The queue system module is reporting zero capacity.\nEither you have set 'queue_system_max_capacity' to 0 or something is uninstalled or unavailable. Exiting.")
+            raise plugins.TextTestError(
+                "The queue system module is reporting zero capacity.\n"
+                "Either you have set 'queue_system_max_capacity' to 0 or "
+                "something is uninstalled or unavailable. Exiting.")
 
         self.maxCapacity = min((c for c in appCapacities if c != 0))
         capacityPerSuite = self.maxCapacity / len(allApps)
@@ -96,8 +101,10 @@ class QueueSystemServer(BaseActionRunner):
     def addSuites(self, suites):
         for suite in suites:
             self.slaveLogDirs.add(suite.app.makeWriteDirectory("slavelogs"))
-            plugins.log.info("Using " + queueSystemName(suite.app) + " queues for " +
-                             suite.app.description(includeCheckout=True))
+            plugins.log.info("Using "
+                             + queueSystemName(suite.app)
+                             + " queues for "
+                             + suite.app.description(includeCheckout=True))
 
     def setSlaveServerAddress(self, address):
         self.submitAddress = os.getenv("CAPTUREMOCK_SERVER", address)

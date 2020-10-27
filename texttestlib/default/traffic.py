@@ -59,6 +59,9 @@ class SetUpCaptureMockHandlers(plugins.Action):
         recordEditDir = test.makeTmpFileName("file_edits", forComparison=0)
         replayEditDir = test.getFileName("file_edits") if extReplayFile else None
         sutDirectory = test.getDirectory(temporary=1, local=1)
+        capturemock_path = test.getConfigValue("capturemock_path")
+        if capturemock_path:
+            sys.path.insert(0, capturemock_path)
         try:
             from capturemock import setUpServer, setUpPython
             externalActive = setUpServer(self.recordSetting, extRecordFile, extReplayFile,

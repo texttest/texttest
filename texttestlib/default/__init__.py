@@ -1390,6 +1390,7 @@ class Config:
         app.setConfigDefault("discard_file", [], "List of generated result files which should not be compared")
         app.setConfigDefault("discard_file_text", {
                              "default": []}, "List of generated result files which should not be compared if they contain the given patterns")
+        app.setConfigDefault("capturemock_path", "", "Path to local CaptureMock installation, in case newer one is required with frozen TextTest")
         rectrafficValue = self.optionIntValue("rectraffic")
         if rectrafficValue == 1:
             # Re-record everything. Don't use this when only recording additional new stuff

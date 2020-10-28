@@ -16,18 +16,6 @@ import meld.conf
 from texttestlib.texttest_version import version
 
 
-def load__ctypes(finder, module):
-    """Only to monkey patch cx_Freeze 6.1. Obsolete once https://github.com/anthony-tuininga/cx_Freeze/pull/565 is integrated."""
-    if sys.platform == "win32" and sys.version_info >= (3, 8):
-        libdir = "lib" if sysconfig.get_platform() == "mingw" else "DLLs"
-        for dll_path in glob.glob(os.path.join(sys.base_prefix, libdir, "libffi-*dll")):
-            finder.IncludeFiles(dll_path, os.path.join("lib", os.path.basename(dll_path)))
-
-
-if cx_Freeze.version == "6.1":
-    cx_Freeze.hooks.load__ctypes = load__ctypes
-
-
 def get_non_python_libs():
     """Returns list of tuples containing extra dependencies required to run
     meld on current platform.
@@ -100,9 +88,8 @@ for lib, possible_path in manually_added_libs.items():
 
 build_exe_options = {
     "includes": ['_sysconfigdata__win32_'] if 'mingw' in sysconfig.get_platform() else [],
-#    "excludes": ["tkinter", "matplotlib.tests", "numpy.random._examples"],  # see https://github.com/marcelotduarte/cx_Freeze/issues/692
+    "excludes": ["tkinter"],
     "packages": ["gi", "weakref", "filecmp", "cgi", "certifi", "texttestlib", "capturemock"],
-#    "namespace_packages": ["mpl_toolkits"],
     "include_files": get_non_python_libs(),
     "bin_excludes": list(manually_added_libs.keys()),
     "zip_exclude_packages": [],

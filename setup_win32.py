@@ -100,9 +100,9 @@ for lib, possible_path in manually_added_libs.items():
 
 build_exe_options = {
     "includes": ['_sysconfigdata__win32_'] if 'mingw' in sysconfig.get_platform() else [],
-    "excludes": ["tkinter", "matplotlib.tests", "numpy.random._examples"],  # see https://github.com/marcelotduarte/cx_Freeze/issues/692
+#    "excludes": ["tkinter", "matplotlib.tests", "numpy.random._examples"],  # see https://github.com/marcelotduarte/cx_Freeze/issues/692
     "packages": ["gi", "weakref", "filecmp", "cgi", "certifi", "texttestlib", "capturemock"],
-    "namespace_packages": ["mpl_toolkits"],
+#    "namespace_packages": ["mpl_toolkits"],
     "include_files": get_non_python_libs(),
     "bin_excludes": list(manually_added_libs.keys()),
     "zip_exclude_packages": [],

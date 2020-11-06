@@ -14,12 +14,11 @@ jobs:
       with:
         update: true
         install: git mingw-w64-x86_64-python3-setuptools mingw-w64-x86_64-python3-cx_Freeze mingw-w64-x86_64-python3-gobject mingw-w64-x86_64-python3-pytest mingw-w64-x86_64-python3-pip mingw-w64-x86_64-python-matplotlib mingw-w64-x86_64-python-certifi mingw-w64-x86_64-python-psutil mingw-w64-x86_64-gtksourceview3 mingw-w64-x86_64-gsettings-desktop-schemas mingw-w64-x86_64-diffutils glib2-devel intltool
-    - name: Cloning meld and capturemock and moving code into the right place
+    - name: Cloning meld and moving code into the right place
       shell: msys2 {0}
       run: |
         git clone -b 3.20.1 https://gitlab.gnome.org/GNOME/meld
-        git clone https://github.com/texttest/capturemock
-        cp -a bin texttestlib setup_win32.py capturemock/bin capturemock/capturemock meld
+        cp -a bin texttestlib setup_win32.py meld
         cp wininstall/*.ico meld/data/icons
     - name: Building package
       shell: msys2 {0}

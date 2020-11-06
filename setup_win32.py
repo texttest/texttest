@@ -35,7 +35,6 @@ def get_non_python_libs():
         # dll imported by dll dependencies expected to be auto-resolved later
         inst_root = [os.path.join(local_bin, 'libgtksourceview-3.0-1.dll'),
                      os.path.join(local_bin, "diff.exe"),
-                     os.path.join("capturemock", "capturemock_intercept.exe"),
                     ]
 
         # gspawn-helper is needed for Gtk.show_uri function
@@ -89,7 +88,7 @@ for lib, possible_path in manually_added_libs.items():
 build_exe_options = {
     "includes": ['_sysconfigdata__win32_'] if 'mingw' in sysconfig.get_platform() else [],
     "excludes": ["tkinter"],
-    "packages": ["gi", "weakref", "filecmp", "cgi", "certifi", "texttestlib", "capturemock"],
+    "packages": ["gi", "weakref", "filecmp", "cgi", "certifi", "texttestlib"],
     "include_files": get_non_python_libs(),
     "bin_excludes": list(manually_added_libs.keys()),
     "zip_exclude_packages": [],
@@ -139,14 +138,6 @@ texttestc_executable_options = {
     "icon": "data/icons/texttest-icon.ico",
 }
 
-capturemock_executable_options = {
-    "script": "bin/capturemock",
-}
-
-capturemock_server_executable_options = {
-    "script": "bin/capturemock_server.py",
-}
-
 if 'mingw' in sysconfig.get_platform():
     executable_options.update({
          "base": "Win32GUI",  # comment to build console version to see stderr
@@ -164,15 +155,7 @@ if 'mingw' in sysconfig.get_platform():
          "targetName": "texttestc.exe",
          "shortcutName": "Texttestc",
     })
-    capturemock_executable_options.update({
-         "targetName": "capturemock.exe",
-         "shortcutName": "CaptureMock",
-    })
-    capturemock_server_executable_options.update({
-         "targetName": "capturemock_server.exe",
-         "shortcutName": "CaptureMockServer",
-    })
-
+ 
 setup(
     name="TextTest",
     version=version,
@@ -201,9 +184,7 @@ setup(
     executables=[
         Executable(**texttest_executable_options),
         Executable(**texttestc_executable_options),
-        Executable(**executable_options),
-        Executable(**capturemock_executable_options),
-        Executable(**capturemock_server_executable_options),
+        Executable(**executable_options)
     ],
     packages=[
         'meld',
@@ -212,8 +193,7 @@ setup(
         'meld.vc',
         "texttestlib", "texttestlib.default", "texttestlib.queuesystem",
             "texttestlib.default.batch", "texttestlib.default.gtkgui", "texttestlib.default.knownbugs",
-            "texttestlib.default.gtkgui.default_gui", "texttestlib.default.gtkgui.version_control",
-            "capturemock"
+            "texttestlib.default.gtkgui.default_gui", "texttestlib.default.gtkgui.version_control"
     ],
     package_data={
         'meld': ['README', 'COPYING', 'NEWS'],
@@ -221,8 +201,7 @@ setup(
                                 "etc/*", "etc/.*", "libexec/*", "log/*", "images/*.*", "images/retro/*"],
         "texttestlib.default.batch": ["testoverview_javascript/*"]
     },
-    scripts=['bin/meld', "bin/texttest", "bin/filter_rundependent.py", "bin/filter_fpdiff.py",
-             "bin/capturemock", "bin/capturemock_server.py"],
+    scripts=['bin/meld', "bin/texttest", "bin/filter_rundependent.py", "bin/filter_fpdiff.py"],
     data_files=[
         ('share/man/man1',
          ['meld.1']

@@ -71,9 +71,9 @@ class SetUpCaptureMockHandlers(plugins.Action):
             pythonActive = setUpPython(self.recordSetting, pyRecordFile, pyReplayFile, rcFiles=rcFiles,
                                        environment=test.environment)
             return externalActive or pythonActive
-        except ImportError:
+        except ImportError as e:
             raise plugins.TextTestError(
-                "Test requires CaptureMock to be installed, but the capturemock module could not be found\nSearched in " + repr(sys.path))
+                "Test requires CaptureMock to be installed, but the capturemock module could not be found\nError was: " + str(e) + "\nSearched in " + repr(sys.path))
 
     def intercept(self, moduleFile, interceptDir):
         interceptName = os.path.join(interceptDir, os.path.basename(moduleFile))

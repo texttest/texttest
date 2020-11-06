@@ -86,7 +86,7 @@ for lib, possible_path in manually_added_libs.items():
         gtk_data_files.append((os.path.dirname(lib), [local_lib]))
 
 build_exe_options = {
-    "includes": ['_sysconfigdata__win32_'] if 'mingw' in sysconfig.get_platform() else [],
+    "includes": ['_sysconfigdata__win32_', 'xmlrpc.server'] if 'mingw' in sysconfig.get_platform() else ['xmlrpc.server'],
     "excludes": ["tkinter"],
     "packages": ["gi", "weakref", "filecmp", "cgi", "certifi", "texttestlib"],
     "include_files": get_non_python_libs(),

@@ -293,9 +293,9 @@ class FileComparison:
                       "Edit the configuration entry 'binary_file' and re-run if you suspect that this file contains only text.\n"
             return self.previewGenerator.getWrappedLine(message)
         elif self.newResult():
-            return self.previewGenerator.getPreview(open(self.tmpCmpFile))
+            return self.previewGenerator.getPreview(open(self.tmpCmpFile, errors="ignore"))
         elif self.missingResult():
-            return self.previewGenerator.getPreview(open(self.stdCmpFile))
+            return self.previewGenerator.getPreview(open(self.stdCmpFile, errors="ignore"))
 
         try:
             stdFileSize = os.path.getsize(self.stdCmpFile)

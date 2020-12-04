@@ -573,6 +573,8 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         directory = self.findFullDirectoryPath(subdir)
         javaClass = self.optionGroup.getOptionValue("javaclass")
         self.checkSanity(ext, executable, subdir, directory, javaClass)
+        if executable.startswith(directory):
+            executable = executable.replace(directory, "${TEXTTEST_ROOT}")
         plugins.ensureDirectoryExists(directory)
         if javaClass:
             executable = javaClass

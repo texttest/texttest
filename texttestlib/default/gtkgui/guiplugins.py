@@ -1118,7 +1118,7 @@ class ActionDialogGUI(OptionGroupGUI):
         for child in vbox.get_children():
             if isinstance(child, Gtk.Container) and not isinstance(child, Gtk.FileChooser):
                 for gchild in child.get_children():  # This may cause indeterministic behavior if called on FileChoosers, see TTT-2485
-                    if isinstance(gchild, Gtk.Entry):
+                    if isinstance(gchild, Gtk.Entry) or isinstance(gchild, Gtk.ComboBox):
                         gchild.get_toplevel().connect("map", lambda x: gchild.grab_focus())
                         return
 

@@ -791,8 +791,8 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         possibleDirs = self.getPossibleDirs(allApps, inputOptions)
         # The point of this is that it's never sensible as the source for anything, so it serves as a "use the parent" option
         # for back-compatibility
-        self.addSwitch("act", options=["Import file/directory from source",
-                                       "Create a new file", "Create a new directory"])
+        self.addSwitch("act", options=["Copy file/directory from source",
+                                       "Create a new empty file and open it in the editor", "Create a new empty directory"])
         self.addOption("src", "Source to copy from", selectFile=True, possibleDirs=possibleDirs)
 
     def getPossibleDirs(self, allApps, inputOptions):
@@ -1021,6 +1021,9 @@ class ImportFiles(guiplugins.ActionDialogGUI):
                 test.filesChanged()
         else:
             sourcePath = self.optionGroup.getOptionValue("src")
+            if sourcePath is None:
+                raise plugins.TextTestError(
+                    "Must select a valid file or directory to copy, there are none in this empty directory.")
             appendAppName = os.path.basename(sourcePath).startswith(stem + "." + test.app.name)
             targetPath = self.getTargetPath(stem, version, appendAppName)
             if targetPath.startswith(sourcePath) and os.path.isdir(sourcePath):

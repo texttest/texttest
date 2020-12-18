@@ -224,6 +224,17 @@ class QueueSystemServer(BaseActionRunner):
         # snap out of our loop if this was the last one. Rely on others to manage the test queue
         self.reuseFailureQueue.put(None)
 
+    def markTestReuse(self, test, newTest):
+        self.jobs[newTest] = self.getJobInfo(test)
+        with self.counterLock:
+            if self.testCount > 1:
+                self.testCount -= 1
+                postText = self.remainStr()
+            else:
+                self.submitTerminators()
+                postText = ": submitting terminators as final test" # Don't allow test count to drop to 0 here, can cause race conditions
+        self.diag.info("Reusing slave from " + test.uniqueName + " for " + newTest.uniqueName + postText)
+
     def getTestForReuse(self, test, state, tryReuse, doneRerun):
         # Pick up any test that matches the current one's resource requirements
         if not self.exited:
@@ -231,30 +242,24 @@ class QueueSystemServer(BaseActionRunner):
                 newTest = self.reusedTests.get(test)
                 newTestName = newTest.uniqueName if newTest else " no test."
                 self.diag.info("Repeating answer: using slave from " + test.uniqueName + " for " + newTestName)
-                return newTest
-            # Don't allow this to use up the terminator
-            newTest = self.getTest(block=False, replaceTerminators=True)
-            if newTest:
-                if tryReuse and self.allowReuse(test, state, newTest):
-                    if not doneRerun:
-                        self.reusedTests[test] = newTest
-                    self.jobs[newTest] = self.getJobInfo(test)
-                    with self.counterLock:
-                        if self.testCount > 1:
-                            self.testCount -= 1
-                            postText = self.remainStr()
-                        else:
-                            # Don't allow test count to drop to 0 here, can cause race conditions
-                            self.submitTerminators()
-                            postText = ": submitting terminators as final test"
-                    self.diag.info("Reusing slave from " + test.uniqueName + " for " + newTest.uniqueName + postText)
+                if newTest:
+                    self.markTestReuse(test, newTest)
                     return newTest
-                else:
-                    self.diag.info("Adding to reuse failure queue : " + newTest.uniqueName)
-                    self.reuseFailureQueue.put(newTest)
             else:
-                self.diag.info("No tests available for reuse : " + test.uniqueName)
-            self.reusedTests[test] = None
+                # Don't allow this to use up the terminator
+                newTest = self.getTest(block=False, replaceTerminators=True)
+                if newTest:
+                    if tryReuse and self.allowReuse(test, state, newTest):
+                        if not doneRerun:
+                            self.reusedTests[test] = newTest
+                        self.markTestReuse(test, newTest)
+                        return newTest
+                    else:
+                        self.diag.info("Adding to reuse failure queue : " + newTest.uniqueName)
+                        self.reuseFailureQueue.put(newTest)
+                else:
+                    self.diag.info("No tests available for reuse : " + test.uniqueName)
+                self.reusedTests[test] = None
 
         # Allowed a submitted job to terminate
         with self.counterLock:

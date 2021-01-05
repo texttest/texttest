@@ -70,11 +70,11 @@ function getComments($file, $dates_in)
 
 	echo '["';
 	while ( ($entry = fgets($fileHandle)) !== false) {
-		list($id, $dateTestsListStr, $rest) = split(";", $entry, 3);
-		$dateTestsList = split("&", $dateTestsListStr); 
+		list($id, $dateTestsListStr, $rest) = explode(";", $entry, 3);
+		$dateTestsList = explode("&", $dateTestsListStr); 
 		for ($i = 0; $i < count($dateTestsList); $i++)
 		{
-		    list($date, $rest) = split("=", $dateTestsList[$i], 2);
+		    list($date, $rest) = explode("=", $dateTestsList[$i], 2);
 	            if (array_key_exists( substr($date, 0, $precision) , $dates)) {
 				echo str_replace("\n","",$entry) . '","';
 				break;

@@ -12,9 +12,11 @@ from time import sleep
 from glob import glob
 from copy import copy
 import time
-from functools import reduce, cmp_to_key
+from functools import reduce
+import locale
 
-# Class to allocate unique names to tests for script identification and cross process communication
+# Class to allocate unique names to tests for script identification and cross
+# process communication
 
 
 class UniqueNameFinder(plugins.Responder):
@@ -392,6 +394,7 @@ class TextTest(plugins.Responder, plugins.Observable):
             pass  # already written about this
 
     def _run(self):
+        locale.setlocale(locale.LC_ALL, '')
         appFindingWroteError, allApps = self.findApps()
         if self.inputOptions.helpMode():
             if len(allApps) > 0:

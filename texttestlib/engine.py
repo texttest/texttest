@@ -562,7 +562,7 @@ class TextTest(plugins.Responder, plugins.Observable):
             threadCount = len(currThreads)
 
     def aliveThreads(self, threads):
-        return [thread for thread in threads if thread.isAlive()]
+        return [thread for thread in threads if thread.is_alive()]
 
     def getSignals(self):
         if hasattr(signal, "SIGUSR1"):

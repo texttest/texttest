@@ -757,7 +757,7 @@ class Config:
         return self.actualBatchMode() and "keeptmp" not in self.optionMap
 
     def cleanWriteDirectory(self, suite):
-        if self.removePreviousThread and self.removePreviousThread.isAlive():
+        if self.removePreviousThread and self.removePreviousThread.is_alive():
             plugins.log.info("Waiting for removal of previous write directories to complete...")
             self.removePreviousThread.join()
             Config.removePreviousThread = None

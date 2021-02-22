@@ -25,7 +25,7 @@ class BackgroundThreadHelper:
 
     def performInBackground(self):
         selection = copy(self.currTestSelection)
-        if self.backgroundThread and self.backgroundThread.isAlive():
+        if self.backgroundThread and self.backgroundThread.is_alive():
             self.notify("Status", "Waiting for previous background action to finish ...")
             self.backgroundThread.join()
         BackgroundThreadHelper.backgroundThread = Thread(target=self.runBackgroundThread, args=(selection,))

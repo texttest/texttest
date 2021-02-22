@@ -133,7 +133,7 @@ class Ec2Machine:
     def cleanup(self, processes):
         # Return whether we are still using the machine in some way
         # i.e. if our thread is running or any of our processes are
-        if self.thread.isAlive():
+        if self.thread.is_alive():
             self.queue.put((None, None))
             return True
 
@@ -150,7 +150,7 @@ class Ec2Machine:
     def submitSlave(self, submitter, cmdArgs, slaveEnv, *args):
         jobId = self.getNextJobId()
         self.remoteProcessInfo[jobId] = None, None
-        if not self.thread.isAlive():
+        if not self.thread.is_alive():
             if self.startMethod:
                 self.diag.info("Starting EC2 instance with private IP address '" + self.ip + "'...")
                 try:

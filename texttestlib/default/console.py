@@ -72,12 +72,15 @@ class TextDisplayResponder(plugins.Responder):
     def getPrefix(self, test):
         return test.getIndent()
 
+    def getTestRepr(self, test):
+        return repr(test)
+
     def describe(self, test, summary):
         prefix = "  " if summary else self.getPrefix(test)
-        desc = test.state.description()
-        if summary and "\n" in desc:
-            desc = " ".join(desc.splitlines()[:2])
-        plugins.log.info(prefix + repr(test) + " " + desc)
+        state_desc = test.state.description()
+        if summary and "\n" in state_desc:
+            state_desc = " ".join(state_desc.splitlines()[:2])
+        plugins.log.info(prefix + self.getTestRepr(test) + " " + state_desc)
 
 
 class InteractiveResponder(plugins.Responder):

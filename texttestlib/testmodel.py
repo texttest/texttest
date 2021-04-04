@@ -266,6 +266,9 @@ class Test(plugins.Observable):
     def __repr__(self):
         return repr(self.app) + " " + self.classId() + " " + self.name
 
+    def relPathRepr(self):
+        return repr(self.app) + " " + self.classId() + " " + self.getRelPath().replace("\\", "/")
+
     def paddedRepr(self):
         return repr(self.app) + " " + self.classId() + " " + self.paddedName()
 

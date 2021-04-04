@@ -1178,6 +1178,9 @@ class MasterTextResponder(TextDisplayResponder):
     def getPrefix(self, test):
         return "S: "  # don't get things in order, so indenting is pointless
 
+    def getTestRepr(self, test):
+        return test.relPathRepr() # don't get things in order, can't rely on that to show where in the structure we are
+
     def shouldDescribe(self, test):
         return True  # Write the successful tests also
 

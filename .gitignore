@@ -15,3 +15,5 @@ TextTest.egg-info
 *~
 #*
 .#*
+.idea
+venv

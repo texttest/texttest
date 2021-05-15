@@ -1,11 +1,13 @@
 
 from . import abstractqueuesystem
-import os
+import os, shutil
 from texttestlib import plugins
 
 
 class QueueSystem(abstractqueuesystem.QueueSystem):
     def __init__(self, app):
+        if shutil.which(self.submitProg) is None:
+            raise plugins.TextTestError("Cannot submit TextTest tests to grid engine: '" + self.submitProg + "' not installed!")
         self.coreFileLocation = self.getCoreFileLocation(app)
 
     def submitSlaveJob(self, cmdArgs, slaveEnv, logDir, *args, **kw):

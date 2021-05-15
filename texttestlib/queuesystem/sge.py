@@ -31,7 +31,7 @@ class QueueSystem(gridqueuesystem.QueueSystem):
                    "SRt": ("SSUSP", "Suspended by SGE due to other higher priority jobs"),
                    "T": ("THRESH", "Suspended by SGE as it exceeded allowed thresholds")}
     errorStatuses = ["Eqw", "ERq"]
-
+    submitProg = "qsub"
     def __init__(self, *args):
         self.qdelOutput = ""
         self.errorReasons = {}

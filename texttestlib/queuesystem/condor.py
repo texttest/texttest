@@ -15,6 +15,7 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
                    "4": ("COMP", "Completed"),
                    "5": ("HELD", "Being held"),
                    "6": ("TRANS", "Transfering output")}
+    submitProg = "condor_submit"
 
     def getSubmitCmdArgs(self, submissionRules, commandArgs=[], slaveEnv={}):
         return commandArgs  # These really aren't very interesting, as all the stuff is in the command file

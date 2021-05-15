@@ -6,6 +6,7 @@ from . import gridqueuesystem
 
 
 class QueueSystem(gridqueuesystem.QueueSystem):
+    submitProg = "bsub"
     def getSubmitCmdArgs(self, submissionRules, commandArgs=[], slaveEnv={}):
         bsubArgs = ["bsub", "-J", submissionRules.getJobName()]
         if submissionRules.processesNeeded != 1:

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, sys, subprocess
+import os, sys, subprocess, shutil
 from tempfile import mktemp
 from locale import getpreferredencoding
 
@@ -17,6 +17,9 @@ def interpretCore(corefile):
     summary, details = writeGdbStackTrace(corefile, binary)
     if "Parse failure" in summary:
         try:
+            if shutil.which("dbx") is None:
+                return "Parse failure in GDB: DBX not installed", details, binary
+
             dbxSummary, dbxDetails = writeDbxStackTrace(corefile, binary)
             if "Parse failure" in dbxSummary:
                 return "Parse failure from both GDB and DBX", details + dbxDetails, binary

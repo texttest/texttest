@@ -1,8 +1,8 @@
 Documentation Summary:
 
     There is some stuff in texttestlib/doc here in this download, but the main documentation is kept at 
-    http://www.texttest.org. At the bottom of this file there is also
-    a brief summary of what TextTest is and what it can do for you.
+    http://texttest.sourceforge.net currently. A new site is under construction at http://www.texttest.org. 
+    At the bottom of this file there is also a brief summary of what TextTest is and what it can do for you.
 
     In texttestlib/doc, you can find :
        a) For those upgrading from previous versions of TextTest, migration notes are available for each 

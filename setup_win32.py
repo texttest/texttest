@@ -16,7 +16,7 @@ import meld.conf
 from texttestlib.texttest_version import version
 
 
-def load_matplotlib(finder: ModuleFinder, module: Module) -> None:
+def load_matplotlib(finder: cx_Freeze.finder.ModuleFinder, module: cx_Freeze.module.Module) -> None:
     """The matplotlib package requires mpl-data subdirectory."""
     data_path = module.path[0] / "mpl-data"
     target_path = Path("lib", module.name, "mpl-data")

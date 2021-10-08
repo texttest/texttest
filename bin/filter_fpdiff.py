@@ -29,6 +29,8 @@ def main():
                       help='Write filtered tofile to use external diff')
     parser.add_option("-d", "--difflib", action="store_true", default=False,
                       help="Use python's difflib")
+    parser.add_option("-s", "--split",
+                      help='Compare individual fields after splitting at the given pattern')
     (options, args) = parser.parse_args()
     if len(args) == 0:  # pragma: no cover - not production code
         parser.print_help()
@@ -40,11 +42,11 @@ def main():
     tolines = open(tofile).readlines()
     if options.output:
         out = open(options.output, 'w')
-        fpfilter(fromlines, tolines, out, options.tolerance, options.relative, options.difflib)
+        fpfilter(fromlines, tolines, out, options.tolerance, options.relative, options.difflib, options.split)
         out.close()
     else:  # pragma: no cover - not production code
         out = io.StringIO()
-        fpfilter(fromlines, tolines, out, options.tolerance, options.relative, options.difflib)
+        fpfilter(fromlines, tolines, out, options.tolerance, options.relative, options.difflib, options.split)
         out.seek(0)
         tolines = out.readlines()
         sys.stdout.writelines(difflib.unified_diff(fromlines, tolines, fromfile, tofile))

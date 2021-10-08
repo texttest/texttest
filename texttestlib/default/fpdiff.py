@@ -65,22 +65,40 @@ def _fpequal(l1, l2, tolerance, relTolerance):
         return _fpequalAtPos(l1, l2, tolerance, relTolerance, pos)[0]
 
 
-def fpfilter(fromlines, tolines, outlines, tolerance, relTolerance=None, useDifflib=False):
+def _cmpLines(fromlines, tolines, outlines, tolerance, relTolerance, split):
+    for fromline, toline in zip(fromlines, tolines):
+        equal = True
+        if fromline != toline:
+            if split != '':
+                fromSplit = fromline.split(split)
+                toSplit = toline.split(split)
+                if len(fromSplit) == len(toSplit):
+                    for f, t in zip(fromSplit, toSplit):
+                        if f != t and not _fpequal(f, t, tolerance, relTolerance):
+                            equal = False
+                            break
+                else:
+                    equal = False
+            elif not _fpequal(fromline, toline, tolerance, relTolerance):
+                equal = False
+        if equal:
+            outlines.write(fromline)
+        else:
+            outlines.write(toline)
+
+
+def fpfilter(fromlines, tolines, outlines, tolerance, relTolerance=None, useDifflib=False, split=None):
+    if split is None:
+        split = ''
+    elif split == '':
+        split = None
     if not useDifflib:
-        for fromline, toline in zip(fromlines, tolines):
-            if fromline == toline or _fpequal(fromline, toline, tolerance, relTolerance):
-                outlines.write(fromline)
-            else:
-                outlines.write(toline)
+        _cmpLines(fromlines, tolines, outlines, tolerance, relTolerance, split)
         outlines.writelines(tolines[len(fromlines):])
         return
     s = difflib.SequenceMatcher(None, fromlines, tolines)
     for tag, i1, i2, j1, j2 in s.get_opcodes():
         if tag == "replace" and i2 - i1 == j2 - j1:
-            for fromline, toline in zip(fromlines[i1:i2], tolines[j1:j2]):
-                if _fpequal(fromline, toline, tolerance, relTolerance):
-                    outlines.write(fromline)
-                else:
-                    outlines.write(toline)
+            _cmpLines(fromlines[i1:i2], tolines[j1:j2], outlines, tolerance, relTolerance, split)
         else:
             outlines.writelines(tolines[j1:j2])

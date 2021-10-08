@@ -51,6 +51,7 @@ def _get_data_path():
 if cx_Freeze.version == "6.8.1":
     import cx_Freeze.hooks
     from pathlib import Path
+    from cx_Freeze.common import code_object_replace
     cx_Freeze.hooks.load_matplotlib = load_matplotlib
 
 

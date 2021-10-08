@@ -125,12 +125,13 @@ class FilterOnTempFile(FilterAction):
         filters = FilterAction._makeAllFilters(self, test, stem, app)
         floatTolerance = test.getCompositeConfigValue("floating_point_tolerance", stem)
         relTolerance = test.getCompositeConfigValue("relative_float_tolerance", stem)
+        floatSplit = test.getCompositeConfigValue("floating_point_split", stem)
         if floatTolerance or relTolerance:
             origFile = test.makeTmpFileName(stem + "." + app.name + "origcmp", forFramework=1)
             if not os.path.isfile(origFile):
                 origFile = test.getFileName(stem)
             if origFile and os.path.isfile(origFile):
-                filters.append(FloatingPointFilter(origFile, floatTolerance, relTolerance))
+                filters.append(FloatingPointFilter(origFile, floatTolerance, relTolerance, floatSplit))
         return filters
 
 
@@ -180,18 +181,16 @@ class FilterResultRecompute(FilterOnTempFile):
 class FloatingPointFilter:
     postfix = "fpdiff"
 
-    def __init__(self, origFileName, tolerance, relative):
+    def __init__(self, origFileName, tolerance, relative, split):
         self.origFileName = origFileName
-        self.tolerance, self.relative = None, None
-        if tolerance:
-            self.tolerance = tolerance
-        if relative:
-            self.relative = relative
+        self.tolerance = tolerance if tolerance else None
+        self.relative = relative if relative else None
+        self.split = split if split else None
 
     def filterFile(self, inFile, writeFile):
         fromlines = open(self.origFileName, errors="ignore").readlines()
         tolines = inFile.readlines()
-        fpdiff.fpfilter(fromlines, tolines, writeFile, self.tolerance, self.relative)
+        fpdiff.fpfilter(fromlines, tolines, writeFile, self.tolerance, self.relative, split=self.split)
 
 
 class RunDependentTextFilter(plugins.Observable):

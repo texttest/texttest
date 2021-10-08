@@ -87,10 +87,8 @@ def _cmpLines(fromlines, tolines, outlines, tolerance, relTolerance, split):
             outlines.write(toline)
 
 
-def fpfilter(fromlines, tolines, outlines, tolerance, relTolerance=None, useDifflib=False, split=None):
-    if split is None:
-        split = ''
-    elif split == '':
+def fpfilter(fromlines, tolines, outlines, tolerance, relTolerance=None, useDifflib=False, split=''):
+    if split == 'None':
         split = None
     if not useDifflib:
         _cmpLines(fromlines, tolines, outlines, tolerance, relTolerance, split)

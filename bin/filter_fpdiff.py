@@ -29,8 +29,8 @@ def main():
                       help='Write filtered tofile to use external diff')
     parser.add_option("-d", "--difflib", action="store_true", default=False,
                       help="Use python's difflib")
-    parser.add_option("-s", "--split",
-                      help='Compare individual fields after splitting at the given pattern')
+    parser.add_option("-s", "--split", default='',
+                      help='Compare individual fields after splitting at the given separator, use "None" to emulate split()')
     (options, args) = parser.parse_args()
     if len(args) == 0:  # pragma: no cover - not production code
         parser.print_help()

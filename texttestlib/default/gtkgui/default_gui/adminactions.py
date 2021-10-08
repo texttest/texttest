@@ -1747,7 +1747,8 @@ class ReportBugs(guiplugins.ActionDialogGUI):
             raise plugins.TextTestError("'Knownbugs' file format cannot handle leading spaces in search string.\n" +
                                         "If the line starts with spaces, suggest to add a ^ at the start, to match the beginning of the line")
         if not self.optionGroup.getValue("rerun_only"):
-            if self.bugSystemGroup.getOptionValue("bug_system") == "<none>":
+            bugSystem = self.bugSystemGroup.getOptionValue("bug_system")
+            if self.hasDefaultValue(bugSystem):
                 if len(self.textDescGroup.getOptionValue("full_description")) == 0 or \
                    len(self.textDescGroup.getOptionValue("brief_description")) == 0:
                     raise plugins.TextTestError(
@@ -1809,7 +1810,7 @@ class ReportBugs(guiplugins.ActionDialogGUI):
                           self.bugSystemGroup, self.textDescGroup, self.optionGroup]:
                 for name, option in list(group.options.items()):
                     value = option.getValue()
-                    if name in namesToIgnore or self.hasDefaultValue(name, value):
+                    if name in namesToIgnore or self.hasDefaultValue(value, name):
                         continue
                     if name == "data_source":
                         writeFile.write("search_file:" + dataSourceText[value] + "\n")
@@ -1822,7 +1823,7 @@ class ReportBugs(guiplugins.ActionDialogGUI):
             writeFile.close()
         self.setFilesChanged(ancestors)
 
-    def hasDefaultValue(self, name, value):
+    def hasDefaultValue(self, value, name=""):
         if name == "use_regexp":
             return value == 1
         else:

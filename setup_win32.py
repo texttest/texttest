@@ -16,6 +16,42 @@ import meld.conf
 from texttestlib.texttest_version import version
 
 
+def load_matplotlib(finder: ModuleFinder, module: Module) -> None:
+    """The matplotlib package requires mpl-data subdirectory."""
+    data_path = module.path[0] / "mpl-data"
+    target_path = Path("lib", module.name, "mpl-data")
+    # After matplotlib 3.4 mpl-data is guaranteed to be a subdirectory.
+    if not data_path.is_dir():
+        data_path = __import__("matplotlib").get_data_path()
+        need_patch = True
+    else:
+        need_patch = not module.in_file_system
+    finder.IncludeFiles(data_path, target_path, copy_dependent_files=False)
+    finder.IncludePackage("matplotlib")
+    finder.ExcludeModule("matplotlib.tests")
+    finder.ExcludeModule("matplotlib.testing")
+    if not need_patch or module.code is None:
+        return
+    CODE_STR = f"""
+def _get_data_path():
+    return os.path.join(os.path.dirname(sys.executable), "{target_path!s}")
+"""
+    for code_str in [CODE_STR, CODE_STR.replace("_get_data_", "get_data_")]:
+        new_code = compile(code_str, str(module.file), "exec")
+        co_func = new_code.co_consts[0]
+        name = co_func.co_name
+        code = module.code
+        consts = list(code.co_consts)
+        for i, c in enumerate(consts):
+            if isinstance(c, type(code)) and c.co_name == name:
+                consts[i] = co_func
+                break
+        module.code = code_object_replace(code, co_consts=consts)
+
+if cx_Freeze.version == "6.8.1":
+    cx_Freeze.hooks.load_matplotlib = load_matplotlib
+
+
 def get_non_python_libs():
     """Returns list of tuples containing extra dependencies required to run
     meld on current platform.

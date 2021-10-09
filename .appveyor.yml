@@ -1,5 +1,5 @@
 environment:
-  APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+  APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
   matrix:
     - MSYS2_ARCH: x86_64
       MSYSTEM: MINGW64
@@ -7,23 +7,20 @@ environment:
       MSYSTEM: MINGW32
 
 install:
-    - git clone https://gitlab.gnome.org/GNOME/meld
+    - git clone -b 3.20.1 https://gitlab.gnome.org/GNOME/meld
     - set MELD=%CD%\meld
-    - cd meld & git checkout 3.20.1 & cd ..
     - set PATH=C:\msys64\%MSYSTEM%\bin;C:\msys64\usr\bin;%PATH%
-    - pacman-key --refresh-keys
-    - pacman -Syyu
+    - pacman --noconfirm -Syyuu
     - pacman --noconfirm -S --refresh --needed mingw-w64-%MSYS2_ARCH%-python3-cx_Freeze mingw-w64-%MSYS2_ARCH%-python3-gobject mingw-w64-%MSYS2_ARCH%-python3-pytest mingw-w64-%MSYS2_ARCH%-python3-pip mingw-w64-%MSYS2_ARCH%-python-matplotlib mingw-w64-%MSYS2_ARCH%-python-certifi mingw-w64-%MSYS2_ARCH%-python-psutil mingw-w64-%MSYS2_ARCH%-gtksourceview3 mingw-w64-%MSYS2_ARCH%-gsettings-desktop-schemas mingw-w64-%MSYS2_ARCH%-diffutils glib2-devel intltool
     - gdk-pixbuf-query-loaders --update-cache
     - pip3 install distro
 
 build_script:
+    - cp -a bin texttestlib setup_win32.py %MELD%
+    - cp wininstall/*.ico %MELD%/data/icons
     - cd %MELD%
-    - cp -a %APPVEYOR_BUILD_FOLDER%/texttestlib %APPVEYOR_BUILD_FOLDER%/setup_win32.py .
-    - cp %APPVEYOR_BUILD_FOLDER%/bin/* bin
-    - cp %APPVEYOR_BUILD_FOLDER%/wininstall/*.ico data/icons
     - glib-compile-schemas data
-    - python3 setup_win32.py bdist_dumb --bdist-dir build\bdist.mingw\msi --keep-temp bdist_msi --keep-temp
+    - python3 setup_win32.py bdist_dumb bdist_msi
     - mv dist %APPVEYOR_BUILD_FOLDER%
 
 artifacts:

@@ -1,5 +1,5 @@
 environment:
-  APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+  APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
   matrix:
     - MSYS2_ARCH: x86_64
       MSYSTEM: MINGW64

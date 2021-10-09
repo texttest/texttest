@@ -15,12 +15,11 @@ install:
     - pip3 install distro
 
 build_script:
-    - cd %MELD%
-    - cp -a %APPVEYOR_BUILD_FOLDER%/texttestlib %APPVEYOR_BUILD_FOLDER%/setup_win32.py .
-    - cp %APPVEYOR_BUILD_FOLDER%/bin/* bin
-    - cp %APPVEYOR_BUILD_FOLDER%/wininstall/*.ico data/icons
+    - cp -a bin texttestlib setup_win32.py meld
+    - cp wininstall/*.ico meld/data/icons
+    - cd meld
     - glib-compile-schemas data
-    - python3 setup_win32.py bdist_dumb --bdist-dir build\bdist.mingw\msi --keep-temp bdist_msi --keep-temp
+    - python3 setup_win32.py bdist_dumb bdist_msi
     - mv dist %APPVEYOR_BUILD_FOLDER%
 
 artifacts:

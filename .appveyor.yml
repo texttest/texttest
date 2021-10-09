@@ -7,16 +7,11 @@ environment:
       MSYSTEM: MINGW32
 
 install:
-    - set PATH=C:\msys64\%MSYSTEM%\bin;C:\msys64\usr\bin;%PATH%
-    - pacman -Syuu --noconfirm && ps -ef | grep 'dirmngr' | grep -v grep | awk '{print `$2}' | xargs -r kill -9 && ps -ef | grep 'gpg-agent' | grep -v grep | awk '{print `$2}' | xargs -r kill -9
-    - pacman -Syuu --noconfirm && ps -ef | grep 'gpg-agent' | grep -v grep | awk '{print `$2}' | xargs -r kill -9
-    - pacman --sync --noconfirm VCS
-    - pacman --sync --noconfirm base-devel
-    - pacman --sync --noconfirm msys2-devel
-    - pacman --sync --noconfirm mingw-w64-{x86_64,i686}-toolchain
     - git clone https://gitlab.gnome.org/GNOME/meld
     - set MELD=%CD%\meld
     - cd meld & git checkout 3.20.1 & cd ..
+    - set PATH=C:\msys64\%MSYSTEM%\bin;C:\msys64\usr\bin;%PATH%
+    - pacman-key --refresh-keys
     - pacman -Syyu
     - pacman --noconfirm -S --refresh --needed mingw-w64-%MSYS2_ARCH%-python3-cx_Freeze mingw-w64-%MSYS2_ARCH%-python3-gobject mingw-w64-%MSYS2_ARCH%-python3-pytest mingw-w64-%MSYS2_ARCH%-python3-pip mingw-w64-%MSYS2_ARCH%-python-matplotlib mingw-w64-%MSYS2_ARCH%-python-certifi mingw-w64-%MSYS2_ARCH%-python-psutil mingw-w64-%MSYS2_ARCH%-gtksourceview3 mingw-w64-%MSYS2_ARCH%-gsettings-desktop-schemas mingw-w64-%MSYS2_ARCH%-diffutils glib2-devel intltool
     - gdk-pixbuf-query-loaders --update-cache

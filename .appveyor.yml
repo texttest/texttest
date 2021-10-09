@@ -11,7 +11,6 @@ install:
     - set MELD=%CD%\meld
     - cd meld & git checkout 3.20.1 & cd ..
     - set PATH=C:\msys64\%MSYSTEM%\bin;C:\msys64\usr\bin;%PATH%
-    - pacman-key --refresh-keys
     - pacman -Syyu
     - pacman --noconfirm -S --refresh --needed mingw-w64-%MSYS2_ARCH%-python3-cx_Freeze mingw-w64-%MSYS2_ARCH%-python3-gobject mingw-w64-%MSYS2_ARCH%-python3-pytest mingw-w64-%MSYS2_ARCH%-python3-pip mingw-w64-%MSYS2_ARCH%-python-matplotlib mingw-w64-%MSYS2_ARCH%-python-certifi mingw-w64-%MSYS2_ARCH%-python-psutil mingw-w64-%MSYS2_ARCH%-gtksourceview3 mingw-w64-%MSYS2_ARCH%-gsettings-desktop-schemas mingw-w64-%MSYS2_ARCH%-diffutils glib2-devel intltool
     - gdk-pixbuf-query-loaders --update-cache

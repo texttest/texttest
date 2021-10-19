@@ -587,7 +587,8 @@ class SummaryGenerator:
         return all((info[0] != i[0] for i in mostRecentInfo))
 
     def isDate(self, tag):
-        return len(tag) == 9 and tag[:2].isdigit() and tag[2:5].isalpha() and tag[5:].isdigit()
+        # Allow also for Jenkins format, 13Jan2006.1234
+        return len(tag) >= 9 and tag[:2].isdigit() and tag[2:5].isalpha() and tag[5:9].isdigit()
 
     def getTrendImage(self, summary, prevSummary):
         text = self.getTrendText(summary, prevSummary)

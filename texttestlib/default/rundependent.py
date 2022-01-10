@@ -185,7 +185,7 @@ class FloatingPointFilter:
         self.origFileName = origFileName
         self.tolerance = tolerance if tolerance else None
         self.relative = relative if relative else None
-        self.split = split if split else None
+        self.split = split
 
     def filterFile(self, inFile, writeFile):
         fromlines = open(self.origFileName, errors="ignore").readlines()

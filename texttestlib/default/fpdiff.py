@@ -61,8 +61,8 @@ def _fpequal(l1, l2, tolerance, relTolerance):
             pos += 1
     if len(l1) == len(l2):
         return True
-    else:
-        return _fpequalAtPos(l1, l2, tolerance, relTolerance, pos)[0]
+    equal, l1, l2 = _fpequalAtPos(l1, l2, tolerance, relTolerance, pos)
+    return equal and l1 == "" and l2 == ""
 
 
 def _cmpLines(fromlines, tolines, outlines, tolerance, relTolerance, split):

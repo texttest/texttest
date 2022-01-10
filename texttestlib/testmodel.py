@@ -1688,7 +1688,9 @@ class Application(object):
         for dircache in self.getAllDirCaches("config", [ self.dircache ], includeRoot=True):
             if dircache.exists("texttest_config_modules"):
                 # Allow config modules to be stored under the test suite
-                sys.path.insert(0, dircache.pathName("texttest_config_modules"))
+                path = dircache.pathName("texttest_config_modules")
+                sys.path.insert(0, path)
+                plugins.installationRoots.append(path)
         try:
             return plugins.importAndCall(moduleName, "getConfig", self.inputOptions)
         except Exception as err:

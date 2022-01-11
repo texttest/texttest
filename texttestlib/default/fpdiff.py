@@ -74,6 +74,7 @@ def _cmpLines(fromlines, tolines, outlines, tolerance, relTolerance, split):
                 toSplit = toline.split(split)
                 if len(fromSplit) == len(toSplit):
                     for f, t in zip(fromSplit, toSplit):
+                        f, t = f.strip(), t.strip()
                         if f != t and not _fpequal(f, t, tolerance, relTolerance):
                             equal = False
                             break

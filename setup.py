@@ -54,7 +54,7 @@ package_data = {"texttestlib": ["doc/ChangeLog", "doc/quick_start.txt", "doc/CRE
                 "texttestlib.default.batch": ["testoverview_javascript/*"]}
 scripts = ["bin/texttest", "bin/filter_rundependent.py", "bin/filter_fpdiff.py"]
 if os.name == "posix":
-    scripts.append("texttestlib/libexec/interpretcore")
+    scripts.append("bin/interpretcore")
 
 from texttestlib.texttest_version import version
 

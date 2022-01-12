@@ -3,6 +3,8 @@ name: Build Windows Package
 on:
   push:
   workflow_dispatch:
+  schedule:        # check once a week, maybe the dependencies are broken
+    - cron:  '25 1 * * 2'
 
 jobs:
   build-windows:

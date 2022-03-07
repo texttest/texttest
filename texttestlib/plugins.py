@@ -58,6 +58,16 @@ def findInstallationRoots():
     return roots
 
 
+def compactHostRepr(hosts):
+    """Convert list ['a', 'a', 'b'] -> 'a*2, b'"""
+    hostCount = dict((host, hosts.count(host)) for host in set(hosts))
+    hostCountStrings = \
+        (('*'.join([str(hostCount[host]), host])
+          if hostCount[host] > 1 else host
+          for host in hostCount))
+    return ', '.join(sorted(hostCountStrings))
+
+
 globalStartTime = datetime.now()
 datetimeFormat = "%d%b%H:%M:%S"
 installationRoots = findInstallationRoots()
@@ -738,7 +748,7 @@ class TestState(Observable):
         return longDescription
 
     def hostString(self):
-        return "on " + ", ".join(self.executionHosts)
+        return "on " + compactHostRepr(self.executionHosts)
 
     def hostRepr(self):
         if self.showExecHosts and len(self.executionHosts) > 0:

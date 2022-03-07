@@ -32,16 +32,6 @@ def parseState(state):
         return "", hosts
 
 
-def compactHostRepr(hosts):
-    """Convert list ['a', 'a', 'b'] -> 'a*2, b'"""
-    hostCount = dict((host, hosts.count(host)) for host in set(hosts))
-    hostCountStrings = \
-        (('*'.join([host, str(hostCount[host])])
-          if hostCount[host] > 1 else host
-          for host in hostCount))
-    return ', '.join(hostCountStrings)
-
-
 def getWeekDay(tag):
     return plugins.weekdays[time.strptime(tag.split("_")[0], "%d%b%Y")[6]]
 
@@ -689,7 +679,7 @@ class TestTable:
         fgcol, bgcol = self.getColours(category, fileComp)
         if not hasattr(state, "category"):
             brief, hosts = parseState(state)
-            return "ok " + brief + compactHostRepr(hosts), True, fgcol, bgcol
+            return "ok " + brief + plugins.compactHostRepr(hosts), True, fgcol, bgcol
         success = category == "success"
         if success:
             cellContent = "ok"
@@ -697,7 +687,7 @@ class TestTable:
                 cellContent += " " + state.briefText
         else:
             cellContent = state.getTypeBreakdown()[1]
-        cellContent += " " + compactHostRepr(state.executionHosts)
+        cellContent += " " + plugins.compactHostRepr(state.executionHosts)
         return cellContent.strip(), success, fgcol, bgcol
 
     def getCellDataFromFileComp(self, fileComp):

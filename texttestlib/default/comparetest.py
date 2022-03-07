@@ -501,7 +501,9 @@ class ProgressTestComparison(BaseTestComparison):
     def progressText(self):
         perc = self.calculatePercentage()
         if perc is not None:
-            return "\nReckoned to be " + str(perc) + "% complete by comparing total file sizes at " + plugins.localtime() + "."
+            return "\nReckoned to be " + str(int(perc)) \
+                + "% complete by comparing total file sizes at " \
+                + plugins.localtime() + "."
         else:
             return ""
 

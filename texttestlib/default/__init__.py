@@ -1227,6 +1227,8 @@ class Config:
                              "Do we collect multiple mails into one in batch mode")
         app.setConfigDefault("batch_junit_format", {"default": "false"},
                              "Do we write out results in junit format in batch mode")
+        app.setConfigDefault("batch_include_comment_plugin", {"default": "true"},
+                             "Do we include the comment plugin in the HTML report (requires PHP)")
         app.setConfigDefault("batch_junit_folder", {
                              "default": ""}, "Which folder to write test results in junit format in batch mode. Only useful together with batch_junit_format")
         app.setConfigDefault("batch_collect_max_age_days", {

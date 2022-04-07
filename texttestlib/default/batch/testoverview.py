@@ -284,10 +284,15 @@ class GenerateWebPages(object):
         sortedColours = sorted(pageColours, key=lambda c: (c != successColour, c))
         scriptCode = "var TEST_ROW_HEADER_COLOR = " + repr(rowHeaderColour) + ";\n" + \
                      "var Colors = " + repr(sortedColours) + ";"
-        return [HTMLgen.Script(code=scriptCode),
-                HTMLgen.Script(src="../javascript/jquery.js"),
-                HTMLgen.Script(src="../javascript/filter.js"),
-                HTMLgen.Script(src="../javascript/comment.js")]
+        scripts = [HTMLgen.Script(code=scriptCode),
+                   HTMLgen.Script(src="../javascript/filter.js")]
+        if self.includeCommentPlugin():
+            scripts.append(HTMLgen.Script(src="../javascript/jquery.js"))
+            scripts.append(HTMLgen.Script(src="../javascript/comment.js"))
+        return scripts
+
+    def includeCommentPlugin(self):
+        return self.getConfigValue("batch_include_comment_plugin") == "true"
 
     def getHeading(self, versionToShow=""):
         heading = "Test results for " + self.pageTitle
@@ -448,7 +453,8 @@ class GenerateWebPages(object):
             pageName = getDetailPageName(self.pageVersion, tag)
             details.write(os.path.join(self.pageDir, pageName))
             plugins.log.info("wrote: '" + pageName + "'")
-        self.writeCommentListPage()
+        if self.includeCommentPlugin():
+            self.writeCommentListPage()
 
     def writeCommentListPage(self):
         filename = os.path.join(self.pageDir, "commentlist.html")

@@ -966,7 +966,7 @@ class WebPageResponder(plugins.Responder):
         for app, repositories, extraApps in pageInfo:
             pageTopDir = os.path.expanduser(app.getBatchConfigValue("historical_report_location"))
             pageDir = os.path.join(pageTopDir, app.name)
-            self.copyJavaScript(pageTopDir, pageDir)
+            self.copyJavaScript(pageTopDir, pageDir, app.getBatchConfigValue)
             extraVersions = self.getExtraVersions(app, extraApps)
             self.diag.info("Found extra versions " + repr(extraVersions))
             relevantSubDirs = self.findRelevantSubdirectories(repositories, app, extraVersions)
@@ -1088,11 +1088,11 @@ class WebPageResponder(plugins.Responder):
         relevantSubDirs, getConfigValue, version, extraVersions, pageSubTitles, descriptionInfo = self.transformToCommon(
             pageInfo)
         pageDir = os.path.expanduser(getConfigValue("historical_report_location"))
-        self.copyJavaScript(pageDir, pageDir)
+        self.copyJavaScript(pageDir, pageDir, getConfigValue)
         self.makeAndGenerate(relevantSubDirs, getConfigValue, pageDir, pageTitle,
                              pageSubTitles, version, extraVersions, descriptionInfo)
 
-    def copyJavaScript(self, pageTopDir, pageDir):
+    def copyJavaScript(self, pageTopDir, pageDir, getConfigValue):
         jsDir = os.path.join(pageTopDir, "javascript")
         srcDir = os.path.join(os.path.dirname(__file__), "testoverview_javascript")
         if not os.path.isdir(srcDir): # for example when zipped, use the installation structure
@@ -1101,7 +1101,10 @@ class WebPageResponder(plugins.Responder):
             srcDir = plugins.installationPath(*pathParts)
         plugins.ensureDirectoryExists(jsDir)
         plugins.ensureDirectoryExists(pageDir)
+        ignoreCommentFiles = getConfigValue("batch_include_comment_plugin") != "true"
         for fn in sorted(os.listdir(srcDir)):
+            if ignoreCommentFiles and (fn.startswith("comment") or fn == "jquery.js"):
+                continue
             targetDir = pageDir if fn.endswith(".php") else jsDir  # Server-side stuff is per application
             targetPath = os.path.join(targetDir, fn)
             try:

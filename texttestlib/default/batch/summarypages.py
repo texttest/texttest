@@ -14,6 +14,7 @@ from glob import glob
 from .batchutils import BatchVersionFilter, parseFileName, convertToUrl, getEnvironmentFromRunFiles
 import datetime
 from functools import reduce
+import urllib.parse
 
 
 class GenerateFromSummaryData(plugins.ScriptWithArgs):
@@ -433,6 +434,13 @@ class SummaryGenerator:
             if jobPath:
                 jobLink = "<br>(built by Jenkins job '" + os.getenv("JOB_NAME") + "', " + "<a href='" + \
                     jobPath + "'> " + "build number " + os.getenv("BUILD_NUMBER") + "</a>" + ")"
+                    
+        if os.getenv("SYSTEM_TEAMFOUNDATIONSERVERURI") and os.getenv("SYSTEM_DEFINITIONNAME") and os.getenv("BUILD_BUILDID"):
+            project = urllib.parse.quote(os.getenv("SYSTEM_TEAMPROJECT"))
+            jobPath = os.path.join(os.getenv("SYSTEM_TEAMFOUNDATIONSERVERURI"), project, "_build", "results?buildId=" + os.getenv("BUILD_BUILDID"))
+            if jobPath:
+                jobLink = "<br>(built by Azure Devops Pipeline '" + os.getenv("SYSTEM_DEFINITIONNAME") + "', " + "<a href='" + \
+                    jobPath + "'> " + "build number " + os.getenv("BUILD_BUILDNUMBER") + "</a>" + ")"
 
         summaryPageTimeStamp = dataFinder.summaryPageName + "." + plugins.startTimeString(self.timeFormat)
         with open(summaryPageTimeStamp, "w") as f:

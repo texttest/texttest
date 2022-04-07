@@ -543,15 +543,21 @@ class SaveState(plugins.Responder):
             self.repositories[suite.app] = os.path.abspath(testStateRepository)
             self.registerRunName(testStateRepository, suite.app)
 
+    def addVarsToRunFile(self, f, envVars):
+        for envVar in envVars: 
+            if envVar in os.environ:
+                f.write(envVar + "=" + os.getenv(envVar) + "\n")
+            else:
+                return False
+        return True
+
     def makeInitialRunFile(self, app, runFile):
         plugins.ensureDirExistsForFile(runFile)
         with open(runFile, "w") as f:
-            for envVar in ["JENKINS_URL", "JOB_NAME", "BUILD_NUMBER"]:
-                if envVar in os.environ:
-                    f.write(envVar + "=" + os.getenv(envVar) + "\n")
-                else:
-                    break
-
+            jenkinsVars = ["JENKINS_URL", "JOB_NAME", "BUILD_NUMBER"]
+            if not self.addVarsToRunFile(f, jenkinsVars):
+                azdoVars = ["SYSTEM_TEAMFOUNDATIONSERVERURI", "SYSTEM_TEAMPROJECT", "BUILD_BUILDID", "BUILD_BUILDNUMBER" ]
+                self.addVarsToRunFile(f, azdoVars)
             f.write(repr(app) + "\n")
 
     def runAlreadyExists(self, runFile, app):

@@ -29,16 +29,19 @@ def getBatchRunName(optionMap):
     if name is not None:
         return name
 
-    jenkinsBuildNumber = os.getenv("BUILD_NUMBER")
+    if "BUILD_BUILDNUMBER" in os.environ:
+        ciBuildNumber = os.getenv("BUILD_BUILDNUMBER").split(".")[-1] # Azure Devops, which includes the date
+    else:
+        ciBuildNumber = os.getenv("BUILD_NUMBER") # Jenkins, which does not include the date
     timeToUse = plugins.globalStartTime
-    if jenkinsBuildNumber is None:
+    if ciBuildNumber is None:
         # If we're not using Jenkins, assume some kind of nightjob set up (mostly for historical reasons)
         # Here we use a standardised date that give a consistent answer for night-jobs.
         # Hence midnight is a bad cutover point. The day therefore starts and ends at 8am :)
         timeToUse -= datetime.timedelta(hours=8)
     name = timeToUse.strftime("%d%b%Y")
-    if jenkinsBuildNumber is not None:
-        name += "." + jenkinsBuildNumber
+    if ciBuildNumber is not None:
+        name += "." + ciBuildNumber
     return name
 
 

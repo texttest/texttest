@@ -538,7 +538,7 @@ def getChanges(build1, build2, *args):
 
 
 def getTimestamp(build):
-    if hasattr(os, "readlink"):
+    if hasattr(os, "readlink") and "JENKINS_HOME" in os.environ:
         jobRoot = os.path.join(os.getenv("JENKINS_HOME"), "jobs")
         buildsDir = getBuildsDir(jobRoot, os.getenv("JOB_NAME"))
         if buildsDir:

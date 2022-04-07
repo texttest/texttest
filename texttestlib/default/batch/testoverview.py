@@ -14,6 +14,7 @@ from glob import glob
 from pprint import pformat
 from datetime import datetime, timedelta
 from .batchutils import convertToUrl, getEnvironmentFromRunFiles
+import urllib.parse
 HTMLgen.PRINTECHO = 0
 
 
@@ -532,7 +533,7 @@ class TestTable:
             return table
 
     def findJenkinsChanges(self, prevTag, tag, cacheDir):
-        buildNumber = self.getJenkinsBuildNumber(tag)
+        buildNumber = self.getCiBuildNumber(tag)
         cacheFileOldName = os.path.join(cacheDir, buildNumber)
         cacheFile = os.path.join(cacheDir, tag)
         if os.path.isfile(cacheFileOldName):
@@ -543,7 +544,7 @@ class TestTable:
             bugSystemData = self.getConfigValue("bug_system_location", allSubKeys=True)
             markedArtefacts = self.getConfigValue("batch_jenkins_marked_artefacts")
             fileFinder = self.getConfigValue("batch_jenkins_archive_file_pattern")
-            prevBuildNumber = self.getJenkinsBuildNumber(prevTag) if prevTag else None
+            prevBuildNumber = self.getCiBuildNumber(prevTag) if prevTag else None
             if buildNumber.isdigit() and prevBuildNumber is not None:
                 try:
                     allChanges = jenkinschanges.getChanges(
@@ -556,7 +557,7 @@ class TestTable:
                     pass  # don't write to cache in this case
             return []
 
-    def getJenkinsBuildNumber(self, tag):
+    def getCiBuildNumber(self, tag):
         return tag.split(".")[-1]
 
     def generateJenkinsChanges(self, pageDir):
@@ -766,25 +767,37 @@ class TestTable:
     def getRunEnv(self, runEnv, key):
         return runEnv.get(key, os.getenv(key))
 
+    def getCiLinkData(self, runEnv, buildNumber):
+        jenkinsUrl = self.getRunEnv(runEnv, "JENKINS_URL")
+        if jenkinsUrl:
+            target = os.path.join(jenkinsUrl, "job", self.getRunEnv(runEnv, "JOB_NAME"), buildNumber)
+            title = "Jenkins " + buildNumber
+        else:
+            azdoUrl = self.getRunEnv(runEnv, "SYSTEM_TEAMFOUNDATIONSERVERURI")
+            if azdoUrl:
+                project = urllib.parse.quote(self.getRunEnv(runEnv, "SYSTEM_TEAMPROJECT"))
+                target = os.path.join(azdoUrl, project, "_build", "results?buildId=" + self.getRunEnv(runEnv, "BUILD_BUILDID"))   
+                title = "AZ DevOps " + self.getRunEnv(runEnv, "BUILD_BUILDNUMBER")
+        return title, target
+
     def generateTableHead(self, repositoryDirs):
         head = [HTMLgen.TH("Test")]
-        jenkinsUrl = os.getenv("JENKINS_URL")
-        runNameDirs = self.getRunNameDirs(repositoryDirs) if jenkinsUrl else []
+        ciUrl = os.getenv("JENKINS_URL") or os.getenv("SYSTEM_TEAMFOUNDATIONSERVERURI")
+        runNameDirs = self.getRunNameDirs(repositoryDirs) if ciUrl else []
         for tag in self.tags:
             tagColour = self.findTagColour(tag)
             linkTarget = getDetailPageName(self.pageVersion, tag)
             linkText = HTMLgen.Font(getDisplayText(tag), color=tagColour)
-            buildNumber = self.getJenkinsBuildNumber(tag)
-            if jenkinsUrl and buildNumber.isdigit():
+            buildNumber = self.getCiBuildNumber(tag)
+            if ciUrl and buildNumber.isdigit():
                 runEnv = getEnvironmentFromRunFiles(runNameDirs, tag)
                 container = HTMLgen.Container()
                 tooltip = jenkinschanges.getTimestamp(buildNumber)
                 container.append(HTMLgen.Href(linkTarget, linkText, title=tooltip))
                 container.append(HTMLgen.BR())
-                jobTarget = os.path.join(self.getRunEnv(runEnv, "JENKINS_URL"), "job",
-                                         self.getRunEnv(runEnv, "JOB_NAME"), buildNumber)
-                jobText = HTMLgen.Emphasis(HTMLgen.Font("(Jenkins " + buildNumber + ")", size=1))
-                container.append(HTMLgen.Href(jobTarget, jobText, title=tooltip))
+                ciTitle, ciTarget = self.getCiLinkData(runEnv, buildNumber)
+                ciText = HTMLgen.Emphasis(HTMLgen.Font("(" + ciTitle + ")", size=1))
+                container.append(HTMLgen.Href(ciTarget, ciText, title=tooltip))
                 head.append(HTMLgen.TH(container))
             else:
                 head.append(HTMLgen.TH(HTMLgen.Href(linkTarget, linkText)))

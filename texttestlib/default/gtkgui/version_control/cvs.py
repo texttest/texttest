@@ -212,7 +212,7 @@ class CVSLogLatest(vcs_independent.LogGUI):
         message = self.getResultDialogMessage()
         if message:
             hbox = Gtk.HBox()
-            icon = Gtk.STOCK_DIALOG_INFO
+            icon = "dialog-information-symbolic"
             hbox.pack_start(self.getStockIcon(icon), False, False, 0)
             hbox.pack_start(Gtk.Label(message), False, False, 0)
             alignment = Gtk.Alignment.new(0.0, 1.0, 1.0, 1.0)

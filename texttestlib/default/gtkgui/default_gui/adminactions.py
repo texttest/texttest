@@ -89,7 +89,7 @@ class PasteTests(FocusDependentAction):
         return True
 
     def _getStockId(self):
-        return "paste"
+        return "edit-paste"
 
     def _getTitle(self):
         return "_Paste"
@@ -276,7 +276,7 @@ class ImportTest(guiplugins.ActionDialogGUI):
             return ""
 
     def _getStockId(self):
-        return "add"
+        return "list-add"
 
     def getSizeAsWindowFraction(self):
         # size of the dialog
@@ -521,7 +521,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         return True
 
     def _getStockId(self):
-        return "add"
+        return "list-add"
 
     def _getTitle(self):
         return "Add Application"
@@ -813,7 +813,7 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         return "Create a new file or directory, possibly by copying it"
 
     def _getStockId(self):
-        return "new"
+        return "document-new"
 
     def getDialogTitle(self):
         return "Create/Import Files and Directories"
@@ -1158,7 +1158,7 @@ class RemoveFiles(guiplugins.ActionGUI):
         return "Remove..."
 
     def _getStockId(self):
-        return "delete"
+        return "edit-delete"
 
     def getTooltip(self):
         return "Remove selected files"
@@ -1301,7 +1301,7 @@ class RepositionTestUp(RepositionTest):
 
 class RepositionTestFirst(RepositionTest):
     def _getStockId(self):
-        return "goto-top"
+        return "go-top"
 
     def _getTitle(self):
         return "Move to first"
@@ -1323,7 +1323,7 @@ class RepositionTestFirst(RepositionTest):
 
 class RepositionTestLast(RepositionTest):
     def _getStockId(self):
-        return "goto-bottom"
+        return "go-bottom"
 
     def _getTitle(self):
         return "Move to last"
@@ -1349,7 +1349,7 @@ class RenameAction(guiplugins.ActionDialogGUI):
         return True
 
     def _getStockId(self):
-        return "italic"
+        return "format-text-italic"
 
     def _getTitle(self):
         return "_Rename..."
@@ -1494,7 +1494,7 @@ class RenameFile(RenameAction):
         return ["ReloadConfig", "ShortcutRename"]
 
     def _getStockId(self):
-        return "italic"
+        return "format-text-italic"
 
     def getActionName(self):
         return "Rename File"
@@ -1570,7 +1570,7 @@ class SortTestSuiteFileAscending(guiplugins.ActionGUI):
         return guiplugins.ActionGUI.isActiveOnCurrent(self, *args) and not self.currTestSelection[0].autoSortOrder
 
     def _getStockId(self):
-        return "sort-ascending"
+        return "view-sort-ascending"
 
     def _getTitle(self):
         return "_Sort Test Suite File"
@@ -1612,7 +1612,7 @@ class SortTestSuiteFileAscending(guiplugins.ActionGUI):
 
 class SortTestSuiteFileDescending(SortTestSuiteFileAscending):
     def _getStockId(self):
-        return "sort-descending"
+        return "view-sort-descending"
 
     def _getTitle(self):
         return "_Reversed Sort Test Suite File"
@@ -1702,7 +1702,7 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         return bugSystems
 
     def _getStockId(self):
-        return "info"
+        return "dialog-information"
 
     def _getTitle(self):
         return "Enter Failure Information"

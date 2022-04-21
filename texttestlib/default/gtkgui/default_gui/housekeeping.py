@@ -54,7 +54,7 @@ class Quit(guiplugins.BasicActionGUI):
         confirmationMessage = self.getConfirmationMessage()
         if confirmationMessage:
             dialog = self.showQueryDialog(self.getParentWindow(), confirmationMessage,
-                                          Gtk."dialog-warning-symbolic", "Confirmation", None)
+                                          "dialog-warning-symbolic", "Confirmation", None)
             responseId = dialog.run()
             saidCancel = responseId not in [Gtk.ResponseType.ACCEPT, Gtk.ResponseType.YES, Gtk.ResponseType.OK]
             dialog.hide()
@@ -243,7 +243,7 @@ class ShowProcesses(guiplugins.ActionResultDialogGUI):
             self.dialog.vbox.pack_start(processBox, True, True, 0)
         else:
             messageBox = self.createDialogMessage(
-                "No external processes have been launched from this TextTest instance.", Gtk."dialog-information-symbolic")
+                "No external processes have been launched from this TextTest instance.", "dialog-information-symbolic")
             self.dialog.vbox.pack_start(messageBox, True, True, 0)
 
     def makePopup(self):

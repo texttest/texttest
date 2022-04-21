@@ -176,7 +176,7 @@ class ViewInEditor(FileViewAction):
         self.dynamic = dynamic
 
     def _getStockId(self):
-        return "open"
+        return "document-open"
 
     def getToolConfigEntry(self):
         return "view_program"
@@ -333,12 +333,12 @@ class EditTestFileInEditor(ViewTestFileInEditor):
         return isNewFile
 
     def _getStockId(self):
-        pass  # don't use same stock for both
+        return None  # don't use same stock for both
 
 
 class ViewFilteredTestFileInEditor(ViewTestFileInEditor):
     def _getStockId(self):
-        pass  # don't use same stock for both
+        return None  # don't use same stock for both
 
     def useFiltered(self):
         return True

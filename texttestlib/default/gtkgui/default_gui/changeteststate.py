@@ -81,9 +81,6 @@ class ApproveTests(BackgroundThreadHelper, guiplugins.ActionDialogGUI):
             saveDesc += ", only files " + ",".join(stemsToApprove)
         return saveDesc
 
-    def _getStockId(self):
-        return "apply"
-
     def _getTitle(self):
         return "Approve _As..."
 
@@ -221,9 +218,6 @@ class SplitResultFiles(guiplugins.ActionGUI):
     def _getTitle(self):
         return "Split result files"
 
-    def _getStockId(self):
-        return "convert"
-
     def getTooltip(self):
         return "Split result files to be able to handle different changes separately"
 
@@ -267,7 +261,7 @@ class RecomputeTests(BackgroundThreadHelper, guiplugins.ActionGUI):
         return "Recompute Status"
 
     def _getStockId(self):
-        return "refresh"
+        return "view-refresh"
 
     def getTooltip(self):
         return "Recompute test status, including progress information if appropriate"
@@ -432,7 +426,7 @@ class UnsuspendTests(guiplugins.ActionGUI):
 
 class KillTests(guiplugins.ActionGUI):
     def _getStockId(self):
-        return "stop"
+        return "process-stop"
 
     def _getTitle(self):
         return "_Kill"
@@ -529,7 +523,7 @@ class FindKnownBugs(guiplugins.ActionDialogGUI):
         self.rootSuites = []
 
     def _getStockId(self):
-        return "find"
+        return "edit-find"
 
     def _getTitle(self):
         return "Find Failure Information"

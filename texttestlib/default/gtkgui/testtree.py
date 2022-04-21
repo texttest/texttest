@@ -419,7 +419,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
 
     def getRecalculationIcon(self, recalc):
         if recalc:
-            return "gtk-refresh"
+            return "view-refresh"
         else:
             return ""
 

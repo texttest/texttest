@@ -155,7 +155,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         return ["SetTestSelection", "Visibility", "ResetVisibility", "AllStems"]
 
     def _getStockId(self):
-        return "find"
+        return "edit-find"
 
     def _getTitle(self):
         return "_Select"
@@ -462,7 +462,7 @@ class SaveSelection(guiplugins.ActionDialogGUI):
         self.rootTestSuites += suites
 
     def _getStockId(self):
-        return "save-as"
+        return "document-save-as"
 
     def _getTitle(self):
         return "S_ave Selection..."
@@ -490,7 +490,7 @@ class SaveSelection(guiplugins.ActionDialogGUI):
             return "\nThe file \n" + fileName + "\nalready exists.\n\nDo you want to overwrite it?\n"
 
     def getConfirmationDialogSettings(self):
-        return Gtk.STOCK_DIALOG_QUESTION, "Query"
+        return "dialog-question-symbolic", "Query"
 
     def notifySaveSelection(self, fileName, writeCriteria=False):
         try:
@@ -538,7 +538,7 @@ class LoadSelection(guiplugins.ActionDialogGUI):
         return ["SetTestSelection"]
 
     def _getStockId(self):
-        return "open"
+        return "document-open"
 
     def _getTitle(self):
         return "_Load Selection..."

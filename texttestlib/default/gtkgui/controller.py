@@ -408,12 +408,12 @@ class TopWindowGUI(guiutils.ContainerGUI):
         # Create toplevel window to show it all.
         self.topWindow = Gtk.Window(Gtk.WindowType.TOPLEVEL)
         self.topWindow.set_name("Top Window")
-        try:
-            from . import stockitems
-            stockitems.register(self.topWindow)
-        except Exception:  # pragma : no cover - should never happen
-            plugins.printWarning("Failed to register texttest stock icons.")
-            plugins.printException()
+        # try:
+        #     from . import stockitems
+        #     stockitems.register(self.topWindow)
+        # except Exception:  # pragma : no cover - should never happen
+        #     plugins.printWarning("Failed to register texttest stock icons.")
+        #     plugins.printException()
         iconFile = self.getIcon()
         try:
             self.topWindow.set_icon_from_file(iconFile)

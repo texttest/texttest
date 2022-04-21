@@ -946,7 +946,7 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
             self.addFilterBoxes(allFilters, fileName, test, versionApp)
         else:
             messageBox = self.createDialogMessage(
-                "No run_dependent_text filters defined for file '" + os.path.basename(fileName) + "' for this test.", Gtk."dialog-information-symbolic")
+                "No run_dependent_text filters defined for file '" + os.path.basename(fileName) + "' for this test.", "dialog-information-symbolic")
             self.dialog.vbox.pack_start(messageBox, True, True, 0)
 
     def editFilter(self, cell, path, newText, model):

@@ -285,8 +285,8 @@ class GenerateWebPages(object):
         scriptCode = "var TEST_ROW_HEADER_COLOR = " + repr(rowHeaderColour) + ";\n" + \
                      "var Colors = " + repr(sortedColours) + ";"
         scripts = [HTMLgen.Script(code=scriptCode),
-                   HTMLgen.Script(src="../javascript/filter.js"),
-                   HTMLgen.Script(src="../javascript/jquery.js")]
+                   HTMLgen.Script(src="../javascript/jquery.js"),
+                   HTMLgen.Script(src="../javascript/filter.js")]
         if self.includeCommentPlugin():
             scripts.append(HTMLgen.Script(src="../javascript/comment.js"))
         return scripts

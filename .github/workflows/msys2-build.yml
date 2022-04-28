@@ -38,7 +38,7 @@ jobs:
       run: |
         cp -a bin texttestlib setup_win32.py meld
         cp wininstall/*.ico meld/data/icons
-        cp -a adwaita/Adwaita /usr/share/icons
+        cp -aL adwaita/Adwaita /usr/share/icons
 
     - name: Building package
       shell: msys2 {0}

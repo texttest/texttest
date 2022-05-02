@@ -1103,7 +1103,7 @@ class WebPageResponder(plugins.Responder):
         plugins.ensureDirectoryExists(pageDir)
         ignoreCommentFiles = getConfigValue("batch_include_comment_plugin") != "true"
         for fn in sorted(os.listdir(srcDir)):
-            if ignoreCommentFiles and (fn.startswith("comment") or fn == "jquery.js"):
+            if ignoreCommentFiles and fn.startswith("comment"):
                 continue
             targetDir = pageDir if fn.endswith(".php") else jsDir  # Server-side stuff is per application
             targetPath = os.path.join(targetDir, fn)

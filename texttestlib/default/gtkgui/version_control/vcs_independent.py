@@ -232,9 +232,9 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
 
     def getResultDialogIconType(self):
         if self.showWarning():
-            return Gtk.STOCK_DIALOG_WARNING
+            return "dialog-warning-symbolic"
         else:
-            return Gtk.STOCK_DIALOG_INFO
+            return "dialog-information-symbolic"
 
     def getExtraArgs(self):
         return []

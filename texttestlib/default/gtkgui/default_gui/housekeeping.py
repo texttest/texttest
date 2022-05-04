@@ -17,7 +17,7 @@ class Quit(guiplugins.BasicActionGUI):
         self.runName = inputOptions.get("name", "") if dynamic else None
 
     def _getStockId(self):
-        return "quit"
+        return "application-exit"
 
     def _getTitle(self):
         return "_Quit"
@@ -54,7 +54,7 @@ class Quit(guiplugins.BasicActionGUI):
         confirmationMessage = self.getConfirmationMessage()
         if confirmationMessage:
             dialog = self.showQueryDialog(self.getParentWindow(), confirmationMessage,
-                                          Gtk.STOCK_DIALOG_WARNING, "Confirmation", None)
+                                          "dialog-warning-symbolic", "Confirmation", None)
             responseId = dialog.run()
             saidCancel = responseId not in [Gtk.ResponseType.ACCEPT, Gtk.ResponseType.YES, Gtk.ResponseType.OK]
             dialog.hide()
@@ -70,7 +70,7 @@ class ResetGroups(guiplugins.BasicActionGUI):
         return True
 
     def _getStockId(self):
-        return "revert-to-saved"
+        return "document-revert"
 
     def _getTitle(self):
         return "R_eset"
@@ -129,7 +129,7 @@ class RefreshAll(guiplugins.BasicActionGUI):
         return "Refresh"
 
     def _getStockId(self):
-        return "refresh"
+        return "view-refresh"
 
     def getTooltip(self):
         return "Refresh the whole test suite so that it reflects file changes"
@@ -243,7 +243,7 @@ class ShowProcesses(guiplugins.ActionResultDialogGUI):
             self.dialog.vbox.pack_start(processBox, True, True, 0)
         else:
             messageBox = self.createDialogMessage(
-                "No external processes have been launched from this TextTest instance.", Gtk.STOCK_DIALOG_INFO)
+                "No external processes have been launched from this TextTest instance.", "dialog-information-symbolic")
             self.dialog.vbox.pack_start(messageBox, True, True, 0)
 
     def makePopup(self):

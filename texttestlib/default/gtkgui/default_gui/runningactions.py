@@ -214,9 +214,6 @@ class ReconnectToTests(BasicRunningAction, guiplugins.ActionDialogGUI):
         self.addApplicationOptions(allApps, appGroup, inputOptions)
         self.addSwitch("reconnfull", "Recomputation", options=appGroup.getOption("reconnfull").options)
 
-    def _getStockId(self):
-        return "connect"
-
     def _getTitle(self):
         return "Re_connect..."
 
@@ -252,9 +249,6 @@ class ReloadTests(BasicRunningAction, guiplugins.ActionDialogGUI):
 
     def getTmpDirectory(self):
         return self.currAppSelection[0].writeDirectory
-
-    def _getStockId(self):
-        return "connect"
 
     def _getTitle(self):
         return "Re_load tests..."
@@ -465,7 +459,7 @@ class RunningAction(BasicRunningAction):
         self.temporaryGroup.reset()
 
     def _getStockId(self):
-        return "media-play"
+        return "media-playback-start"
 
 
 class RunTests(RunningAction, guiplugins.ActionTabGUI):
@@ -822,15 +816,15 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
 
     def notifyUsecaseRename(self, argstr, *args):
         self.showQueryDialog(self.getParentWindow(), "Usecase names were renamed. Would you like to update them in all usecases now?",
-                             Gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respondUsecaseRename, respondData=(argstr, False, "*usecase*,stdout"))
+                             "dialog-warning-symbolic", "Confirmation", self.respondUsecaseRename, respondData=(argstr, False, "*usecase*,stdout"))
 
     def notifyShortcutRename(self, argstr, *args):
         self.showQueryDialog(self.getParentWindow(), "Shortcuts were renamed. Would you like to update all usecases now?",
-                             Gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respondUsecaseRename, respondData=(argstr, True, "*usecase*"))
+                             "dialog-warning-symbolic", "Confirmation", self.respondUsecaseRename, respondData=(argstr, True, "*usecase*"))
 
     def notifyShortcutRemove(self, argstr, *args):
         self.showQueryDialog(self.getParentWindow(), "Shortcuts were removed. Would you like to update all usecases now?",
-                             Gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respondUsecaseRename, respondData=(argstr, True, "*usecase*"))
+                             "dialog-warning-symbolic", "Confirmation", self.respondUsecaseRename, respondData=(argstr, True, "*usecase*"))
 
     def respondUsecaseRename(self, dialog, ans, args):
         if ans == Gtk.ResponseType.YES:
@@ -952,7 +946,7 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
             self.addFilterBoxes(allFilters, fileName, test, versionApp)
         else:
             messageBox = self.createDialogMessage(
-                "No run_dependent_text filters defined for file '" + os.path.basename(fileName) + "' for this test.", Gtk.STOCK_DIALOG_INFO)
+                "No run_dependent_text filters defined for file '" + os.path.basename(fileName) + "' for this test.", "dialog-information-symbolic")
             self.dialog.vbox.pack_start(messageBox, True, True, 0)
 
     def editFilter(self, cell, path, newText, model):
@@ -1161,7 +1155,7 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
     def createButtons(self):
         button = self.dialog.add_button('Test Filtering', Gtk.ResponseType.NONE)
         button.connect("clicked", self.testFiltering)
-        self.dialog.add_button(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
+        self.dialog.add_button("_Cancel", Gtk.ResponseType.CANCEL)
         self.dialog.add_button("Apply and Close", Gtk.ResponseType.ACCEPT)
         self.dialog.set_default_response(Gtk.ResponseType.ACCEPT)
         self.dialog.connect("response", self.respond)
@@ -1191,7 +1185,7 @@ class InsertShortcuts(RunScriptAction, guiplugins.OptionGroupGUI):
 
     def notifyShortcut(self, *args):
         self.showQueryDialog(self.getParentWindow(), "New shortcuts were created. Would you like to insert them into all usecases now?",
-                             Gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respondShortcut)
+                             "dialog-warning-symbolic", "Confirmation", self.respondShortcut)
 
     def respondShortcut(self, dialog, ans, *args):
         if ans == Gtk.ResponseType.YES:

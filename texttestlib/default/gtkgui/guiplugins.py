@@ -212,12 +212,10 @@ class BasicActionGUI(SubGUI, GtkActionWrapper):
         return True
 
     def getStockId(self):
-        stockId = self._getStockId()
-        if stockId:
-            return "gtk-" + stockId
+        return self._getStockId() + "-symbolic" if self._getStockId() else None
 
     def _getStockId(self):  # The stock ID for the action, in toolbar and menu.
-        pass
+        return None
 
     def setObservers(self, observers):
         signals = ["Status", "ActionStart"] + self.getSignalsSent()
@@ -259,14 +257,14 @@ class BasicActionGUI(SubGUI, GtkActionWrapper):
         return alignment
 
     def showErrorDialog(self, message):
-        self.showErrorWarningDialog(message, Gtk.STOCK_DIALOG_ERROR, "Error")
+        self.showErrorWarningDialog(message, "dialog-error-symbolic", "Error")
 
     def showWarningDialog(self, message):
-        self.showErrorWarningDialog(message, Gtk.STOCK_DIALOG_WARNING, "Warning")
+        self.showErrorWarningDialog(message, "dialog-warning-symbolic", "Warning")
 
     def showErrorWarningDialog(self, message, stockIcon, alarmLevel):
         dialog = self.createAlarmDialog(self.getParentWindow(), message, stockIcon, alarmLevel)
-        dialog.add_button(Gtk.STOCK_OK, Gtk.ResponseType.ACCEPT)
+        dialog.add_button("_OK", Gtk.ResponseType.ACCEPT)
         dialog.set_default_response(Gtk.ResponseType.ACCEPT)
         dialog.connect("response", lambda d, r: self._cleanDialog(d))
         dialog.show_all()
@@ -286,8 +284,8 @@ class BasicActionGUI(SubGUI, GtkActionWrapper):
     def showQueryDialog(self, parent, message, stockIcon, alarmLevel, respondMethod, respondData=None):
         dialog = self.createAlarmDialog(parent, message, stockIcon, alarmLevel)
         dialog.set_default_response(Gtk.ResponseType.NO)
-        dialog.add_button(Gtk.STOCK_NO, Gtk.ResponseType.NO)
-        dialog.add_button(Gtk.STOCK_YES, Gtk.ResponseType.YES)
+        dialog.add_button("_No", Gtk.ResponseType.NO)
+        dialog.add_button("_Yes", Gtk.ResponseType.YES)
         if respondMethod:
             dialog.connect("response", respondMethod, respondData)
         dialog.show_all()
@@ -323,7 +321,7 @@ class BasicActionGUI(SubGUI, GtkActionWrapper):
             confirmationMessage = self.getConfirmationMessage()
             if confirmationMessage:
                 self.showQueryDialog(self.getParentWindow(), confirmationMessage,
-                                     Gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respond)
+                                     "dialog-warning-symbolic", "Confirmation", self.respond)
             else:
                 # Each time we perform an action we collect and save the current registered entries
                 # Actions showing dialogs will handle this in the dialog code.
@@ -494,7 +492,7 @@ class ActionGUI(BasicActionGUI):
         button.set_related_action(action)
         # In theory all this should be automatic, but it appears not to work
         if self.getStockId():
-            image = Gtk.Image.new_from_stock(self.getStockId(), Gtk.IconSize.BUTTON)
+            image = Gtk.Image.new_from_icon_name(self.getStockId(), Gtk.IconSize.BUTTON)
             button.set_image(image)
             image.show()
 
@@ -537,7 +535,7 @@ class ActionResultDialogGUI(ActionGUI):
         pass
 
     def createButtons(self):
-        self.dialog.add_button(Gtk.STOCK_CLOSE, Gtk.ResponseType.ACCEPT)
+        self.dialog.add_button("window-close-symbolic", Gtk.ResponseType.ACCEPT)
         self.dialog.set_default_response(Gtk.ResponseType.ACCEPT)
         self.dialog.connect("response", self.respond)
 
@@ -836,8 +834,8 @@ class OptionGroupGUI(ActionGUI):
         dialog = Gtk.FileChooserDialog("Select a file",
                                        self.getParentWindow(),
                                        Gtk.FileChooserAction.OPEN,
-                                       (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                                        Gtk.STOCK_OPEN, Gtk.ResponseType.OK))
+                                       ("_Cancel", Gtk.ResponseType.CANCEL,
+                                        "document-open-symbolic", Gtk.ResponseType.OK))
         self.startFileChooser(dialog, entry, option)
 
     def startFileChooser(self, dialog, entry, option):
@@ -1007,7 +1005,7 @@ class ActionDialogGUI(OptionGroupGUI):
         return False
 
     def getConfirmationDialogSettings(self):
-        return Gtk.STOCK_DIALOG_WARNING, "Confirmation"
+        return "dialog-warning-symbolic", "Confirmation"
 
     def _respond(self, saidOK=True, dialog=None, fileChooserOption=None):
         if saidOK:
@@ -1055,14 +1053,14 @@ class ActionDialogGUI(OptionGroupGUI):
 
     def getOkStock(self, scriptName):
         if scriptName.startswith("load"):
-            return "texttest-stock-load"
+            return "document-open-symbolic"
         elif scriptName.startswith("save"):
-            return Gtk.STOCK_SAVE
+            return "document-save-symbolic"
         else:
-            return Gtk.STOCK_OK
+            return "_OK"
 
     def createButtons(self, dialog, fileChooser, fileChooserOption):
-        dialog.add_button(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
+        dialog.add_button("_Cancel", Gtk.ResponseType.CANCEL)
         actionScriptName = self.getTooltip()
         dialog.add_button(self.getOkStock(actionScriptName.lower()), Gtk.ResponseType.ACCEPT)
         dialog.set_default_response(Gtk.ResponseType.ACCEPT)

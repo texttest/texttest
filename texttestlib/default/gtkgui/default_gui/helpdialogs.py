@@ -27,7 +27,7 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         return True
 
     def _getStockId(self):
-        return "about"
+        return "help-about"
 
     def _getTitle(self):
         return "_About TextTest"

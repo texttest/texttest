@@ -90,7 +90,7 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
         guiplugins.ActionResultDialogGUI.__init__(self, allApps)
 
     def _getStockId(self):
-        return "properties"
+        return "document-properties"
 
     def isActiveOnCurrent(self, *args):
         return ((not self.dynamic) or len(self.currTestSelection) == 1) and \

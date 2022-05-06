@@ -1,6 +1,5 @@
 import os
 import filecmp
-import string
 import shutil
 import logging
 from texttestlib.default import performance, knownbugs
@@ -387,6 +386,9 @@ class TestComparison(BaseTestComparison):
                 splitComps.append(comp)
         return parentComp, splitComps
 
+    def getCaptureMockStems(self):
+        return [ "externalmocks", "traffic" ]
+
     def save(self, test, exact=True, versionString=None, overwriteSuccessFiles=False, onlyStems=[], backupVersions=[]):
         self.diag.info("Approving " + repr(test) + " stems " + repr(onlyStems) + ", exact=" + repr(exact))
         for comparison in self.filterComparisons(self.changedResults, onlyStems):
@@ -399,7 +401,7 @@ class TestComparison(BaseTestComparison):
             self.updateStatus(test, str(comparison), versionString)
             comparison.saveMissing(versionString, self.fakeMissingFileText(), backupVersions)
         # Save any external file edits we may have made. Only do this on partial saves for CaptureMock related files
-        if len(onlyStems) == 0 or "externalmocks" in onlyStems or "traffic" in onlyStems:
+        if len(onlyStems) == 0 or any((mockStem in onlyStems for mockStem in self.getCaptureMockStems())):
             self.saveFileEdits(test, versionString)
         elif any(("/" in stem for stem in onlyStems)):  # We've explicitly selected split files
             self.rebuildFromSplit(onlyStems, test, exact, versionString, backupVersions)
@@ -413,6 +415,9 @@ class TestComparison(BaseTestComparison):
         fileEditDir = test.dircache.pathName("file_edits")
         if versionString:
             fileEditDir += "." + versionString
+        if os.path.isdir(fileEditDir) and test.app.isRecording():
+            # Recording that we've approved the CaptureMock part of. Don't let files from previous recordings get left behind!
+            shutil.rmtree(fileEditDir)
         if os.path.isdir(tmpFileEditDir):
             for root, _, files in os.walk(tmpFileEditDir):
                 for file in sorted(files):

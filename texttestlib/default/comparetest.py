@@ -386,8 +386,8 @@ class TestComparison(BaseTestComparison):
                 splitComps.append(comp)
         return parentComp, splitComps
 
-    def getCaptureMockStems(self):
-        return [ "externalmocks", "traffic" ]
+    def hasCaptureMockStems(self, onlyStems):
+        return "externalmocks" in onlyStems or "traffic" in onlyStems
 
     def save(self, test, exact=True, versionString=None, overwriteSuccessFiles=False, onlyStems=[], backupVersions=[]):
         self.diag.info("Approving " + repr(test) + " stems " + repr(onlyStems) + ", exact=" + repr(exact))
@@ -401,7 +401,7 @@ class TestComparison(BaseTestComparison):
             self.updateStatus(test, str(comparison), versionString)
             comparison.saveMissing(versionString, self.fakeMissingFileText(), backupVersions)
         # Save any external file edits we may have made. Only do this on partial saves for CaptureMock related files
-        if len(onlyStems) == 0 or any((mockStem in onlyStems for mockStem in self.getCaptureMockStems())):
+        if len(onlyStems) == 0 or self.hasCaptureMockStems(onlyStems):
             self.saveFileEdits(test, versionString)
         elif any(("/" in stem for stem in onlyStems)):  # We've explicitly selected split files
             self.rebuildFromSplit(onlyStems, test, exact, versionString, backupVersions)

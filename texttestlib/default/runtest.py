@@ -59,9 +59,12 @@ class RunTest(plugins.Action):
 
     def changeToRunningState(self, test):
         execMachines = test.state.executionHosts
-        self.diag.info("Changing " + repr(test) + " to state Running on " + repr(execMachines))
+        self.diag.info("Changing {} to state Running on {}".format(
+            repr(test),
+            repr(execMachines)))
+
         briefText = self.getBriefText(execMachines)
-        freeText = "Running on " + ",".join(execMachines)
+        freeText = "Running on {}".format(plugins.compactHostRepr(execMachines))
         newState = Running(execMachines, briefText=briefText, freeText=freeText)
         test.changeState(newState)
 

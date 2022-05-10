@@ -27,7 +27,7 @@ def importAndCallFromQueueSystem(app, *args):
 # Use a non-monitoring runTest, but the rest from unix
 class RunTestInSlave(RunTest):
     def getBriefText(self, execMachines):
-        return "RUN (" + ",".join(execMachines) + ")"
+        return "RUN ({})".format(plugins.compactHostRepr(execMachines))
 
     def getKillInfoOtherSignal(self, test):
         if os.name == "posix":

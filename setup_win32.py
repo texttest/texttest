@@ -48,7 +48,7 @@ def _get_data_path():
                 break
         module.code = code_object_replace(code, co_consts=consts)
 
-if cx_Freeze.version == "6.8.1":
+if hasattr(cx_Freeze, "version") and cx_Freeze.version == "6.8.1":
     import cx_Freeze.hooks
     from pathlib import Path
     from cx_Freeze.common import code_object_replace

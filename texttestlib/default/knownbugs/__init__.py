@@ -73,9 +73,11 @@ class BugSystemBug(Bug):
 
     def findBugInfo(self, bugId, location, username, password):
         namespace = {}
-        exec("from ." + self.bugSystem + " import findBugInfo as _findBugInfo", globals(), namespace)
-        return namespace["_findBugInfo"](self.bugId, location, username, password)  # @UndefinedVariable
-
+        try:
+            exec("from ." + self.bugSystem + " import findBugInfo as _findBugInfo", globals(), namespace)
+            return namespace["_findBugInfo"](self.bugId, location, username, password)  # @UndefinedVariable
+        except ImportError:
+            return "unknown", "Bug " + bugId + " in unknown bug system '" + self.bugSystem + "'", False, bugId
 
 class UnreportedBug(Bug):
     def __init__(self, fullText, briefText, internalError, priorityStr, *args):

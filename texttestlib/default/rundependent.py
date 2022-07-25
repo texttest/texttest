@@ -257,7 +257,7 @@ class RunDependentTextFilter(plugins.Observable):
             lineNumber += 1
             lineFilter, filteredLine, removeCount = self.getFilteredLine(line, lineNumber, lineFilters)
             if removeCount:
-                seekPoint = seekPoints[-removeCount - 1]
+                seekPoint = seekPoints[-removeCount - 1] if removeCount < len(seekPoints) else 0
                 self.diag.info("Removing " + repr(removeCount) + " lines")
                 newFile.seek(seekPoint)
                 newFile.truncate()

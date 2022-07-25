@@ -1216,6 +1216,8 @@ class Config:
                              "default": []}, "Which performance/memory entries should be shown as separate lines in the historical report")
         app.setConfigDefault("historical_report_piechart_summary", {
                              "default": "false"}, "Generate pie chart summary page rather than default HTML tables.")
+        app.setConfigDefault("historical_report_split_version", {
+                             "default": "false"}, "Split pages per version.")
         app.setConfigDefault("batch_sender", {"default": self.getDefaultMailAddress()},
                              "Sender address to use sending mail in batch mode")
         app.setConfigDefault("batch_recipients", {"default": ""},

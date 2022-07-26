@@ -461,7 +461,7 @@ class TestProgressMonitor(guiutils.SubGUI):
             testCount = self.treeModel.get_value(iter, 1)
             self.treeModel.set_value(iter, 1, testCount - 1)
             if testCount == 1:
-                self.treeModel.set_value(iter, 3, "white")
+                self.treeModel.set_value(iter, 3, None)
                 self.treeModel.set_value(iter, 4, "")
             allTests.remove(test)
             self.diag.info("Removing test " + repr(test) + " from node " + self.treeModel.get_value(iter, 0))

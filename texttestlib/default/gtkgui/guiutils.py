@@ -314,16 +314,18 @@ class GUIConfig:
 
     @staticmethod
     def getDefaultColours():
+        dark = "dark" in Gtk.Settings.get_default().get_property("gtk-theme-name")
+        run_col = "DarkGoldenrod1" if dark else "LightGoldenrod1"
         d = {}
         d["default"] = "salmon"
-        d["success"] = "DarkSeaGreen2"
+        d["success"] = "DarkSeaGreen4" if dark else "DarkSeaGreen2"
         d["failure"] = "salmon"
-        d["running"] = "LightGoldenrod1"
-        d["initial_filter"] = "LightGoldenrod1"
-        d["final_filter"] = "LightGoldenrod1"
-        d["not_started"] = "white"
+        d["running"] = run_col
+        d["initial_filter"] = run_col
+        d["final_filter"] = run_col
+        d["not_started"] = None if dark else "white"
         d["pending"] = "grey80"
-        d["static"] = "grey90"
+        d["static"] = None if dark else "grey90"
         d["clipboard_cut"] = "red"
         d["clipboard_copy"] = "grey60"
         d["bug"] = "orange"

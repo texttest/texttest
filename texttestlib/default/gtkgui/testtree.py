@@ -290,7 +290,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         nodeName = self.getNodeName(suite, parent)
         self.diag.info("Adding node with name " + nodeName)
         colour = guiutils.guiConfig.getTestColour("not_started")
-        row = [nodeName, colour, [suite], "", colour, self.newTestsVisible, "", "black"]
+        row = [nodeName, colour, [suite], "", colour, self.newTestsVisible, "", None]
         iter = self.model.insert_before(parent, follower, row)
         storeIter = iter.copy()
         self.itermap.store(suite, storeIter)

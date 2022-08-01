@@ -296,7 +296,7 @@ class ApplicationFileGUI(FileViewGUI):
         importedFiles = {}
         allTitles = self.getApplicationTitles()
         for index, app in enumerate(self.allApps):
-            headerRow = ["Files for " + allTitles[index], "white", app.getDirectory(), None, "", ""]
+            headerRow = ["Files for " + allTitles[index], None, app.getDirectory(), None, "", ""]
             confiter = self.model.insert_before(None, None, headerRow)
             for file in self.getConfigFiles(app):
                 self.addFileToModel(confiter, file, colour, [app])
@@ -309,7 +309,7 @@ class ApplicationFileGUI(FileViewGUI):
                                            app.getDirectory(), associatedObject=self.allApps)
             testScripts = self.testScripts.get(app.name)
             if testScripts:
-                headerRow = ["Scripts for " + allTitles[index], "white", app.getDirectory(), None, "", ""]
+                headerRow = ["Scripts for " + allTitles[index], None, app.getDirectory(), None, "", ""]
                 scriptiter = self.model.insert_before(None, None, headerRow)
                 self.addDataFilesUnderIter(scriptiter, sorted(testScripts), colour,
                                            app.getDirectory(), associatedObject=self.allApps)
@@ -327,7 +327,7 @@ class ApplicationFileGUI(FileViewGUI):
         personalDir = plugins.getPersonalConfigDir()
         personalFiles = self.getPersonalFiles(personalDir)
         if len(personalFiles) > 0:
-            headerRow = ["Personal Files", "white", personalDir, None, "", ""]
+            headerRow = ["Personal Files", None, personalDir, None, "", ""]
             persiter = self.model.insert_before(None, None, headerRow)
             self.addDataFilesUnderIter(persiter, personalFiles, colour, personalDir, associatedObject=self.allApps)
 
@@ -568,7 +568,7 @@ class TestFileGUI(FileViewGUI):
     def getRootIterAndColour(self, heading, rootDir=None):
         if not rootDir:
             rootDir = self.currentTest.getDirectory()
-        headerRow = [heading + " Files", "white", rootDir, None, "", ""]
+        headerRow = [heading + " Files", None, rootDir, None, "", ""]
         stditer = self.model.insert_before(None, None, headerRow)
         colour = guiutils.guiConfig.getCompositeValue("file_colours", "static_" + heading.lower(), defaultKey="static")
         return stditer, colour
@@ -604,7 +604,7 @@ class TestFileGUI(FileViewGUI):
         currDir = self.currentTest.getDirectory()
         self.addDataFilesUnderIter(datiter, dataFiles, colour, currDir)
         if inheritedDataFiles:
-            inheritedRow = [self.inheritedText, "white", currDir, None, "", ""]
+            inheritedRow = [self.inheritedText, None, currDir, None, "", ""]
             inheritedIter = self.model.insert_before(datiter, None, inheritedRow)
             for suite, inherited in list(inheritedDataFiles.items()):
                 self.addDataFilesUnderIter(inheritedIter, inherited, colour, suite.getDirectory())
@@ -617,7 +617,7 @@ class TestFileGUI(FileViewGUI):
         for name, filelist in externalFiles:
             exiter = self.model.insert_before(datiter, None)
             self.model.set_value(exiter, 0, name)
-            self.model.set_value(exiter, 1, "white")  # mostly to trigger output...
+            self.model.set_value(exiter, 1, None)  # mostly to trigger output...
             for file in filelist:
                 self.addFileToModel(exiter, file, colour)
 

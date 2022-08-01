@@ -972,8 +972,16 @@ class WebPageResponder(plugins.Responder):
             relevantSubDirs = self.findRelevantSubdirectories(repositories, app, extraVersions)
             version = getVersionName(app, self.getAppsToGenerate())
             pageSubTitles = self.makePageSubTitles([app])
-            self.makeAndGenerate(relevantSubDirs, self.getConfigValueMethod(app), pageDir, pageTitle, pageSubTitles,
-                                 version, extraVersions, self.getDescriptionInfo([app]))
+            if app.getBatchConfigValue("historical_report_split_version") == "true":
+                for version, d in relevantSubDirs.items():
+                    title = pageTitle
+                    if version != "default":
+                        title += "." + version
+                    self.makeAndGenerate({version: d}, self.getConfigValueMethod(app), pageDir, title, pageSubTitles,
+                                         version, extraVersions, self.getDescriptionInfo([app]))
+            else:
+                self.makeAndGenerate(relevantSubDirs, self.getConfigValueMethod(app), pageDir, pageTitle, pageSubTitles,
+                                     version, extraVersions, self.getDescriptionInfo([app]))
 
     def getConfigValueMethod(self, app):
         def getConfigValue(key, subKey=app.getBatchSession(), allSubKeys=False):

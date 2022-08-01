@@ -313,8 +313,17 @@ class GUIConfig:
         return d
 
     @staticmethod
+    def isDarkTheme():
+        settings = Gtk.Settings.get_default()
+        if settings.get_property("gtk-application-prefer-dark-theme"):
+            return True
+        if "dark" in settings.get_property("gtk-theme-name"):
+            return True
+        return "dark" in os.getenv("GTK_THEME", "")
+
+    @staticmethod
     def getDefaultColours():
-        dark = "dark" in Gtk.Settings.get_default().get_property("gtk-theme-name")
+        dark = GUIConfig.isDarkTheme()
         run_col = "DarkGoldenrod1" if dark else "LightGoldenrod1"
         d = {}
         d["default"] = "salmon"

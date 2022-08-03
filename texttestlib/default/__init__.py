@@ -1384,10 +1384,15 @@ class Config:
         app.setConfigDefault("collect_traffic_client_server", "false", trafficText)
         app.setConfigDefault("run_dependent_text", {"default": []},
                              "Mapping of patterns to remove from result files", trackFiles=True)
+        app.setConfigAlias("scrubbers", "run_dependent_text")
+
         app.setConfigDefault("unordered_text", {"default": []},
                              "Mapping of patterns to extract and sort from result files", trackFiles=True)
         app.setConfigDefault("file_split_pattern", {}, "Pattern to use for splitting result files")
         app.setConfigDefault("create_catalogues", "false", "Do we create a listing of files created/removed by tests")
+        app.setConfigAlias("collect_file_changes", "create_catalogues")
+        app.setConfigAlias("collate_file_changes", "create_catalogues")
+
         app.setConfigDefault("catalogue_process_string", "",
                              "String for catalogue functionality to identify processes created")
         app.setConfigDefault(

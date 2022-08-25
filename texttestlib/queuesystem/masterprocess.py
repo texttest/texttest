@@ -987,7 +987,11 @@ class SlaveRequestHandler(StreamRequestHandler):
         else:
             self.server.diag.info("Test " + test.uniqueName + " already complete, ignoring new results")
             self.sendReuseResponse(test, test.state, tryReuse, False)
-        self.connection.shutdown(socket.SHUT_RDWR)
+        try:
+            self.connection.shutdown(socket.SHUT_RDWR)
+        except socket.error:
+            # This only occurs on a mac, and doesn't affect functionality.
+            pass
 
     def getHostName(self, ipAddress):
         try:

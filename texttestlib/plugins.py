@@ -1179,7 +1179,7 @@ def getAggregateString(items, method):
 def readList(filename):
     try:
         items = []
-        for longline in open(filename).readlines():
+        for longline in open(filename, encoding=getpreferredencoding(), errors="replace").readlines():
             line = longline.strip()
             if len(line) > 0 and not line.startswith("#"):
                 items.append(line)

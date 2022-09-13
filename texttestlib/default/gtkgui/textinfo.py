@@ -374,7 +374,7 @@ class TextInfoGUI(TextViewGUI):
             maxLength = self.currentTest.getConfigValue("lines_of_text_difference")
             maxWidth = self.currentTest.getConfigValue("max_width_text_difference")
             previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength)
-            text += previewGenerator.getPreview(open(fileName))
+            text += previewGenerator.getPreview(open(fileName, errors="ignore"))
         return text
 
     def notifyNameChange(self, test, *args):

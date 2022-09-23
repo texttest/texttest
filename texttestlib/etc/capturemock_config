@@ -4,6 +4,7 @@ default:capturemockrc
 regenerate:traffic
 regenerate:pythonmocks
 regenerate:externalmocks
+regenerate:httpmocks
 
 [failure_severity]
 *traffic:1

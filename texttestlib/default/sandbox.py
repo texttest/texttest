@@ -803,9 +803,9 @@ class CollateFiles(plugins.Action):
         else:
             return testDir, existingPaths
 
-    def runCollationScript(self, args, test, stdin, stdout, stderr, useShell):
+    def runCollationScript(self, args, test, stdin, stdout, stderr):
         # Windows isn't clever enough to know how to run Python/Java programs without some help...
-        if os.name == "nt" and not useShell:
+        if os.name == "nt":
             interpreter = plugins.getInterpreter(args[0])
             if interpreter:
                 args = [interpreter] + args
@@ -816,7 +816,7 @@ class CollateFiles(plugins.Action):
             runEnv["PATH"] += os.pathsep + os.pathsep.join(libexecPaths)
             return subprocess.Popen(args, env=runEnv,
                                     stdin=stdin, stdout=stdout, stderr=stderr,
-                                    cwd=test.getDirectory(temporary=1), shell=useShell)
+                                    cwd=test.getDirectory(temporary=1))
         except OSError:
             # Might just be pipe identifiers here
             if hasattr(stdout, "close"):
@@ -856,8 +856,7 @@ class CollateFiles(plugins.Action):
                 stdout = subprocess.PIPE
                 stderr = subprocess.STDOUT
 
-            useShell = os.name == "nt" and len(scripts) == 1
-            self.collationProc = self.runCollationScript(args, test, stdin, stdout, stderr, useShell)
+            self.collationProc = self.runCollationScript(args, test, stdin, stdout, stderr)
             if not self.collationProc:
                 if os.path.isfile(targetFile):
                     os.remove(targetFile)

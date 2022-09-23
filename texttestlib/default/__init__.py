@@ -20,6 +20,7 @@ from locale import getpreferredencoding
 from .runtest import RunTest, Running, Killed
 from .scripts import *
 from functools import reduce
+from configparser import ConfigParser
 
 
 def getConfig(optionMap):
@@ -91,7 +92,8 @@ class Config:
                     self.addDefaultSwitch(group, "ignorecat", "Ignore catalogue file when isolating data", description="Treat test data identified by 'partial_copy_test_path' as if it were in 'copy_test_path', " +
                                           "i.e. copy everything without taking notice of the catalogue file. Useful when many things have changed with the files written by the test")
                 if useCaptureMock:
-                    self.addCaptureMockSwitch(group)
+                    hasClientServer = self.anyAppHas(apps, self.captureMockHasClientServer)
+                    self.addCaptureMockSwitch(group, hasClientServer=hasClientServer)
             elif group.name.startswith("Advanced"):
                 self.addDefaultOption(group, "b", "Run batch mode session")
                 self.addDefaultOption(group, "name", "Name this run")
@@ -154,13 +156,17 @@ class Config:
     def addDefaultOption(self, group, key, name, *args, **kw):
         group.addOption(key, name, self.optionValue(key), *args, **kw)
 
-    def addCaptureMockSwitch(self, group, value=0):
+    def addCaptureMockSwitch(self, group, value=0, hasClientServer=False):
         options = ["Replay", "Record", "Mixed Mode", "Disabled"]
         descriptions = ["Replay all existing interactions from the information in CaptureMock's mock files. Do not record anything new.",
                         "Ignore any existing CaptureMock files and record all the interactions afresh.",
                         "Replay all existing interactions from the information in the CaptureMock mock files. " +
                         "Record any other interactions that occur.",
                         "Disable CaptureMock"]
+        if hasClientServer:
+            # "Mixed mode" makes no sense here, so remove it
+            options.pop(2)
+            descriptions.pop(2)
         group.addSwitch("rectraffic", "CaptureMock", value=value, options=options, description=descriptions)
 
     def getReconnFullOptions(self):
@@ -460,6 +466,16 @@ class Config:
 
     def usesCaptureMock(self, app):
         return "traffic" in app.defFileStems()
+    
+    def captureMockHasClientServer(self, app):
+        rcFile = os.path.join(app.getDirectory(), "capturemockrc")
+        return self.clientServerEnabled([ rcFile ]) if rcFile and os.path.isfile(rcFile) else False
+         
+    def clientServerEnabled(self, rcFiles):
+        # check for server_protocol being explicitly set
+        parser = ConfigParser(strict=False)
+        parser.read(rcFiles)
+        return parser.has_section("general") and parser.has_option("general", "server_protocol")
 
     def hasWritePermission(self, path):
         if os.path.isdir(path):

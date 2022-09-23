@@ -5,7 +5,6 @@ import subprocess
 import sys
 from texttestlib import plugins
 from locale import getpreferredencoding
-from configparser import ConfigParser
 
 class SetUpCaptureMockHandlers(plugins.Action):
     def __init__(self, recordSetting):
@@ -44,15 +43,9 @@ class SetUpCaptureMockHandlers(plugins.Action):
             for var in ["PYTHONPATH", "JYTHONPATH"]:
                 test.setEnvironment(var, interceptDir + os.pathsep + test.getEnvironment(var, ""))
 
-    def clientServerEnabled(self, rcFiles):
-        # check for server_protocol being explicitly set
-        parser = ConfigParser(strict=False)
-        parser.read(rcFiles)
-        return parser.has_section("general") and parser.has_option("general", "server_protocol")
-
     def setUpCaptureMock(self, test, interceptDir, rcFiles):
         extReplayFile = test.getFileName("traffic")
-        clientServer = self.clientServerEnabled(rcFiles)
+        clientServer = test.app.clientServerEnabled(rcFiles)
         if extReplayFile:
             # "Legacy" setup to avoid the need to rename hundreds of files
             extRecordFile = test.makeTmpFileName("traffic")
@@ -70,8 +63,10 @@ class SetUpCaptureMockHandlers(plugins.Action):
         recordEditDir = test.makeTmpFileName("file_edits", forComparison=0)
         replayEditDir = test.getFileName("file_edits") if extReplayFile else None
         if clientServer:
+            # translate as mixed mode (2) isn't used in this context
+            cpMockMode = "3" if self.recordSetting == 2 else str(self.recordSetting)
             # Let a "test rig" script control what to do with capturemock, easier to have control there
-            test.setEnvironment("TEXTTEST_CAPTUREMOCK_MODE", str(self.recordSetting)) # For use in your test rig. See CaptureMock docs
+            test.setEnvironment("TEXTTEST_CAPTUREMOCK_MODE", cpMockMode) # For use in your test rig. See CaptureMock docs
             if extReplayFile:
                 test.setEnvironment("TEXTTEST_CAPTUREMOCK_REPLAY", extReplayFile) # For use in your test rig. See CaptureMock docs
             test.setEnvironment("TEXTTEST_CAPTUREMOCK_RECORD", extRecordFile) # For use in your test rig. See CaptureMock docs

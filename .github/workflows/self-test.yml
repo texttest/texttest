@@ -47,10 +47,17 @@ jobs:
         update: true
         install: git mingw-w64-x86_64-python3-setuptools mingw-w64-x86_64-python3-cx_Freeze mingw-w64-x86_64-python3-gobject mingw-w64-x86_64-python3-pytest mingw-w64-x86_64-python3-pip mingw-w64-x86_64-python-matplotlib mingw-w64-x86_64-python-certifi mingw-w64-x86_64-python-psutil mingw-w64-x86_64-gtksourceview3 mingw-w64-x86_64-gsettings-desktop-schemas mingw-w64-x86_64-diffutils glib2-devel intltool
 
-    - name: Preparing System
+    - name: Preparing Virtual Environment 
+      if: runner.os == 'Linux' || matrix.build_env == 'msys'
       run: |
         python -m venv venv
         venv/bin/pip install capturemock $PWD/texttest
+
+    - name: Preparing Virtual Environment (Windows)
+      if: runner.os == 'Windows' && matrix.build_env != 'msys'
+      run: |
+        python -m venv venv
+        venv\bin\pip install capturemock $PWD/texttest
 
     - name: Running Linux Tests
       if: runner.os == 'Linux'

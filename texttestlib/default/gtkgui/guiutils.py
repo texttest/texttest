@@ -4,6 +4,7 @@ Generic module broken out from guiplugins. Contains utility code that can be
 called from anywhere in the gtkgui package
 """
 import os
+import sys
 import operator
 import locale
 from texttestlib import plugins
@@ -314,13 +315,10 @@ class GUIConfig:
 
     @staticmethod
     def isDarkTheme():
-        settings = Gtk.Settings.get_default()
-        if settings:
-            if settings.get_property("gtk-application-prefer-dark-theme"):
-                return True
-            if "dark" in settings.get_property("gtk-theme-name"):
-                return True
-        return "dark" in os.getenv("GTK_THEME", "")
+        style_context = Gtk.Window().get_style_context()
+        bg = style_context.get_background_color(Gtk.StateFlags.NORMAL)
+        fg = style_context.get_color(Gtk.StateFlags.NORMAL)
+        return bg.red + bg.green + bg.blue < fg.red + fg.green + fg.blue
 
     @staticmethod
     def getDefaultColours():

@@ -56,7 +56,7 @@ jobs:
       if: runner.os == 'Linux'
       run: |
         export TEXTTEST_HOME=$PWD/tests
-        python venv/bin/texttest -c $PWD/venv -b ci -v ci
+        venv/bin/texttest -c $PWD/venv -b ci -v ci
 
     - name: Compressing Test Results (Linux)
       if: failure() && runner.os == 'Linux'
@@ -67,14 +67,14 @@ jobs:
       if: runner.os == 'Windows' && matrix.build_env != 'msys'
       run: |
         $env:TEXTTEST_HOME = "$pwd\tests"
-        python venv\bin\texttest -c $PWD\venv -b ci -v ci
+        venv\bin\python venv\bin\texttest -c $PWD\venv -b ci -v ci
 
     - name: Running MSYS Tests
       if: matrix.build_env == 'msys'
       shell: msys2 {0}
       run: |
         export TEXTTEST_HOME=$PWD/tests
-        python venv/bin/texttest -c $PWD/venv -b ci -v ci
+        venv/bin/python venv/bin/texttest -c $PWD/venv -b ci -v ci
 
     - name: Compressing Test Results (Windows)
       if: failure() && runner.os == 'Windows'

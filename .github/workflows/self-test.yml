@@ -63,7 +63,7 @@ jobs:
       if: matrix.build_env == 'msys'
       run: |
         python -m venv venv
-        ls -l -a venv
+        ls -a venv
         venv/Scripts/pip install capturemock $PWD/texttest
 
     - name: Running Linux Tests
@@ -81,7 +81,8 @@ jobs:
       if: runner.os == 'Windows' && matrix.build_env != 'msys'
       run: |
         $env:TEXTTEST_HOME = "$pwd\tests"
-        venv\Scripts\python.exe venv\Scripts\texttest -c $PWD\venv -b ci -v ci
+        Get-ChildItem venv\Scripts
+        venv\Scripts\python.exe $PWD\venv\Scripts\texttest -c $PWD\venv -b ci -v ci
 
     - name: Running MSYS Tests
       if: matrix.build_env == 'msys'

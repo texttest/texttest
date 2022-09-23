@@ -63,7 +63,6 @@ jobs:
       if: matrix.build_env == 'msys'
       run: |
         python -m venv venv
-        ls -a venv
         venv/Scripts/pip install capturemock $PWD/texttest
 
     - name: Running Linux Tests
@@ -81,15 +80,14 @@ jobs:
       if: runner.os == 'Windows' && matrix.build_env != 'msys'
       run: |
         $env:TEXTTEST_HOME = "$pwd\tests"
-        Get-ChildItem venv\Scripts
-        venv\Scripts\python.exe $PWD\venv\Scripts\texttest -c $PWD\venv -b ci -v ci
+        venv\Scripts\python.exe venv\Scripts\texttestc.py -c $PWD\venv -b ci -v ci
 
     - name: Running MSYS Tests
       if: matrix.build_env == 'msys'
       shell: msys2 {0}
       run: |
         export TEXTTEST_HOME=$PWD/tests
-        venv/Scripts/python venv/Scripts/texttest -c $PWD/venv -b ci -v ci
+        venv/Scripts/python venv/Scripts/texttestc.py -c $PWD/venv -b ci -v ci
 
     - name: Compressing Test Results (Windows)
       if: failure() && runner.os == 'Windows'

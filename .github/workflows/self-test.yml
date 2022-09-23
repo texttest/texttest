@@ -45,7 +45,7 @@ jobs:
       if: matrix.build_env == 'msys'
       with:
         update: true
-        install: git mingw-w64-x86_64-python3-setuptools mingw-w64-x86_64-python3-cx_Freeze mingw-w64-x86_64-python3-gobject mingw-w64-x86_64-python3-pytest mingw-w64-x86_64-python3-pip mingw-w64-x86_64-python-matplotlib mingw-w64-x86_64-python-certifi mingw-w64-x86_64-python-psutil mingw-w64-x86_64-gtksourceview3 mingw-w64-x86_64-gsettings-desktop-schemas mingw-w64-x86_64-diffutils glib2-devel intltool
+        install: git mingw-w64-x86_64-python3-setuptools mingw-w64-x86_64-python3-cx_Freeze mingw-w64-x86_64-python3-gobject mingw-w64-x86_64-python3-pytest mingw-w64-x86_64-python3-pip mingw-w64-x86_64-python-matplotlib mingw-w64-x86_64-python-certifi mingw-w64-x86_64-python-psutil mingw-w64-x86_64-gtksourceview3 mingw-w64-x86_64-gsettings-desktop-schemas diffutils glib2-devel intltool
 
     - name: Preparing Virtual Environment (Linux) 
       if: runner.os == 'Linux'

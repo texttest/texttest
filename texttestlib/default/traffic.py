@@ -67,6 +67,7 @@ class SetUpCaptureMockHandlers(plugins.Action):
             cpMockMode = "3" if self.recordSetting == 2 else str(self.recordSetting)
             # Let a "test rig" script control what to do with capturemock, easier to have control there
             test.setEnvironment("TEXTTEST_CAPTUREMOCK_MODE", cpMockMode) # For use in your test rig. See CaptureMock docs
+            test.setEnvironment("TEXTTEST_CAPTUREMOCK_RCFILES", ",".join(rcFiles)) # For use in your test rig. See CaptureMock docs
             if extReplayFile:
                 test.setEnvironment("TEXTTEST_CAPTUREMOCK_REPLAY", extReplayFile) # For use in your test rig. See CaptureMock docs
             test.setEnvironment("TEXTTEST_CAPTUREMOCK_RECORD", extRecordFile) # For use in your test rig. See CaptureMock docs

@@ -29,12 +29,6 @@ jobs:
       with:
         path: texttest
 
-    - name: Cloning CaptureMock
-      uses: actions/checkout@v2
-      with:
-        repository: texttest/capturemock
-        path: capturemock
-
     - name: Cloning SelfTests
       uses: actions/checkout@v2
       with:
@@ -54,14 +48,15 @@ jobs:
         install: git mingw-w64-x86_64-python3-setuptools mingw-w64-x86_64-python3-cx_Freeze mingw-w64-x86_64-python3-gobject mingw-w64-x86_64-python3-pytest mingw-w64-x86_64-python3-pip mingw-w64-x86_64-python-matplotlib mingw-w64-x86_64-python-certifi mingw-w64-x86_64-python-psutil mingw-w64-x86_64-gtksourceview3 mingw-w64-x86_64-gsettings-desktop-schemas mingw-w64-x86_64-diffutils glib2-devel intltool
 
     - name: Preparing System
-      run: python -m pip install psutil
+      run: |
+        python -m venv venv
+        venv/bin/pip install capturemock $PWD/texttest
 
     - name: Running Linux Tests
       if: runner.os == 'Linux'
       run: |
         export TEXTTEST_HOME=$PWD/tests
-        export PYTHONPATH=$PWD/capturemock
-        python texttest/bin/texttest -c $PWD/texttest -b ci -v ci
+        python venv/bin/texttest -c $PWD/venv -b ci -v ci
 
     - name: Compressing Test Results (Linux)
       if: failure() && runner.os == 'Linux'
@@ -72,16 +67,14 @@ jobs:
       if: runner.os == 'Windows' && matrix.build_env != 'msys'
       run: |
         $env:TEXTTEST_HOME = "$pwd\tests"
-        $env:PYTHONPATH = "$pwd\capturemock"
-        python texttest\bin\texttest -c $PWD\texttest -b ci -v ci
+        python venv\bin\texttest -c $PWD\venv -b ci -v ci
 
     - name: Running MSYS Tests
       if: matrix.build_env == 'msys'
       shell: msys2 {0}
       run: |
         export TEXTTEST_HOME=$PWD/tests
-        export PYTHONPATH=$PWD/capturemock
-        python texttest/bin/texttest -c $PWD/texttest -b ci -v ci
+        python venv/bin/texttest -c $PWD/venv -b ci -v ci
 
     - name: Compressing Test Results (Windows)
       if: failure() && runner.os == 'Windows'

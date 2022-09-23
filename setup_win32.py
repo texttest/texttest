@@ -255,7 +255,7 @@ setup(
                                 "etc/*", "etc/.*", "libexec/*", "log/*", "images/*.*", "images/retro/*"],
         "texttestlib.default.batch": ["testoverview_javascript/*"]
     },
-    scripts=['bin/meld', "bin/texttest", "bin/filter_rundependent.py", "bin/filter_fpdiff.py"],
+    scripts=['bin/meld', "bin/texttest"],
     data_files=[
         ('share/man/man1',
          ['data/meld.1']

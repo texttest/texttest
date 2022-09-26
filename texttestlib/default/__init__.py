@@ -468,7 +468,7 @@ class Config:
         return "traffic" in app.defFileStems()
     
     def captureMockHasClientServer(self, app):
-        rcFile = os.path.join(app.getDirectory(), "capturemockrc")
+        rcFile = os.path.join(app.getDirectory(), "capturemockrc." + app.name)
         return self.clientServerEnabled([ rcFile ]) if rcFile and os.path.isfile(rcFile) else False
          
     def clientServerEnabled(self, rcFiles):

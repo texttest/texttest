@@ -144,6 +144,9 @@ class QueueSystemConfig(default.Config):
                 # GUI gives us a numeric value, can also get it from the command line
                 return self.optionValue("reconnfull") in ["2", "grid"]
             else:
+                for app in allApps:
+                    if any(("dbtext-setup-" + pathName.lower() in self.optionMap for pathName in app.getConfigValue("dbtext_database_path"))):
+                        return False
                 return True
 
     def getRemoteTestTmpDir(self, test):

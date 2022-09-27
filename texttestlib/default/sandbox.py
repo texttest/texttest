@@ -442,6 +442,10 @@ class TestEnvironmentCreator:
             if localCheckout and localCheckout != checkout:
                 vars.append(("TEXTTEST_CHECKOUT_NAME", localCheckout))  # Local name of the checkout directory
             vars.append(("TEXTTEST_SANDBOX_ROOT", self.test.app.localWriteDirectory)) # Full path to the sandbox root directory
+            for pathName in self.test.getConfigValue("dbtext_database_path"):
+                if "dbtext-setup-" + pathName.lower() in self.optionMap:
+                    postfix = "_" + pathName.upper() if pathName != "default" else ""
+                    vars.append(("TEXTTEST_DB_SETUP" + postfix, "1")) # Environment variable set when "database setup run" selected in the UI
             if self.test.getConfigValue("use_case_record_mode") == "GUI":
                 usecaseRecorder = self.test.getConfigValue("use_case_recorder")
                 # Mostly to make sure StoryText's own tests have a chance of working

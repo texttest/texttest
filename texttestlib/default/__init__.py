@@ -18,6 +18,7 @@ from threading import Thread
 from locale import getpreferredencoding
 # For back-compatibility
 from .runtest import RunTest, Running, Killed
+from .database_data import SaveDatabase
 from .scripts import *
 from functools import reduce
 from configparser import ConfigParser
@@ -91,6 +92,14 @@ class Config:
                 if useCatalogues:
                     self.addDefaultSwitch(group, "ignorecat", "Ignore catalogue file when isolating data", description="Treat test data identified by 'partial_copy_test_path' as if it were in 'copy_test_path', " +
                                           "i.e. copy everything without taking notice of the catalogue file. Useful when many things have changed with the files written by the test")
+                
+                db_pathnames = set()
+                for app in apps:
+                    for pathName in app.getConfigValue("dbtext_database_path"):
+                        if pathName not in db_pathnames:
+                            group.addSwitch("dbtext-setup-" + pathName.lower(), "Database setup run (" + pathName + ")", description="Set up the " + pathName + " database: save all changes after this run")
+                        db_pathnames.add(pathName)
+
                 if useCaptureMock:
                     hasClientServer = self.anyAppHas(apps, self.captureMockHasClientServer)
                     self.addCaptureMockSwitch(group, hasClientServer=hasClientServer)
@@ -226,7 +235,7 @@ class Config:
             else:
                 return [scriptObject]
         else:
-            return self.getTestProcessor()
+            return self.getTestProcessor(app)
 
     def usesComparator(self, scriptObject):
         try:
@@ -586,17 +595,21 @@ class Config:
         filterAction = rundependent.FilterAction()
         return filterAction.getAllFilters(test, fileName, app), app
 
-    def getTestProcessor(self):
+    def getTestProcessor(self, app):
         catalogueCreator = self.getCatalogueCreator()
         ignoreCatalogues = self.shouldIgnoreCatalogues()
         collator = self.getTestCollator()
         from .traffic import SetUpCaptureMockHandlers, TerminateCaptureMockHandlers
         trafficSetup = SetUpCaptureMockHandlers(self.optionIntValue("rectraffic"))
         trafficTerminator = TerminateCaptureMockHandlers()
-        return [self.getExecHostFinder(), self.getWriteDirectoryMaker(),
-                self.getWriteDirectoryPreparer(ignoreCatalogues),
-                trafficSetup, catalogueCreator, collator, self.getOriginalFilterer(), self.getTestRunner(),
-                trafficTerminator, catalogueCreator, collator, self.getTestEvaluator()]
+        actions = [self.getExecHostFinder(), self.getWriteDirectoryMaker(),
+                   self.getWriteDirectoryPreparer(ignoreCatalogues),
+                   trafficSetup, catalogueCreator, collator, self.getOriginalFilterer(), self.getTestRunner(),
+                   trafficTerminator, catalogueCreator, collator, self.getTestEvaluator()]
+        for pathName, path in app.getConfigValue("dbtext_database_path").items():
+            if "dbtext-setup-" + pathName.lower() in self.optionMap:
+                actions.append(SaveDatabase(path))
+        return actions
 
     def isRecording(self):
         return "record" in self.optionMap
@@ -1652,11 +1665,13 @@ class Config:
                              "Automatically sort test suites in alphabetical order. 1 means sort in ascending order, -1 means sort in descending order.")
         app.setConfigDefault("extra_test_process_postfix", [],
                              "Postfixes to use on ordinary files to denote an additional run of the SUT to be triggered")
+        app.setConfigDefault("dbtext_database_path", {}, "Paths which represent textual data for databases, for use in dbtext")
         app.addConfigEntry("builtin", "options", "definition_file_stems")
         app.addConfigEntry("regenerate", "usecase", "definition_file_stems")
         app.addConfigEntry("builtin", self.getStdinName(namingScheme), "definition_file_stems")
         app.addConfigEntry("builtin", "knownbugs", "definition_file_stems")
         app.setConfigAlias("test_list_files_directory", "filter_file_directory")
+        
 
     def setApplicationDefaults(self, app):
         homeOS = app.getConfigValue("home_operating_system")
@@ -1691,6 +1706,13 @@ class Config:
                 app.getConfigValue("use_case_recorder") in ["", "storytext"] and \
                 not any(("usecase" in k for k in app.getConfigValue("view_program"))):
             app.addConfigEntry("*usecase*", "storytext_editor", "view_program")
+        test_data_paths = app.getConfigValue("copy_test_path") + app.getConfigValue("link_test_path") + \
+                          app.getConfigValue("partial_copy_test_path") + app.getConfigValue("copy_test_path_merge")
+        for path in app.getConfigValue("dbtext_database_path").values():
+            for sep in { "/", os.sep }:
+                path = path.split(sep)[0]
+            if path not in test_data_paths:
+                app.addConfigEntry("copy_test_path_merge", path)
         return False
 
 

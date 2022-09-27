@@ -95,9 +95,12 @@ class Config:
                 
                 db_pathnames = set()
                 for app in apps:
-                    for pathName in app.getConfigValue("dbtext_database_path"):
+                    for pathName, dirName in app.getConfigValue("dbtext_database_path").items():
+                        if not dirName:
+                            continue
                         if pathName not in db_pathnames:
-                            group.addSwitch("dbtext-setup-" + pathName.lower(), "Database setup run (" + pathName + ")", description="Set up the " + pathName + " database: save all changes after this run")
+                            postfix = " (" + pathName + ")" if pathName != "default" else ""
+                            group.addSwitch("dbtext-setup-" + pathName.lower(), "Database setup run" + postfix, description="Set up the " + pathName + " database: save all changes after this run")
                         db_pathnames.add(pathName)
 
                 if useCaptureMock:
@@ -1665,7 +1668,7 @@ class Config:
                              "Automatically sort test suites in alphabetical order. 1 means sort in ascending order, -1 means sort in descending order.")
         app.setConfigDefault("extra_test_process_postfix", [],
                              "Postfixes to use on ordinary files to denote an additional run of the SUT to be triggered")
-        app.setConfigDefault("dbtext_database_path", {}, "Paths which represent textual data for databases, for use in dbtext")
+        app.setConfigDefault("dbtext_database_path", {"default": ""}, "Paths which represent textual data for databases, for use in dbtext")
         app.addConfigEntry("builtin", "options", "definition_file_stems")
         app.addConfigEntry("regenerate", "usecase", "definition_file_stems")
         app.addConfigEntry("builtin", self.getStdinName(namingScheme), "definition_file_stems")
@@ -1711,7 +1714,7 @@ class Config:
         for path in app.getConfigValue("dbtext_database_path").values():
             for sep in { "/", os.sep }:
                 path = path.split(sep)[0]
-            if path not in test_data_paths:
+            if path and path not in test_data_paths:
                 app.addConfigEntry("copy_test_path_merge", path)
         return False
 

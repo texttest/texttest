@@ -99,7 +99,7 @@ class TextViewGUI(guiutils.SubGUI):
     def event_after(self, text_view, event):  # pragma : no cover - external code and untested browser code
         if event.type != Gdk.EventType.BUTTON_RELEASE:
             return False
-        if event.button != 1:
+        if event.button.button != 1:
             return False
         buffer = text_view.get_buffer()
 
@@ -142,7 +142,7 @@ class TextViewGUI(guiutils.SubGUI):
     def findLinkTarget(self, iter):  # pragma : no cover - called by external code
         tags = iter.get_tags()
         for tag in tags:
-            target = tag.get_data("target")
+            target = tag.target
             if target:
                 return target
 
@@ -151,7 +151,7 @@ class TextViewGUI(guiutils.SubGUI):
         x, y = text_view.window_to_buffer_coords(Gtk.TextWindowType.WIDGET,
                                                  int(event.x), int(event.y))
         self.set_cursor_if_appropriate(text_view, x, y)
-        text_view.window.get_pointer()
+        text_view.get_window(Gtk.TextWindowType.TEXT).get_pointer()
         return False
 
     def setHyperlinkText(self, buffer, text):

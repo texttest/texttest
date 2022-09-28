@@ -59,6 +59,15 @@ def _encodeString(value):
     # Get given Windows line endings but Python doesn't use them internally.
     return value.replace("\r", "")
 
+def get_request_context():
+    try:
+        # Needed in msys2 environment. If we have certifi installed, use it.
+        # On Linux appears to work without this
+        import certifi, ssl
+        return ssl.create_default_context(cafile=certifi.where())
+    except ModuleNotFoundError:
+        return 
+
 def _getJson(query_url, username, password):
     # Setting up password managers and using openers as described in the
     # documentation for urllib did not work.
@@ -66,7 +75,7 @@ def _getJson(query_url, username, password):
     encoded_credentials = base64.b64encode(credentials.encode('ascii'))
     request = urllib.request.Request(query_url)
     request.add_header('Authorization', 'Basic %s' % encoded_credentials.decode('ascii'))
-    response = urllib.request.urlopen(request)
+    response = urllib.request.urlopen(request, context=get_request_context())
     response_text = response.read()
     return json.loads(response_text.decode())
 

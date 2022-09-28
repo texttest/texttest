@@ -2,6 +2,7 @@ import urllib.request
 import base64
 import json
 import re
+import os
 
 def _makeURL(location, bugText):
     return location + "/_workitems/edit/" + bugText
@@ -103,7 +104,9 @@ def findBugInfo(bugId, location, username, password):
                        "System.ChangedDate",
                        "System.Title"]
     rest_url = location + "/_apis/wit/workitems?ids=" + bugId + "&api-version=7.1-preview.3&fields=" + ",".join(fields_to_fetch)
-
+    if not password:
+        # This variable is set in azure devops pipelines, make use of it
+        password = os.getenv("SYSTEM_ACCESSTOKEN")
     if not username and not password:
         # We have no means of logging in, perhaps the user didn't want to. Be nice...
         return findBugInfoWithoutLogin(bugId, location)

@@ -114,7 +114,7 @@ class TextViewGUI(guiutils.SubGUI):
                 return False
 
         x, y = text_view.window_to_buffer_coords(Gtk.TextWindowType.WIDGET, int(event.x), int(event.y))
-        iter = text_view.get_iter_at_location(x, y)
+        _, iter = text_view.get_iter_at_location(x, y)
         target = self.findLinkTarget(iter)
         if target:
             statusMessage = guiplugins.openLinkInBrowser(target)
@@ -128,7 +128,7 @@ class TextViewGUI(guiutils.SubGUI):
     def set_cursor_if_appropriate(self, text_view, x, y):  # pragma : no cover - external code
         hovering = False
 
-        iter = text_view.get_iter_at_location(x, y)
+        _, iter = text_view.get_iter_at_location(x, y)
 
         hovering = bool(self.findLinkTarget(iter))
         if hovering != self.hovering_over_link:

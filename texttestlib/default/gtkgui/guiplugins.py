@@ -626,7 +626,8 @@ class OptionGroupGUI(ActionGUI):
             # dialogs that have been closed
             def get_text():
                 text = widget.get_text()
-                return float(text) if widget.get_digits() else int(text)
+                # many locales have commas for decimal point: don't fail here if so
+                return float(text.replace(",", ".")) if widget.get_digits() else int(text)
             return get_text
         elif isinstance(widget, Gtk.Entry):
             return widget.get_text

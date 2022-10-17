@@ -796,6 +796,9 @@ class OptionGroupGUI(ActionGUI):
         text = model.get_value(iter, 0)
         return text == "-" * 10
 
+    def stopScrollInSpinButton(self, widget, *args):
+        widget.stop_emission("scroll_event")
+
     def createOptionWidget(self, option):
         optionName = option.name.strip()
         if option.multilineEntry:
@@ -809,6 +812,8 @@ class OptionGroupGUI(ActionGUI):
                 digits = int(isinstance(value, float))
                 widget = Gtk.SpinButton.new(adjustment, 0., digits)
                 widget.set_numeric(True)
+                widget.connect("scroll_event", self.stopScrollInSpinButton)
+        
                 entry = widget
             elif option.usePossibleValues():
                 widget, entry = self.createComboBoxEntry(option)

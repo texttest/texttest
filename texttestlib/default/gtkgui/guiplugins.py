@@ -780,9 +780,12 @@ class OptionGroupGUI(ActionGUI):
             toEnable = autoEnableInfo.get(switch)
             checkButton.connect("toggled", self.transferEnable, toEnable)
 
-        checkButton.show()
-        return checkButton
-
+        # ensure the checkbox doesn't expand to fill the whole width, otherwise clicking in the space enables it
+        hbox = Gtk.HBox()
+        hbox.pack_start(checkButton, False, False, 0)
+        hbox.show_all()
+        return hbox
+        
     def createComboBoxEntry(self, option):
         # may need review MB 2018-12-04
         combobox = Gtk.ComboBoxText.new_with_entry()

@@ -764,7 +764,7 @@ class OptionGroupGUI(ActionGUI):
             else:
                 return self.createRadioButtonCollection(switch, optionGroup)
         else:
-            return self.createCheckBox(switch, autoEnableInfo)
+            return self.createCheckBoxWidget(switch, autoEnableInfo)
 
     def createCheckBox(self, switch, autoEnableInfo):
         self.updateForConfig(switch)
@@ -780,7 +780,12 @@ class OptionGroupGUI(ActionGUI):
             toEnable = autoEnableInfo.get(switch)
             checkButton.connect("toggled", self.transferEnable, toEnable)
 
+        checkButton.show()
+        return checkButton
+
+    def createCheckBoxWidget(self, *args):
         # ensure the checkbox doesn't expand to fill the whole width, otherwise clicking in the space enables it
+        checkButton = self.createCheckBox(*args)
         hbox = Gtk.HBox()
         hbox.pack_start(checkButton, False, False, 0)
         hbox.show_all()

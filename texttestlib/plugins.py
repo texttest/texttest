@@ -963,8 +963,11 @@ def copyEnvironment(values={}, ignoreVars=[]):
 
 
 def getInterpreter(executable):
+    if "." not in executable:
+        return ""
+    
     extension = executable.rsplit(".", 1)[-1]
-    cache = {"py": "python",
+    cache = {"py": "py" if os.name == "nt" else "python",
              "rb": "ruby",
              "jar": "java -jar"}
     return cache.get(extension, "")

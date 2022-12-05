@@ -291,13 +291,15 @@ class RunTest(plugins.Action):
             signal.signal(signum, signal.SIG_IGN)
 
     @classmethod
-    def getInterpreterArgs(cls, test, interpreter):
+    def getInterpreterArgs(cls, test, interpreter, forLinux=False):
         args = plugins.splitcmd(interpreter)
         if len(args) > 0 and args[0] == "ttpython":  # interpreted to mean "whatever python TextTest runs with"
             basename = os.path.basename(sys.executable).lower()
             python = sys.executable if "python" in basename else "python"
             # 'Native launcher' on Windows, such as via Windows installer. Don't know what Python it used
             return [ python, "-u" ] + args[1:]
+        elif forLinux and interpreter == "py": # Windows default Python interpreter
+            return [ "python" ]
         else:
             return args
 
@@ -382,7 +384,7 @@ class RunTest(plugins.Action):
             perfFile = test.makeTmpFileName("unixperf", forFramework=1)
         return ["time", "-p", "-o", perfFile]
 
-    def getLocalExecuteCmdArgs(self, test, postfix="", makeDirs=True):
+    def getLocalExecuteCmdArgs(self, test, postfix="", makeDirs=True, forLinux=False):
         args = []
         if test.app.hasAutomaticCputimeChecking() and test.app.executingOnPerformanceMachine(test):
             args += self.getTimingArgs(test, makeDirs)
@@ -390,7 +392,7 @@ class RunTest(plugins.Action):
         # Don't expand environment if we're running on a different file system
         expandVars = test.app.getRunMachine() == "localhost" or not test.getConfigValue("remote_copy_program")
         for interpreterName, interpreter in list(test.getConfigValue("interpreters", expandVars=expandVars).items()):
-            args += self.getInterpreterArgs(test, interpreter)
+            args += self.getInterpreterArgs(test, interpreter, forLinux=forLinux)
             args += test.getCommandLineOptions(stem=interpreterName + "_options")
             if postfix:
                 args += test.getCommandLineOptions(stem=interpreterName + "_options" + postfix)
@@ -404,11 +406,13 @@ class RunTest(plugins.Action):
         return args
 
     def getExecuteCmdArgs(self, test, runMachine, postfix):
-        args = self.getLocalExecuteCmdArgs(test, postfix)
-        if runMachine == "localhost":
-            return args
-        else:
+        # only support remote runs on Linux servers
+        forLinux = runMachine != "localhost"
+        args = self.getLocalExecuteCmdArgs(test, postfix, forLinux=forLinux)
+        if forLinux:
             return self.getRemoteExecuteCmdArgs(test, runMachine, args, postfix)
+        else:
+            return args
 
     def makeFile(self, test, name):
         fileName = test.makeTmpFileName(name)

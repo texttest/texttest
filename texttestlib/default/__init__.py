@@ -49,6 +49,9 @@ class Config:
     def getMachineLabel(self):
         return "Run on machine"
 
+    def addCheckoutOptions(self, group, checkout):
+        return group.addOption("c", self.getCheckoutLabel(), checkout)
+
     def addToOptionGroups(self, apps, groups):
         recordsUseCases = len(apps) == 0 or self.anyAppHas(
             apps, lambda app: app.getConfigValue("use_case_record_mode") != "disabled")
@@ -77,7 +80,7 @@ class Config:
                 else:
                     version, checkout, machine = "", "", ""
                 group.addOption("v", "Run this version", version)
-                group.addOption("c", self.getCheckoutLabel(), checkout)
+                self.addCheckoutOptions(group, checkout)
                 group.addOption("m", self.getMachineLabel(), self.getMachineNameForDisplay(machine))
                 group.addOption("cp", "Times to run", 1, minimum=1, maximum=10000,
                                 description="Set this to some number larger than 1 to run the same test multiple times, for example to try to catch indeterminism in the system under test")

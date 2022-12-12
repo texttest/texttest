@@ -641,9 +641,7 @@ class TestTable:
             cellContent, bgcol, hasData = self.generateTestCell(tag, testName, testId, results)
             testRow.append(HTMLgen.TD(cellContent, bgcolor=bgcol))
             foundData |= hasData
-            if hasData:
-                # Keep track of colour for filtering purposes
-                self.usedColours.add(bgcol)
+            self.usedColours.add(bgcol)
 
         if foundData:
             rows.append(HTMLgen.TR(*testRow))

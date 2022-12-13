@@ -124,6 +124,15 @@ Filter.prototype.apply = function()
 Filter.prototype.setFilterStrategy = function(filterStrategy)
 {
     this.filterStrategy = filterStrategy;
+    // Older reports will not have ColorsLastCol defined and hence
+    // will show all filter buttons as options
+    if (window.ColorsLastCol !== undefined)
+    {
+        $(".colortoggle").each((i, element) => {
+            const visible = (filterStrategy !== STRATEGY_LAST_TEST || ColorsLastCol.includes(element.dataset.color));
+            $(element.parentNode).toggle(visible);
+        });
+    }
     this.apply();
 };
 
@@ -173,7 +182,7 @@ var createFilterStrategySelector = function(filter) {
 // Create html and behavior of a category toggler
 var createCategoryToggler = function(filter, category, id)
 {
-    var toggler = $('<div title="Toggle this category" id=color' + id + '></div>');
+    var toggler = $('<div title="Toggle this category" class=colortoggle id=color' + id + ' data-color="' + category.color + '"></div>');
     toggler.css({
             'position' : 'relative',
 	    'background-color': category.color,
@@ -270,6 +279,7 @@ var init = function()
     toolbarContent.append(layoutTable);
     $(document.body).append(toolbarContent);
 
+    filter.setFilterStrategy(STRATEGY_LAST_TEST);
     filter.apply();
 };
 

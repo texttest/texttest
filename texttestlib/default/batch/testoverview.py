@@ -209,7 +209,7 @@ class GenerateWebPages(object):
                         page, pageColours = self.pagesOverview[filePath]
                     else:
                         page = self.createPage()
-                        pageColours = set()
+                        pageColours = {"last_column": set(), "all_columns": set()}
                         self.pagesOverview[filePath] = page, pageColours
 
                     tableHeader = self.getTableHeader(version, repositoryDirs)
@@ -217,7 +217,8 @@ class GenerateWebPages(object):
                     hasNewData, graphLink, tableColours = self.addTable(page, self.resourceNames, categoryHandlers, version,
                                                                         loggedTests, sel, tableHeader, filePath, heading, repositoryDirInfo)
                     hasData |= hasNewData
-                    pageColours.update(tableColours)
+                    for colourGroupKey in tableColours:
+                        pageColours[colourGroupKey].update(tableColours[colourGroupKey])
                     if graphLink:
                         pageToGraphs.setdefault(page, []).append(graphLink)
 
@@ -259,7 +260,7 @@ class GenerateWebPages(object):
             creationDate = TitleWithDateStamp("").__str__().strip()
             page.prepend(HTMLgen.Paragraph(creationDate, align="center"))
             page.prepend(HTMLgen.Heading(1, self.getHeading(), align='center'))
-            if len(pageColours) > 0:
+            if any((len(pageColoursGroup) > 0 for pageColoursGroup in pageColours.values())):
                 page.prepend(HTMLgen.BR())
                 page.prepend(HTMLgen.BR())
                 page.script = self.getFilterScripts(pageColours)
@@ -271,9 +272,13 @@ class GenerateWebPages(object):
         rowHeaderColour = finder.find("row_header_bg")
         successColour = finder.find("success_bg")
         # Always put green at the start, we often want to filter that
-        sortedColours = sorted(pageColours, key=lambda c: (c != successColour, c))
+        lastColumnColours = pageColours.get("last_column", set())
+        allColumnsColours = pageColours.get("all_columns", set())
+        sortedColours = sorted(lastColumnColours, key=lambda c: (c != successColour, c))
+        sortedColoursAll = sorted(allColumnsColours, key=lambda c: (c != successColour, c not in sortedColours, c))
         scriptCode = "var TEST_ROW_HEADER_COLOR = " + repr(rowHeaderColour) + ";\n" + \
-                     "var Colors = " + repr(sortedColours) + ";"
+                     "var Colors = " + repr(sortedColoursAll) + ";\n" + \
+                     "var ColorsLastCol = " + repr(sortedColours) + ";"
         scripts = [HTMLgen.Script(code=scriptCode),
                    HTMLgen.Script(src="../javascript/jquery.js"),
                    HTMLgen.Script(src="../javascript/filter.js")]
@@ -474,7 +479,7 @@ class TestTable:
         self.pageVersion = pageVersion
         self.version = version
         self.graphFilePath = graphFilePath  # For convenience in performance analyzer.
-        self.usedColours = set()
+        self.usedColours = {"last_column": set(), "all_columns": set()}
 
     def generateGraph(self, fileName, heading):
         if len(self.tags) > 1:  # Don't bother with graphs when tests have only run once
@@ -641,10 +646,10 @@ class TestTable:
             cellContent, bgcol, hasData = self.generateTestCell(tag, testName, testId, results)
             testRow.append(HTMLgen.TD(cellContent, bgcolor=bgcol))
             foundData |= hasData
+            self.usedColours["all_columns"].add(bgcol)
 
         if foundData:
-            # We only filter based on the final column
-            self.usedColours.add(bgcol)
+            self.usedColours["last_column"].add(bgcol)
             rows.append(HTMLgen.TR(*testRow))
         else:
             return rows

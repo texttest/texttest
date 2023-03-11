@@ -12,17 +12,17 @@ jobs:
 
     steps:
     - name: Cloning TextTest
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
 
     - name: Cloning Meld
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         repository: GNOME/meld
         ref: '3.22.0'
         path: meld
 
     - name: Cloning Adwaita Icons
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         repository: GNOME/adwaita-icon-theme
         ref: '41.0'

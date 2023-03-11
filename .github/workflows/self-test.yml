@@ -20,7 +20,7 @@ jobs:
           - os: windows-latest
             build_env: msys
             python: msys
-          
+
     runs-on: ${{ matrix.os }}
 
     steps:

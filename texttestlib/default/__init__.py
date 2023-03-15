@@ -425,9 +425,9 @@ class Config:
                     self.optionMap["b"] = "default"
                 if self.anyAppHas(allApps, lambda app: self.emailEnabled(app)):
                     classes.append(batch.EmailResponder)
-                if self.anyAppHas(allApps, lambda app: self.getBatchConfigValue(app, "batch_junit_format") == "true"):
-                    from .batch.junitreport import JUnitResponder
-                    classes.append(JUnitResponder)
+                if self.anyAppHas(allApps, lambda app: self.getBatchConfigValue(app, "batch_external_format") != "false"):
+                    from .batch.externalreport import ExternalFormatResponder
+                    classes.append(ExternalFormatResponder)
 
         if os.name == "posix" and self.useVirtualDisplay():
             from .virtualdisplay import VirtualDisplayResponder
@@ -1262,12 +1262,12 @@ class Config:
                              "Generic filter for batch session, more flexible than timelimit")
         app.setConfigDefault("batch_use_collection", {"default": "false"},
                              "Do we collect multiple mails into one in batch mode")
-        app.setConfigDefault("batch_junit_format", {"default": "false"},
-                             "Do we write out results in junit format in batch mode")
+        app.setConfigDefault("batch_external_format", {"default": "false"},
+                             "Do we write out results in external format in batch mode. Supports junit, trx")
         app.setConfigDefault("batch_include_comment_plugin", {"default": "true"},
                              "Do we include the comment plugin in the HTML report (requires PHP)")
-        app.setConfigDefault("batch_junit_folder", {
-                             "default": ""}, "Which folder to write test results in junit format in batch mode. Only useful together with batch_junit_format")
+        app.setConfigDefault("batch_external_folder", {
+                             "default": ""}, "Which folder to write test results in external format in batch mode. Only useful together with batch_external_format")
         app.setConfigDefault("batch_collect_max_age_days", {
                              "default": 100000}, "When collecting multiple messages, what is the maximum age of run that we should accept?")
         app.setConfigDefault("batch_collect_compulsory_version", self.getDefaultCollectCompulsoryVersions(
@@ -1280,6 +1280,9 @@ class Config:
                              "List of versions to allow if batch_use_version_filtering enabled")
         app.setConfigAlias("testoverview_colours", "historical_report_colours")
         app.setConfigAlias("historical_report_resource_pages", "historical_report_resources")
+        app.setConfigAlias("batch_junit_format", "batch_external_format")
+        app.setConfigAlias("batch_junit_folder", "batch_external_folder")
+
 
     def setPerformanceDefaults(self, app):
         # Performance values

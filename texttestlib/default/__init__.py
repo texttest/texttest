@@ -18,6 +18,7 @@ from threading import Thread
 from locale import getpreferredencoding
 # For back-compatibility
 from .runtest import RunTest, Running, Killed
+from .batch.externalreport import ExternalFormatResponder, ExternalFormatCollector
 from .database_data import SaveDatabase
 from .scripts import *
 from functools import reduce
@@ -419,6 +420,8 @@ class Config:
                     classes.append(self.getWebPageResponder())
                 if not arg or "web" not in arg:
                     classes.append(batch.CollectFilesResponder)
+                if self.anyAppHas(allApps, lambda app: self.getBatchConfigValue(app, "batch_external_format") == "trx"):
+                    classes.append(ExternalFormatCollector)
             else:
                 if self.optionValue("b") is None:
                     plugins.log.info("No batch session identifier provided, using 'default'")
@@ -426,7 +429,6 @@ class Config:
                 if self.anyAppHas(allApps, lambda app: self.emailEnabled(app)):
                     classes.append(batch.EmailResponder)
                 if self.anyAppHas(allApps, lambda app: self.getBatchConfigValue(app, "batch_external_format") != "false"):
-                    from .batch.externalreport import ExternalFormatResponder
                     classes.append(ExternalFormatResponder)
 
         if os.name == "posix" and self.useVirtualDisplay():

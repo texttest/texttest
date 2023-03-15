@@ -10,7 +10,20 @@ from texttestlib.default.performance import getPerformance
 from xml.sax.saxutils import escape
 import uuid
 from datetime import datetime
+from glob import glob
 
+
+def getExternalFormat(app):
+    return app.getBatchConfigValue("batch_external_format").replace("true", "junit")
+
+def getFileExtension(fmt):
+    return "xml" if fmt == "junit" else fmt
+
+def getBatchExternalFolder(app):
+    resultsDir = app.getBatchConfigValue("batch_external_folder")
+    if (resultsDir is None or resultsDir.strip() == ""):
+        resultsDir = os.path.join(app.writeDirectory, "junitreport")
+    return resultsDir
 
 class ExternalFormatResponder(plugins.Responder):
     """Respond to test results and write out results in format suitable for reading in to external tools 
@@ -24,18 +37,15 @@ class ExternalFormatResponder(plugins.Responder):
         self.startTimes = {}
         self.diag = logging.getLogger("JUnit Report Writer")
         
-    def getExternalFormat(self, app):
-        return app.getBatchConfigValue("batch_external_format").replace("true", "junit")
-
     def useExternalFormat(self, app):
-        return self.getExternalFormat(app) != "false"
+        return getExternalFormat(app) != "false"
     
     def notifyLifecycleChange(self, test, dummyState, changeDesc):
         if changeDesc == "start" and self.useExternalFormat(test.app):
             self.startTimes[test] = datetime.now()
 
     def notifyComplete(self, test):
-        extFormat = self.getExternalFormat(test.app)
+        extFormat = getExternalFormat(test.app)
         if extFormat == "false":
             return
         if test.app not in self.appData:
@@ -48,7 +58,7 @@ class ExternalFormatResponder(plugins.Responder):
         for appList in list(self.allApps.values()):
             # appData is {app : data}
             for app in appList:
-                writerFormat = self.getExternalFormat(app)
+                writerFormat = getExternalFormat(app)
                 if writerFormat != "false":
                     self.diag.info("writing results in " + writerFormat + " format for app " + app.fullName())
                     self.writeResults(app, writerFormat)
@@ -56,7 +66,7 @@ class ExternalFormatResponder(plugins.Responder):
     def writeResults(self, app, writerFormat):
         results = self.appData[app].getResults()
         appResultsDir = self.createResultsDir(app)
-        fileExt = "xml" if writerFormat == "junit" else writerFormat
+        fileExt = getFileExtension(writerFormat)
         for testName, result in results.items():
             if result["success"]:
                 text = self.evaluate(result, "success", writerFormat)
@@ -75,10 +85,7 @@ class ExternalFormatResponder(plugins.Responder):
             return Template(eval(writerFormat + "_template")).substitute(result)
               
     def createResultsDir(self, app):
-        resultsDir = app.getBatchConfigValue("batch_external_folder")
-        if (resultsDir is None or resultsDir.strip() == ""):
-            resultsDir = os.path.join(app.writeDirectory, "junitreport")
-
+        resultsDir = getBatchExternalFolder(app)
         if not os.path.exists(resultsDir):
             os.mkdir(resultsDir)
         appResultsDir = os.path.join(resultsDir, app.name + app.versionSuffix())
@@ -286,4 +293,85 @@ $stack_trace
 </TestRun>
 """
 
-                                 
+class ExternalFormatCollector(plugins.Responder):
+    def __init__(self, optionMap, allApps):
+        plugins.Responder.__init__(self)
+        self.diag = logging.getLogger("external format collect")
+        self.allApps = allApps
+
+    def notifyAllComplete(self):
+        plugins.log.info("Collecting external format files locally...")
+        allFiles = {}
+        for app in self.allApps:
+            resultsDir = getBatchExternalFolder(app)
+            appResultsDir = os.path.join(resultsDir, app.name + app.versionSuffix())
+            fileExt = getFileExtension(getExternalFormat(app))
+            currFiles = glob(os.path.join(appResultsDir, "*." + fileExt))
+            writeFile = os.path.join(resultsDir, "all_tests." + fileExt)
+            filesSoFar = allFiles.setdefault(writeFile, [])
+            filesSoFar += currFiles
+            
+        for targetFn, sourceFns in allFiles.items():
+            plugins.log.info("Creating " + targetFn + " from " + repr(len(sourceFns)) + " source files.")
+            if len(sourceFns) > 0:
+                self.combineFiles(sourceFns, targetFn)
+                
+    @classmethod     
+    def combineFiles(cls, sourceFns, targetFn):
+        entries = {}
+        counters = {}
+        for fnix, fn in enumerate(sourceFns):
+            with open(fn) as f:
+                currTag = None
+                for rawline in f:
+                    line = rawline.strip()
+                    if line.startswith("<"):
+                        words = line.split()
+                        if words[0] == "<Counters":
+                            cls.updateCounters(counters, words[1:-1])
+                        elif words[0].endswith("s>"): # collections
+                            if words[0].startswith("</"):
+                                currTag = None
+                            else:
+                                currTag = words[0][1:-1]
+                            continue
+                    if currTag:
+                        if fnix == 0 or currTag != "TestLists":
+                            entries[currTag] = entries.get(currTag, "") + rawline
+
+        templateFn = sourceFns[0]
+        with open(targetFn, "w") as wf:
+            with open(templateFn) as f:
+                currTag = None
+                for rawline in f:
+                    line = rawline.lstrip()
+                    if line.startswith("<Counters"):
+                        wf.write(rawline.replace(line, ""))
+                        cls.writeCountersLine(wf, counters)
+                    elif line.endswith("s>\n"): # collections:
+                        wf.write(rawline)
+                        if line.startswith("</"):
+                            currTag = None
+                        else:
+                            currTag = line.strip()[1:-1]
+                            entry = entries.get(currTag)
+                            if entry:
+                                wf.write(entry)
+                    elif currTag is None:
+                        wf.write(rawline)
+
+             
+    @classmethod           
+    def updateCounters(cls, counters, words):
+        for word in words:
+            key, rawValue = word.split("=")
+            value = counters.get(key, 0) + int(eval(rawValue))
+            counters[key] = value
+            
+    @classmethod
+    def writeCountersLine(cls, wf, counters):
+        wf.write("<Counters ")
+        for key, value in counters.items():
+            wf.write(key + '="' + str(value) + '" ')
+        wf.write("/>\n")
+            

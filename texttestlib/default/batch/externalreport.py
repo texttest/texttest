@@ -257,7 +257,7 @@ junit_success_template = """\
 trx_template = """\
 <?xml version="1.0" encoding="UTF-8"?>
 <TestRun id="$id" name="$run_name" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
-  <ResultSummary outcome="Failed">
+  <ResultSummary outcome="$outcome">
     <Counters total="1" executed="1" passed="$success" error="$error" failed="$failure" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
   </ResultSummary>
   <TestDefinitions>
@@ -320,21 +320,22 @@ class ExternalFormatCollector(plugins.Responder):
     @classmethod     
     def combineFiles(cls, sourceFns, targetFn):
         entries = {}
-        counters = {}
+        summaryTags = {"Counters" : {}, "ResultSummary" : {}}
         for fnix, fn in enumerate(sourceFns):
             with open(fn) as f:
                 currTag = None
                 for rawline in f:
                     line = rawline.strip()
                     if line.startswith("<"):
-                        words = line.split()
-                        if words[0] == "<Counters":
-                            cls.updateCounters(counters, words[1:-1])
-                        elif words[0].endswith("s>"): # collections
-                            if words[0].startswith("</"):
+                        words = line.lstrip("<").rstrip("/> ").split()
+                        summaryDict = summaryTags.get(words[0])
+                        if summaryDict is not None:
+                            cls.updateSummary(summaryDict, words[1:])
+                        elif words[0].endswith("s"): # collections
+                            if words[0].startswith("/"):
                                 currTag = None
                             else:
-                                currTag = words[0][1:-1]
+                                currTag = words[0]
                             continue
                     if currTag:
                         if fnix == 0 or currTag != "TestLists":
@@ -345,34 +346,49 @@ class ExternalFormatCollector(plugins.Responder):
             with open(templateFn) as f:
                 currTag = None
                 for rawline in f:
-                    line = rawline.lstrip()
-                    if line.startswith("<Counters"):
-                        wf.write(rawline.replace(line, ""))
-                        cls.writeCountersLine(wf, counters)
-                    elif line.endswith("s>\n"): # collections:
+                    line = rawline.lstrip(" <").rstrip("/> \n")
+                    if cls.writeSummaryLine(wf, rawline, line, summaryTags):
+                        continue
+                    elif line.endswith("s"): # collections:
                         wf.write(rawline)
-                        if line.startswith("</"):
+                        if line.startswith("/"):
                             currTag = None
                         else:
-                            currTag = line.strip()[1:-1]
+                            currTag = line
                             entry = entries.get(currTag)
                             if entry:
                                 wf.write(entry)
                     elif currTag is None:
                         wf.write(rawline)
 
+    @classmethod
+    def writeSummaryLine(cls, wf, rawline, line, summaryTags):
+        for summaryTag, summaryDict in summaryTags.items():
+            if line.startswith(summaryTag):
+                summaryLine = summaryTag + " " + cls.getSummaryLine(summaryDict)
+                wf.write(rawline.replace(line, summaryLine))
+                return True
+        return False
              
     @classmethod           
-    def updateCounters(cls, counters, words):
+    def updateSummary(cls, summary, words):
         for word in words:
             key, rawValue = word.split("=")
-            value = counters.get(key, 0) + int(eval(rawValue))
-            counters[key] = value
-            
+            value = eval(rawValue)
+            numeric = value.isdigit()
+            if numeric:
+                value = int(value)
+            oldValue = summary.get(key)
+            if oldValue is None:
+                summary[key] = value
+            elif numeric:
+                summary[key] = oldValue + value
+            else:
+                # prefer error to failure to success, happens to be alphabetic
+                summary[key] = min(oldValue, value)
+                            
     @classmethod
-    def writeCountersLine(cls, wf, counters):
-        wf.write("<Counters ")
-        for key, value in counters.items():
-            wf.write(key + '="' + str(value) + '" ')
-        wf.write("/>\n")
+    def getSummaryLine(cls, data):
+        texts = [ key + '="' + str(value) + '"' for key, value in data.items() ]
+        return " ".join(texts)
             

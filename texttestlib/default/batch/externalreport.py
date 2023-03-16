@@ -19,10 +19,10 @@ def getExternalFormat(app):
 def getFileExtension(fmt):
     return "xml" if fmt == "junit" else fmt
 
-def getBatchExternalFolder(app):
+def getBatchExternalFolder(app, extFormat):
     resultsDir = app.getBatchConfigValue("batch_external_folder")
     if (resultsDir is None or resultsDir.strip() == ""):
-        resultsDir = os.path.join(app.writeDirectory, "junitreport")
+        resultsDir = os.path.join(app.writeDirectory, extFormat + "report")
     return resultsDir
 
 class ExternalFormatResponder(plugins.Responder):
@@ -65,7 +65,7 @@ class ExternalFormatResponder(plugins.Responder):
                     
     def writeResults(self, app, writerFormat):
         results = self.appData[app].getResults()
-        appResultsDir = self.createResultsDir(app)
+        appResultsDir = self.createResultsDir(app, writerFormat)
         fileExt = getFileExtension(writerFormat)
         for testName, result in results.items():
             if result["success"]:
@@ -84,8 +84,8 @@ class ExternalFormatResponder(plugins.Responder):
         except NameError:
             return Template(eval(writerFormat + "_template")).substitute(result)
               
-    def createResultsDir(self, app):
-        resultsDir = getBatchExternalFolder(app)
+    def createResultsDir(self, app, extFormat):
+        resultsDir = getBatchExternalFolder(app, extFormat)
         if not os.path.exists(resultsDir):
             os.mkdir(resultsDir)
         appResultsDir = os.path.join(resultsDir, app.name + app.versionSuffix())
@@ -303,9 +303,10 @@ class ExternalFormatCollector(plugins.Responder):
         plugins.log.info("Collecting external format files locally...")
         allFiles = {}
         for app in self.allApps:
-            resultsDir = getBatchExternalFolder(app)
+            extFormat = getExternalFormat(app)
+            resultsDir = getBatchExternalFolder(app, extFormat)
             appResultsDir = os.path.join(resultsDir, app.name + app.versionSuffix())
-            fileExt = getFileExtension(getExternalFormat(app))
+            fileExt = getFileExtension(extFormat)
             currFiles = glob(os.path.join(appResultsDir, "*." + fileExt))
             writeFile = os.path.join(resultsDir, "all_tests." + fileExt)
             filesSoFar = allFiles.setdefault(writeFile, [])

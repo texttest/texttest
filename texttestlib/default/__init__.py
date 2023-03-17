@@ -420,7 +420,7 @@ class Config:
                     classes.append(self.getWebPageResponder())
                 if not arg or "web" not in arg:
                     classes.append(batch.CollectFilesResponder)
-                if self.anyAppHas(allApps, lambda app: self.getBatchConfigValue(app, "batch_external_format") == "trx"):
+                if self.anyAppHas(allApps, lambda app: self.getBatchConfigValue(app, "batch_external_format") in ["trx", "jetbrains"]):
                     classes.append(ExternalFormatCollector)
             else:
                 if self.optionValue("b") is None:

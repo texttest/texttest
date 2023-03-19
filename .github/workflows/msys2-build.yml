@@ -18,7 +18,7 @@ jobs:
       uses: actions/checkout@v3
       with:
         repository: GNOME/meld
-        ref: '3.21.1'
+        ref: '3.22.0'
         path: meld
 
     - name: Cloning Adwaita Icons
@@ -36,6 +36,7 @@ jobs:
     - name: Moving meld code and icons into the right place
       shell: msys2 {0}
       run: |
+        patch -p0 -R < meld_build_helpers.patch
         cp -a bin texttestlib setup_win32.py meld
         cp wininstall/*.ico meld/data/icons
         cp -aL adwaita/Adwaita /usr/share/icons

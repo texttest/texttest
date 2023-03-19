@@ -80,6 +80,7 @@ manually_added_libs = {
     "librsvg-2-2.dll": os.path.join(sys.prefix, 'bin'),
     "libcroco-0.6-3.dll": os.path.join(sys.prefix, 'bin'),
     "libsigsegv-2.dll": os.path.join(sys.prefix, 'bin'),
+    "libwinpthread-1.dll": os.path.join(sys.prefix, 'bin'),
     }
 
 for lib, possible_path in manually_added_libs.items():

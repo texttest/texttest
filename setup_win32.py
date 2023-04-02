@@ -7,51 +7,12 @@ import platform
 import sys
 import sysconfig
 import certifi
-import setuptools  # setuptools patches distutils, which needs to be finished before cx_Freeze to avoid https://bugs.python.org/issue23102
+#import setuptools  # setuptools patches distutils, which needs to be finished before cx_Freeze to avoid https://bugs.python.org/issue23102
 
 import cx_Freeze
 from cx_Freeze import Executable, setup
 
 from texttestlib.texttest_version import version
-
-
-def load_matplotlib(finder: cx_Freeze.finder.ModuleFinder, module: cx_Freeze.module.Module) -> None:
-    """The matplotlib package requires mpl-data subdirectory."""
-    data_path = module.path[0] / "mpl-data"
-    target_path = Path("lib", module.name, "mpl-data")
-    # After matplotlib 3.4 mpl-data is guaranteed to be a subdirectory.
-    if not data_path.is_dir():
-        data_path = __import__("matplotlib").get_data_path()
-        need_patch = True
-    else:
-        need_patch = not module.in_file_system
-    finder.IncludeFiles(data_path, target_path, copy_dependent_files=False)
-    finder.IncludePackage("matplotlib")
-    finder.ExcludeModule("matplotlib.tests")
-    finder.ExcludeModule("matplotlib.testing")
-    if not need_patch or module.code is None:
-        return
-    CODE_STR = f"""
-def _get_data_path():
-    return os.path.join(os.path.dirname(sys.executable), "{target_path!s}")
-"""
-    for code_str in [CODE_STR, CODE_STR.replace("_get_data_", "get_data_")]:
-        new_code = compile(code_str, str(module.file), "exec")
-        co_func = new_code.co_consts[0]
-        name = co_func.co_name
-        code = module.code
-        consts = list(code.co_consts)
-        for i, c in enumerate(consts):
-            if isinstance(c, type(code)) and c.co_name == name:
-                consts[i] = co_func
-                break
-        module.code = code_object_replace(code, co_consts=consts)
-
-if hasattr(cx_Freeze, "version") and cx_Freeze.version == "6.8.1":
-    import cx_Freeze.hooks
-    from pathlib import Path
-    from cx_Freeze.common import code_object_replace
-    cx_Freeze.hooks.load_matplotlib = load_matplotlib
 
 
 def get_non_python_libs():
@@ -119,6 +80,7 @@ manually_added_libs = {
     "librsvg-2-2.dll": os.path.join(sys.prefix, 'bin'),
     "libcroco-0.6-3.dll": os.path.join(sys.prefix, 'bin'),
     "libsigsegv-2.dll": os.path.join(sys.prefix, 'bin'),
+    "libwinpthread-1.dll": os.path.join(sys.prefix, 'bin'),
     }
 
 for lib, possible_path in manually_added_libs.items():

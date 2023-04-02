@@ -31,11 +31,12 @@ jobs:
     - uses: msys2/setup-msys2@v2
       with:
         update: true
-        install: git mingw-w64-x86_64-python3-setuptools mingw-w64-x86_64-python3-cx_Freeze mingw-w64-x86_64-python3-gobject mingw-w64-x86_64-python3-pytest mingw-w64-x86_64-python3-pip mingw-w64-x86_64-python-matplotlib mingw-w64-x86_64-python-certifi mingw-w64-x86_64-python-psutil mingw-w64-x86_64-python-yaml mingw-w64-x86_64-gtksourceview4 mingw-w64-x86_64-gsettings-desktop-schemas mingw-w64-x86_64-diffutils glib2-devel intltool
+        install: git mingw-w64-x86_64-python3-setuptools mingw-w64-x86_64-python3-cx_Freeze mingw-w64-x86_64-python3-gobject mingw-w64-x86_64-python3-pytest mingw-w64-x86_64-python3-pip mingw-w64-x86_64-python-matplotlib mingw-w64-x86_64-python-certifi mingw-w64-x86_64-python-psutil mingw-w64-x86_64-python-yaml mingw-w64-x86_64-gtksourceview4 mingw-w64-x86_64-gsettings-desktop-schemas mingw-w64-x86_64-diffutils glib2-devel intltool patch
 
     - name: Moving meld code and icons into the right place
       shell: msys2 {0}
       run: |
+        patch -p0 -R < meld_build_helpers.patch
         cp -a bin texttestlib setup_win32.py meld
         cp wininstall/*.ico meld/data/icons
         cp -aL adwaita/Adwaita /usr/share/icons

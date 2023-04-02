@@ -80,6 +80,8 @@ manually_added_libs = {
     "librsvg-2-2.dll": os.path.join(sys.prefix, 'bin'),
     "libcroco-0.6-3.dll": os.path.join(sys.prefix, 'bin'),
     "libsigsegv-2.dll": os.path.join(sys.prefix, 'bin'),
+    # the following is only here because of https://github.com/marcelotduarte/cx_Freeze/issues/1651
+    # which happened again in https://github.com/marcelotduarte/cx_Freeze/issues/1850
     "libwinpthread-1.dll": os.path.join(sys.prefix, 'bin'),
     }
 

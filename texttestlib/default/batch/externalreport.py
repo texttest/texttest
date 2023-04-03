@@ -342,6 +342,7 @@ class ExternalFormatCollector(plugins.Responder):
             appResultsDir = os.path.join(resultsDir, app.name + app.versionSuffix())
             fileExt = getFileExtension(extFormat)
             currFiles = glob(os.path.join(appResultsDir, "*." + fileExt))
+            currFiles.sort()
             writeFile = os.path.join(resultsDir, "all_tests." + fileExt)
             filesSoFar = allFiles.setdefault((writeFile, extFormat), [])
             filesSoFar += currFiles

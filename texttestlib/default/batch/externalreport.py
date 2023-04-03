@@ -117,7 +117,7 @@ class ExternalFormatApplicationData:
         if startTime is not None:
             endTime = datetime.now()
         else:
-            startTime = datetime.fromtimestamp(0)
+            startTime = datetime.utcfromtimestamp(0)
             endTime = startTime
         result = dict(id=self.runId,
                       run_name=self.runName,

@@ -967,7 +967,7 @@ def getInterpreter(executable):
         return ""
     
     extension = executable.rsplit(".", 1)[-1]
-    cache = {"py": "py" if os.name == "nt" else "python",
+    cache = {"py": "py -3" if os.name == "nt" else "python",
              "rb": "ruby",
              "jar": "java -jar"}
     return cache.get(extension, "")

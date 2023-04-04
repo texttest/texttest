@@ -164,7 +164,7 @@ class ModifyTraffic(plugins.ScriptWithArgs):
         if os.name == "nt":
             interpreter = plugins.getInterpreter(self.script)
             if interpreter:
-                args = [interpreter] + args
+                args = plugins.splitcmd(interpreter) + args
         if trafficType in self.trafficTypes:
             proc = subprocess.Popen(args, cwd=dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             stdout, stderr = proc.communicate()

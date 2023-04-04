@@ -812,7 +812,7 @@ class CollateFiles(plugins.Action):
         if os.name == "nt":
             interpreter = plugins.getInterpreter(args[0])
             if interpreter:
-                args = [interpreter] + args
+                args = plugins.splitcmd(interpreter) + args
 
         try:
             runEnv = test.getRunEnvironment()

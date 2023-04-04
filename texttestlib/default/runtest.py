@@ -298,7 +298,7 @@ class RunTest(plugins.Action):
             python = sys.executable if "python" in basename else "python"
             # 'Native launcher' on Windows, such as via Windows installer. Don't know what Python it used
             return [ python, "-u" ] + args[1:]
-        elif forLinux and interpreter == "py": # Windows default Python interpreter
+        elif forLinux and len(args) > 0 and args[0] == "py": # Windows default Python interpreter
             return [ "python" ]
         else:
             return args

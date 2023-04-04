@@ -49,11 +49,13 @@ jobs:
         gdk-pixbuf-query-loaders --update-cache
         glib-compile-schemas data
         python3 setup_win32.py bdist_dumb bdist_msi
-    - uses: actions/upload-artifact@v2
+
+    - uses: actions/upload-artifact@v3
       with:
         name: Windows installer
         path: meld/dist/*.msi
-    - uses: actions/upload-artifact@v2
+
+    - uses: actions/upload-artifact@v3
       with:
         name: Windows zip
         path: meld/dist/*.zip

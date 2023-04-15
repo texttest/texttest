@@ -15,7 +15,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         build_env: [native]
-        python: [3.8, 3.9, '3.10']
+        python: [3.8, 3.9, '3.10', 3.11]
         include:
           - os: windows-latest
             build_env: msys
@@ -25,21 +25,22 @@ jobs:
 
     steps:
     - name: Cloning TextTest
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         path: texttest
 
     - name: Cloning SelfTests
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         repository: texttest/selftest
         path: tests/selftest
 
     - name: Configuring Python
       if: matrix.build_env != 'msys'
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python }}
+        architecture: x64
 
     - uses: msys2/setup-msys2@v2
       if: matrix.build_env == 'msys'
@@ -97,7 +98,7 @@ jobs:
 
     - name: Uploading test results
       if: failure()
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: texttesttmp-${{ runner.os }}-Py${{ matrix.python }}
         path: ~/.texttest/ttt.zip

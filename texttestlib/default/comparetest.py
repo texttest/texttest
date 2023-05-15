@@ -466,7 +466,7 @@ class TestComparison(BaseTestComparison):
     def makeNewState(self, test, lifeCycleDest):
         crashed = hasattr(
             self, "failedPrediction") and self.failedPrediction is not None and self.failedPrediction.category == "crash"
-        newState = TestComparison(self, test.app, "be " + lifeCycleDest, copyFailedPrediction=crashed)
+        newState = self.__class__(self, test.app, "be " + lifeCycleDest, copyFailedPrediction=crashed)
         for comparison in self.allResults:
             newState.addComparison(comparison)
         variablesToStore = test.app.getTestRunVariables()

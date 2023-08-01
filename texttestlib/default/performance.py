@@ -5,6 +5,9 @@ import time
 from texttestlib import plugins
 from .comparefile import FileComparison
 
+
+from functools import cmp_to_key
+
 # This module won't work without an external module creating a file called performance.app
 # This file should be of a format understood by the function below i.e. a single line containing
 # CPU time   :      30.31 sec. on heathlands
@@ -306,41 +309,31 @@ class TimeGroupFilter(plugins.Filter):
         self.testCount = testCount
 
     def makePerformanceDictionary(self, tests):
-        dict = {}
-        for test in tests:
-            testPerformance = getTestPerformance(test)
-            if testPerformance >= 0:
-                dict.setdefault(testPerformance, set()).add(test)
-        return dict
+        return {test: getTestPerformance(test) for test in tests}
 
     def refine(self, tests):
         if self.testCount <= 0 or self.testCount >= len(tests):
             return tests
-
         testPerfDict = self.makePerformanceDictionary(tests)
-        perfs = list(testPerfDict.keys())
-        perfs.sort(self.comparePerformance)
-        newTests = []
-        for perf in perfs:
-            for test in testPerfDict.get(perf):
-                newTests.append(test)
-                if len(newTests) == self.testCount:
-                    return newTests
-        return newTests
+        sortedTestPerfDict = sorted(testPerfDict, key=cmp_to_key(lambda test1, test2: self.comparePerformance(testPerfDict[test1], testPerfDict[test2])))
+        return sortedTestPerfDict[:self.testCount]
+    
+    def comparePerformance(self, perf1, perf2):
+        return 0
 
 
 class FastestFilter(TimeGroupFilter):
     option = "fastest"
 
     def comparePerformance(self, perf1, perf2):
-        return cmp(perf1, perf2)
+        return perf1-perf2
 
 
 class SlowestFilter(TimeGroupFilter):
     option = "slowest"
 
     def comparePerformance(self, perf1, perf2):
-        return cmp(perf2, perf1)
+        return perf2-perf1
 
 
 class PerformanceStatistics(plugins.ScriptWithArgs):

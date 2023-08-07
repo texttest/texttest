@@ -1818,10 +1818,10 @@ class GrepFilter(plugins.TextFilter):
                 return self.findAllStdFiles(test)
         return logFiles
 
-    def matches(self, logFile):
-        for line in open(logFile, errors="ignore"):
-            if self.stringContainsText(line):
-                return True
+    def matches(self, filePath):
+        with open(filePath, "rb") as f:
+            content = f.read()
+            return self.stringContainsText(content.decode())
         return False
 
 

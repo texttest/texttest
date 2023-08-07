@@ -1420,7 +1420,7 @@ class TextTrigger:
         self.matchEmptyString = matchEmptyString
         if tryAsRegexp and isRegularExpression(text):
             try:
-                self.regex = re.compile(text)
+                self.regex = re.compile(text, re.MULTILINE)
             except re.error:
                 pass
 

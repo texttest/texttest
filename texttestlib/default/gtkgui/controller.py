@@ -300,8 +300,18 @@ class GUIController(plugins.Responder, plugins.Observable):
         tabGUIs = [testTab, self.progressMonitor] + self.actionTabGUIs + [self.appFileGUI, runInfoTab]
         return actionholders.NotebookGUI(tabGUIs)
 
+    def _startCaches(self):
+        for app in self.initialApps: app.startFileCache()
+
+    def _cleanupCaches(self):
+        for app in self.initialApps:
+            if app.hasFileCache:
+                app.stopFileCache()
+
     def run(self):
-        Gtk.main()
+        self._startCaches()
+        Gtk.main() 
+        self._cleanupCaches()
 
     def notifyExit(self):
         Gtk.main_quit()

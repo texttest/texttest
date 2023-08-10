@@ -1542,6 +1542,7 @@ class Application(object):
             self.diag.info("Local write directory at " + self.localWriteDirectory)
         self.checkout = self.configObject.setUpCheckout(self)
         self.diag.info("Checkout set to " + self.checkout)
+        self.hasFileCache = False
 
     def __repr__(self):
         return self.fullName() + self.versionSuffix()
@@ -2148,6 +2149,19 @@ class Application(object):
 
     def setConfigAlias(self, aliasName, realName):
         self.configDir.setAlias(aliasName, realName)
+
+    def startFileCache(self):
+        from texttestlib.default.gtkgui.filecaching import FileCache
+        files = []
+        if self.hasPerformance():
+            stem = self.getConfigValue("default_performance_stem")
+            files += self.getFileNamesFromFileStructure(stem)
+        self.fileCache = FileCache(files)
+        self.fileCache.init()
+        self.hasFileCache = True
+
+    def stopFileCache(self):
+        self.fileCache.clear()
 
     @staticmethod
     def fileMatches(file, filesToIgnore):

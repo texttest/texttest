@@ -17,13 +17,14 @@ from functools import cmp_to_key
 
 # Returns -1 as error value, if the file is the wrong format
 
-
 def getPerformance(fileName):
-    if not fileName:
-        return float(-1)
     line = open(fileName).readline()
     return getPerformanceFromLine(line)
 
+
+def getPerformanceFromCache(fileName, fileCache):
+    line = fileCache.get_file_content(fileName)
+    return getPerformanceFromLine(line)
 
 def getPerformanceFromLine(line):
     pos = line.find(":")
@@ -35,7 +36,13 @@ def getPerformanceFromLine(line):
 def getTestPerformance(test, version=None):
     try:
         perfStem = test.getConfigValue("default_performance_stem")
-        return getPerformance(test.getFileName(perfStem, version))
+        fileName = test.getFileName(perfStem, version)
+        if not fileName:
+            return float(-1)
+        if test.app.hasFileCache:
+            return getPerformanceFromCache(fileName, test.app.fileCache)
+        else:
+            return getPerformance(fileName)
     except IOError:  # assume something disappeared externally
         test.refreshFiles()
         return getTestPerformance(test, version)

@@ -2150,18 +2150,20 @@ class Application(object):
     def setConfigAlias(self, aliasName, realName):
         self.configDir.setAlias(aliasName, realName)
 
-    def startFileCache(self):
-        from texttestlib.default.gtkgui.filecaching import FileCache
-        files = []
+    def get_cache_files(self):
+        stems = []#self.getConfigValue("log_file")
         if self.hasPerformance():
-            stem = self.getConfigValue("default_performance_stem")
-            files += self.getFileNamesFromFileStructure(stem)
-        self.fileCache = FileCache(files)
-        self.fileCache.init()
-        self.hasFileCache = True
+            stems.append(self.getConfigValue("default_performance_stem"))
 
-    def stopFileCache(self):
-        self.fileCache.clear()
+        files = []
+        for stem in stems:
+            files += self.getFileNamesFromFileStructure(stem)
+        return files
+
+
+    def addFileCache(self, cache):
+        self.fileCache = cache
+        self.hasFileCache = True
 
     @staticmethod
     def fileMatches(file, filesToIgnore):

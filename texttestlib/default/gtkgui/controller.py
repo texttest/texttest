@@ -300,18 +300,27 @@ class GUIController(plugins.Responder, plugins.Observable):
         tabGUIs = [testTab, self.progressMonitor] + self.actionTabGUIs + [self.appFileGUI, runInfoTab]
         return actionholders.NotebookGUI(tabGUIs)
 
-    def _startCaches(self):
-        for app in self.initialApps: app.startFileCache()
+    def _makeListUnique(self, array):
+        return list(set(array))
 
-    def _cleanupCaches(self):
+    def _startCache(self):
+        files = []
         for app in self.initialApps:
-            if app.hasFileCache:
-                app.stopFileCache()
+            files.extend(app.get_cache_files())
+        files = self._makeListUnique(files)
+        
+        from texttestlib.default.gtkgui.filecaching import FileCache
+        self.fileCache = FileCache(files)
+        self.fileCache.init()
+        for app in self.initialApps: app.addFileCache(self.fileCache)
+
+    def _cleanupCache(self):
+        self.fileCache.clear()
 
     def run(self):
-        self._startCaches()
+        self._startCache()
         Gtk.main() 
-        self._cleanupCaches()
+        self._cleanupCache()
 
     def notifyExit(self):
         Gtk.main_quit()

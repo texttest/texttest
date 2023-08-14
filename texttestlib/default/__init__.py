@@ -1739,7 +1739,7 @@ class GrepFilter(plugins.TextFilter):
         if self.fileStem == "free_text":
             return self.stringContainsText(test.state.freeText)
         for logFile in self.findAllFiles(test):
-            if self.matches(logFile):
+            if self.matches(logFile, test):
                 return True
         return False
 
@@ -1766,11 +1766,13 @@ class GrepFilter(plugins.TextFilter):
                 return self.findAllStdFiles(test)
         return logFiles
 
-    def matches(self, filePath):
-        with open(filePath, "rb") as f:
-            content = f.read()
-            return self.stringContainsText(content.decode())
-        return False
+    def matches(self, filePath, test):
+        if test.app.hasFileCache:
+            content = test.app.fileCache.get_file_content(filePath)
+        else:
+            with open(filePath, "rb") as f:
+                content = f.read().decode()
+        return self.stringContainsText(content)
 
 
 class TestDescriptionFilter(plugins.TextFilter):

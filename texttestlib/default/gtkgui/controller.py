@@ -308,14 +308,15 @@ class GUIController(plugins.Responder, plugins.Observable):
         for app in self.initialApps:
             files.extend(app.get_cache_files())
         files = self._makeListUnique(files)
-        
-        from texttestlib.default.gtkgui.filecaching import FileCache
-        self.fileCache = FileCache(files)
-        self.fileCache.init()
-        for app in self.initialApps: app.addFileCache(self.fileCache)
+        if len(files):
+            from texttestlib.default.gtkgui.filecaching import FileCache
+            self.fileCache = FileCache(files)
+            self.fileCache.init()
+            for app in self.initialApps: app.addFileCache(self.fileCache)
 
     def _cleanupCache(self):
-        self.fileCache.clear()
+        if hasattr(self, "fileCache"):
+            self.fileCache.clear()
 
     def run(self):
         self._startCache()

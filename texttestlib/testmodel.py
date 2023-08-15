@@ -1925,7 +1925,7 @@ class Application(object):
                               "Additional directories to search for TextTest files")
         self.setConfigDefault("filename_convention_scheme", "classic",
                               "Naming scheme to use for files for stdin,stdout and stderr")
-        self.setConfigDefault("cache_file_stems", "", "Cache files for faster test selection in GUI")
+        self.setConfigDefault("cache_file_stems", None, "Cache files for faster test selection in GUI")
         self.setConfigAlias("test_data_searchpath", "extra_search_directory")
         self.setConfigAlias("extra_config_directory", "extra_search_directory")
 
@@ -2152,10 +2152,15 @@ class Application(object):
         self.configDir.setAlias(aliasName, realName)
 
     def _get_cache_stems(self):
-        return self.getConfigValue("cache_file_stems").split(",")
+        cache_file_stems = self.getConfigValue("cache_file_stems")
+        if cache_file_stems:
+            return cache_file_stems.split(",")
+        return None
 
     def get_cache_files(self):
         stems = self._get_cache_stems()
+        if not stems:
+            return[]
         files = []
         for stem in stems:
             files += self.getFileNamesFromFileStructure(stem)

@@ -143,6 +143,8 @@ class GUIController(plugins.Responder, plugins.Observable):
 
         self.topWindowGUI = self.createTopWindowGUI(allApps, runName, optionMap.get("rerun"))
 
+        self.fileCache = None
+
     def createNewApplication(self, optionMap):
         from .default_gui import ImportApplication
         return ImportApplication([], False, optionMap).runDialog()
@@ -315,7 +317,7 @@ class GUIController(plugins.Responder, plugins.Observable):
             for app in self.initialApps: app.addFileCache(self.fileCache)
 
     def _cleanupCache(self):
-        if hasattr(self, "fileCache"):
+        if self.fileCache:
             self.fileCache.clear()
 
     def run(self):

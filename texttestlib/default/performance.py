@@ -19,11 +19,15 @@ from functools import cmp_to_key
 # Returns -1 as error value, if the file is the wrong format
 
 def getPerformance(fileName):
+    if not fileName:
+        return float(-1)
     line = open(fileName).readline()
     return getPerformanceFromLine(line)
 
 
 def getPerformanceFromCache(fileName, fileCache):
+    if not fileName:
+        return float(-1)
     line = fileCache.get_file_content(fileName)
     return getPerformanceFromLine(line)
 

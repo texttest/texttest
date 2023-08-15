@@ -7,7 +7,9 @@ environment:
       MSYSTEM: MINGW32
 
 install:
-    - git clone -b 3.20.1 https://gitlab.gnome.org/GNOME/meld
+    - git clone -b 3.22.0 https://gitlab.gnome.org/GNOME/meld
+    - git clone -b 41.0 https://github.com/GNOME/adwaita-icon-theme
+    - cp -aL adwaita-icon-theme/Adwaita /usr/share/icons
     - set MELD=%CD%\meld
     - set PATH=C:\msys64\%MSYSTEM%\bin;C:\msys64\usr\bin;%PATH%
     - pacman --noconfirm -Syyuu

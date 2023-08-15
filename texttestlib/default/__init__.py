@@ -18,8 +18,11 @@ from threading import Thread
 from locale import getpreferredencoding
 # For back-compatibility
 from .runtest import RunTest, Running, Killed
+from .batch.externalreport import ExternalFormatResponder, ExternalFormatCollector
+from .database_data import SaveDatabase
 from .scripts import *
 from functools import reduce
+from configparser import ConfigParser
 
 
 def getConfig(optionMap):
@@ -46,6 +49,9 @@ class Config:
 
     def getMachineLabel(self):
         return "Run on machine"
+
+    def addCheckoutOptions(self, group, checkout):
+        return group.addOption("c", self.getCheckoutLabel(), checkout)
 
     def addToOptionGroups(self, apps, groups):
         recordsUseCases = len(apps) == 0 or self.anyAppHas(
@@ -75,7 +81,7 @@ class Config:
                 else:
                     version, checkout, machine = "", "", ""
                 group.addOption("v", "Run this version", version)
-                group.addOption("c", self.getCheckoutLabel(), checkout)
+                self.addCheckoutOptions(group, checkout)
                 group.addOption("m", self.getMachineLabel(), self.getMachineNameForDisplay(machine))
                 group.addOption("cp", "Times to run", 1, minimum=1, maximum=10000,
                                 description="Set this to some number larger than 1 to run the same test multiple times, for example to try to catch indeterminism in the system under test")
@@ -90,8 +96,20 @@ class Config:
                 if useCatalogues:
                     self.addDefaultSwitch(group, "ignorecat", "Ignore catalogue file when isolating data", description="Treat test data identified by 'partial_copy_test_path' as if it were in 'copy_test_path', " +
                                           "i.e. copy everything without taking notice of the catalogue file. Useful when many things have changed with the files written by the test")
+                
+                db_pathnames = set()
+                for app in apps:
+                    for pathName, dirName in app.getConfigValue("dbtext_database_path").items():
+                        if not dirName:
+                            continue
+                        if pathName not in db_pathnames:
+                            postfix = " (" + pathName + ")" if pathName != "default" else ""
+                            group.addSwitch("dbtext-setup-" + pathName.lower(), "Database setup run" + postfix, description="Set up the " + pathName + " database: save all changes after this run")
+                        db_pathnames.add(pathName)
+
                 if useCaptureMock:
-                    self.addCaptureMockSwitch(group)
+                    hasClientServer = self.anyAppHas(apps, self.captureMockHasClientServer)
+                    self.addCaptureMockSwitch(group, hasClientServer=hasClientServer)
             elif group.name.startswith("Advanced"):
                 self.addDefaultOption(group, "b", "Run batch mode session")
                 self.addDefaultOption(group, "name", "Name this run")
@@ -154,13 +172,17 @@ class Config:
     def addDefaultOption(self, group, key, name, *args, **kw):
         group.addOption(key, name, self.optionValue(key), *args, **kw)
 
-    def addCaptureMockSwitch(self, group, value=0):
+    def addCaptureMockSwitch(self, group, value=0, hasClientServer=False):
         options = ["Replay", "Record", "Mixed Mode", "Disabled"]
         descriptions = ["Replay all existing interactions from the information in CaptureMock's mock files. Do not record anything new.",
                         "Ignore any existing CaptureMock files and record all the interactions afresh.",
                         "Replay all existing interactions from the information in the CaptureMock mock files. " +
                         "Record any other interactions that occur.",
                         "Disable CaptureMock"]
+        if hasClientServer:
+            # "Mixed mode" makes no sense here, so remove it
+            options.pop(2)
+            descriptions.pop(2)
         group.addSwitch("rectraffic", "CaptureMock", value=value, options=options, description=descriptions)
 
     def getReconnFullOptions(self):
@@ -220,7 +242,7 @@ class Config:
             else:
                 return [scriptObject]
         else:
-            return self.getTestProcessor()
+            return self.getTestProcessor(app)
 
     def usesComparator(self, scriptObject):
         try:
@@ -398,15 +420,16 @@ class Config:
                     classes.append(self.getWebPageResponder())
                 if not arg or "web" not in arg:
                     classes.append(batch.CollectFilesResponder)
+                if self.anyAppHas(allApps, lambda app: self.getBatchConfigValue(app, "batch_external_format") in ["trx", "jetbrains"]):
+                    classes.append(ExternalFormatCollector)
             else:
                 if self.optionValue("b") is None:
                     plugins.log.info("No batch session identifier provided, using 'default'")
                     self.optionMap["b"] = "default"
                 if self.anyAppHas(allApps, lambda app: self.emailEnabled(app)):
                     classes.append(batch.EmailResponder)
-                if self.anyAppHas(allApps, lambda app: self.getBatchConfigValue(app, "batch_junit_format") == "true"):
-                    from .batch.junitreport import JUnitResponder
-                    classes.append(JUnitResponder)
+                if self.anyAppHas(allApps, lambda app: self.getBatchConfigValue(app, "batch_external_format") != "false"):
+                    classes.append(ExternalFormatResponder)
 
         if os.name == "posix" and self.useVirtualDisplay():
             from .virtualdisplay import VirtualDisplayResponder
@@ -460,6 +483,16 @@ class Config:
 
     def usesCaptureMock(self, app):
         return "traffic" in app.defFileStems()
+    
+    def captureMockHasClientServer(self, app):
+        rcFile = os.path.join(app.getDirectory(), "capturemockrc." + app.name)
+        return self.clientServerEnabled([ rcFile ]) if rcFile and os.path.isfile(rcFile) else False
+         
+    def clientServerEnabled(self, rcFiles):
+        # check for server_protocol being explicitly set
+        parser = ConfigParser(strict=False)
+        parser.read(rcFiles)
+        return parser.has_section("general") and parser.has_option("general", "server_protocol")
 
     def hasWritePermission(self, path):
         if os.path.isdir(path):
@@ -570,17 +603,21 @@ class Config:
         filterAction = rundependent.FilterAction()
         return filterAction.getAllFilters(test, fileName, app), app
 
-    def getTestProcessor(self):
+    def getTestProcessor(self, app):
         catalogueCreator = self.getCatalogueCreator()
         ignoreCatalogues = self.shouldIgnoreCatalogues()
         collator = self.getTestCollator()
         from .traffic import SetUpCaptureMockHandlers, TerminateCaptureMockHandlers
         trafficSetup = SetUpCaptureMockHandlers(self.optionIntValue("rectraffic"))
         trafficTerminator = TerminateCaptureMockHandlers()
-        return [self.getExecHostFinder(), self.getWriteDirectoryMaker(),
-                self.getWriteDirectoryPreparer(ignoreCatalogues),
-                trafficSetup, catalogueCreator, collator, self.getOriginalFilterer(), self.getTestRunner(),
-                trafficTerminator, catalogueCreator, collator, self.getTestEvaluator()]
+        actions = [self.getExecHostFinder(), self.getWriteDirectoryMaker(),
+                   self.getWriteDirectoryPreparer(ignoreCatalogues),
+                   trafficSetup, catalogueCreator, collator, self.getOriginalFilterer(), self.getTestRunner(),
+                   trafficTerminator, catalogueCreator, collator, self.getTestEvaluator()]
+        for pathName, path in app.getConfigValue("dbtext_database_path").items():
+            if "dbtext-setup-" + pathName.lower() in self.optionMap:
+                actions.append(SaveDatabase(path))
+        return actions
 
     def isRecording(self):
         return "record" in self.optionMap
@@ -1227,12 +1264,12 @@ class Config:
                              "Generic filter for batch session, more flexible than timelimit")
         app.setConfigDefault("batch_use_collection", {"default": "false"},
                              "Do we collect multiple mails into one in batch mode")
-        app.setConfigDefault("batch_junit_format", {"default": "false"},
-                             "Do we write out results in junit format in batch mode")
+        app.setConfigDefault("batch_external_format", {"default": "false"},
+                             "Do we write out results in external format in batch mode. Supports junit, trx")
         app.setConfigDefault("batch_include_comment_plugin", {"default": "true"},
                              "Do we include the comment plugin in the HTML report (requires PHP)")
-        app.setConfigDefault("batch_junit_folder", {
-                             "default": ""}, "Which folder to write test results in junit format in batch mode. Only useful together with batch_junit_format")
+        app.setConfigDefault("batch_external_folder", {
+                             "default": ""}, "Which folder to write test results in external format in batch mode. Only useful together with batch_external_format")
         app.setConfigDefault("batch_collect_max_age_days", {
                              "default": 100000}, "When collecting multiple messages, what is the maximum age of run that we should accept?")
         app.setConfigDefault("batch_collect_compulsory_version", self.getDefaultCollectCompulsoryVersions(
@@ -1245,6 +1282,9 @@ class Config:
                              "List of versions to allow if batch_use_version_filtering enabled")
         app.setConfigAlias("testoverview_colours", "historical_report_colours")
         app.setConfigAlias("historical_report_resource_pages", "historical_report_resources")
+        app.setConfigAlias("batch_junit_format", "batch_external_format")
+        app.setConfigAlias("batch_junit_folder", "batch_external_folder")
+
 
     def setPerformanceDefaults(self, app):
         # Performance values
@@ -1402,6 +1442,7 @@ class Config:
         app.setConfigDefault("discard_file_text", {
                              "default": []}, "List of generated result files which should not be compared if they contain the given patterns")
         app.setConfigDefault("capturemock_path", "", "Path to local CaptureMock installation, in case newer one is required with frozen TextTest")
+        app.setConfigDefault("capturemock_clientserver_mock_name", "httpmocks", "Path stem to use for client-server mocks for CaptureMock")
         rectrafficValue = self.optionIntValue("rectraffic")
         if rectrafficValue == 1:
             # Re-record everything. Don't use this when only recording additional new stuff
@@ -1635,11 +1676,13 @@ class Config:
                              "Automatically sort test suites in alphabetical order. 1 means sort in ascending order, -1 means sort in descending order.")
         app.setConfigDefault("extra_test_process_postfix", [],
                              "Postfixes to use on ordinary files to denote an additional run of the SUT to be triggered")
+        app.setConfigDefault("dbtext_database_path", {"default": ""}, "Paths which represent textual data for databases, for use in dbtext")
         app.addConfigEntry("builtin", "options", "definition_file_stems")
         app.addConfigEntry("regenerate", "usecase", "definition_file_stems")
         app.addConfigEntry("builtin", self.getStdinName(namingScheme), "definition_file_stems")
         app.addConfigEntry("builtin", "knownbugs", "definition_file_stems")
         app.setConfigAlias("test_list_files_directory", "filter_file_directory")
+        
 
     def setApplicationDefaults(self, app):
         homeOS = app.getConfigValue("home_operating_system")
@@ -1674,6 +1717,13 @@ class Config:
                 app.getConfigValue("use_case_recorder") in ["", "storytext"] and \
                 not any(("usecase" in k for k in app.getConfigValue("view_program"))):
             app.addConfigEntry("*usecase*", "storytext_editor", "view_program")
+        test_data_paths = app.getConfigValue("copy_test_path") + app.getConfigValue("link_test_path") + \
+                          app.getConfigValue("partial_copy_test_path") + app.getConfigValue("copy_test_path_merge")
+        for path in app.getConfigValue("dbtext_database_path").values():
+            for sep in { "/", os.sep }:
+                path = path.split(sep)[0]
+            if path and path not in test_data_paths:
+                app.addConfigEntry("copy_test_path_merge", path)
         return False
 
 

@@ -6,7 +6,6 @@ import sys
 from texttestlib import plugins
 from locale import getpreferredencoding
 
-
 class SetUpCaptureMockHandlers(plugins.Action):
     def __init__(self, recordSetting):
         self.recordSetting = recordSetting
@@ -46,11 +45,16 @@ class SetUpCaptureMockHandlers(plugins.Action):
 
     def setUpCaptureMock(self, test, interceptDir, rcFiles):
         extReplayFile = test.getFileName("traffic")
+        clientServer = test.app.clientServerEnabled(rcFiles)
         if extReplayFile:
             # "Legacy" setup to avoid the need to rename hundreds of files
             extRecordFile = test.makeTmpFileName("traffic")
             pyReplayFile = extReplayFile
             pyRecordFile = extRecordFile
+        elif clientServer:
+            clientServerMockName = test.getConfigValue("capturemock_clientserver_mock_name")
+            extReplayFile = test.getFileName(clientServerMockName)
+            extRecordFile = test.makeTmpFileName(clientServerMockName)
         else:
             extReplayFile = test.getFileName("externalmocks")
             extRecordFile = test.makeTmpFileName("externalmocks")
@@ -58,22 +62,35 @@ class SetUpCaptureMockHandlers(plugins.Action):
             pyRecordFile = test.makeTmpFileName("pythonmocks")
         recordEditDir = test.makeTmpFileName("file_edits", forComparison=0)
         replayEditDir = test.getFileName("file_edits") if extReplayFile else None
-        sutDirectory = test.getDirectory(temporary=1, local=1)
-        capturemock_path = test.getConfigValue("capturemock_path")
-        if capturemock_path:
-            sys.path.insert(0, capturemock_path)
-        try:
-            from capturemock import setUpServer, setUpPython
-            externalActive = setUpServer(self.recordSetting, extRecordFile, extReplayFile,
-                                         recordEditDir=recordEditDir, replayEditDir=replayEditDir,
-                                         rcFiles=rcFiles, interceptDir=interceptDir,
-                                         sutDirectory=sutDirectory, environment=test.environment)
-            pythonActive = setUpPython(self.recordSetting, pyRecordFile, pyReplayFile, rcFiles=rcFiles,
-                                       environment=test.environment)
-            return externalActive or pythonActive
-        except ImportError as e:
-            raise plugins.TextTestError(
-                "Test requires CaptureMock to be installed, but the capturemock module could not be found\nError was: " + str(e) + "\nSearched in " + repr(sys.path))
+        if clientServer:
+            # translate as mixed mode (2) isn't used in this context
+            cpMockMode = "3" if self.recordSetting == 2 else str(self.recordSetting)
+            # Let a "test rig" script control what to do with capturemock, easier to have control there
+            test.setEnvironment("TEXTTEST_CAPTUREMOCK_MODE", cpMockMode) # For use in your test rig. See CaptureMock docs
+            test.setEnvironment("TEXTTEST_CAPTUREMOCK_RCFILES", ",".join(rcFiles)) # For use in your test rig. See CaptureMock docs
+            if extReplayFile:
+                test.setEnvironment("TEXTTEST_CAPTUREMOCK_REPLAY", extReplayFile) # For use in your test rig. See CaptureMock docs
+            test.setEnvironment("TEXTTEST_CAPTUREMOCK_RECORD", extRecordFile) # For use in your test rig. See CaptureMock docs
+            if replayEditDir:
+                test.setEnvironment("TEXTTEST_CAPTUREMOCK_REPLAY_EDIT_DIR", replayEditDir) # For use in your test rig. See CaptureMock docs
+            test.setEnvironment("TEXTTEST_CAPTUREMOCK_RECORD_EDIT_DIR", recordEditDir) # For use in your test rig. See CaptureMock docs
+        else:
+            sutDirectory = test.getDirectory(temporary=1, local=1)
+            capturemock_path = test.getConfigValue("capturemock_path")
+            if capturemock_path:
+                sys.path.insert(0, capturemock_path)
+            try:
+                from capturemock import setUpServer, setUpPython
+                externalActive = setUpServer(self.recordSetting, extRecordFile, extReplayFile,
+                                             recordEditDir=recordEditDir, replayEditDir=replayEditDir,
+                                             rcFiles=rcFiles, interceptDir=interceptDir,
+                                             sutDirectory=sutDirectory, environment=test.environment)
+                pythonActive = setUpPython(self.recordSetting, pyRecordFile, pyReplayFile, rcFiles=rcFiles,
+                                           environment=test.environment)
+                return externalActive or pythonActive
+            except ImportError as e:
+                raise plugins.TextTestError(
+                    "Test requires CaptureMock to be installed, but the capturemock module could not be found\nError was: " + str(e) + "\nSearched in " + repr(sys.path))
 
     def intercept(self, moduleFile, interceptDir):
         interceptName = os.path.join(interceptDir, os.path.basename(moduleFile))
@@ -147,7 +164,7 @@ class ModifyTraffic(plugins.ScriptWithArgs):
         if os.name == "nt":
             interpreter = plugins.getInterpreter(self.script)
             if interpreter:
-                args = [interpreter] + args
+                args = plugins.splitcmd(interpreter) + args
         if trafficType in self.trafficTypes:
             proc = subprocess.Popen(args, cwd=dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             stdout, stderr = proc.communicate()

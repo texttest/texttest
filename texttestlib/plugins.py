@@ -963,8 +963,11 @@ def copyEnvironment(values={}, ignoreVars=[]):
 
 
 def getInterpreter(executable):
+    if "." not in executable:
+        return ""
+    
     extension = executable.rsplit(".", 1)[-1]
-    cache = {"py": "python",
+    cache = {"py": "py -3" if os.name == "nt" else "python",
              "rb": "ruby",
              "jar": "java -jar"}
     return cache.get(extension, "")
@@ -1179,7 +1182,7 @@ def getAggregateString(items, method):
 def readList(filename):
     try:
         items = []
-        for longline in open(filename).readlines():
+        for longline in open(filename, encoding=getpreferredencoding(), errors="replace").readlines():
             line = longline.strip()
             if len(line) > 0 and not line.startswith("#"):
                 items.append(line)

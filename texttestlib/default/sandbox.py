@@ -442,6 +442,10 @@ class TestEnvironmentCreator:
             if localCheckout and localCheckout != checkout:
                 vars.append(("TEXTTEST_CHECKOUT_NAME", localCheckout))  # Local name of the checkout directory
             vars.append(("TEXTTEST_SANDBOX_ROOT", self.test.app.localWriteDirectory)) # Full path to the sandbox root directory
+            for pathName in self.test.getConfigValue("dbtext_database_path"):
+                if "dbtext-setup-" + pathName.lower() in self.optionMap:
+                    postfix = "_" + pathName.upper() if pathName != "default" else ""
+                    vars.append(("TEXTTEST_DB_SETUP" + postfix, "1")) # Environment variable set when "database setup run" selected in the UI
             if self.test.getConfigValue("use_case_record_mode") == "GUI":
                 usecaseRecorder = self.test.getConfigValue("use_case_recorder")
                 # Mostly to make sure StoryText's own tests have a chance of working
@@ -803,12 +807,12 @@ class CollateFiles(plugins.Action):
         else:
             return testDir, existingPaths
 
-    def runCollationScript(self, args, test, stdin, stdout, stderr, useShell):
+    def runCollationScript(self, args, test, stdin, stdout, stderr):
         # Windows isn't clever enough to know how to run Python/Java programs without some help...
-        if os.name == "nt" and not useShell:
+        if os.name == "nt":
             interpreter = plugins.getInterpreter(args[0])
             if interpreter:
-                args = [interpreter] + args
+                args = plugins.splitcmd(interpreter) + args
 
         try:
             runEnv = test.getRunEnvironment()
@@ -816,7 +820,7 @@ class CollateFiles(plugins.Action):
             runEnv["PATH"] += os.pathsep + os.pathsep.join(libexecPaths)
             return subprocess.Popen(args, env=runEnv,
                                     stdin=stdin, stdout=stdout, stderr=stderr,
-                                    cwd=test.getDirectory(temporary=1), shell=useShell)
+                                    cwd=test.getDirectory(temporary=1))
         except OSError:
             # Might just be pipe identifiers here
             if hasattr(stdout, "close"):
@@ -856,8 +860,7 @@ class CollateFiles(plugins.Action):
                 stdout = subprocess.PIPE
                 stderr = subprocess.STDOUT
 
-            useShell = os.name == "nt" and len(scripts) == 1
-            self.collationProc = self.runCollationScript(args, test, stdin, stdout, stderr, useShell)
+            self.collationProc = self.runCollationScript(args, test, stdin, stdout, stderr)
             if not self.collationProc:
                 if os.path.isfile(targetFile):
                     os.remove(targetFile)

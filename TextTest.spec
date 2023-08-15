@@ -40,8 +40,6 @@ rm -rf %{buildroot}
 %defattr(-,root,root,-)
 %doc readme.txt
 %{_bindir}/texttest
-%{_bindir}/filter_rundependent.py
-%{_bindir}/filter_fpdiff.py
 %{_bindir}/interpretcore
 %{python_sitelib}/*
 

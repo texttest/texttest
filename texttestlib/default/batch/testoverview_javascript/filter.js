@@ -1,4 +1,8 @@
 
+// Enum values for strategy choice
+var STRATEGY_LAST_TEST = 'LAST';
+var STRATEGY_ANY_TESTS = 'ANY';
+
 // A test result category.
 // - Containts its color and view state
 var Category = function(color)
@@ -18,6 +22,8 @@ var TestRow = function(trElem)
 {
     var tdList = trElem.getElementsByTagName('td');
     this.lastCol = tdList[tdList.length-1];
+    const [, ...dataCells] = tdList;
+    this.allCols = dataCells;
     this.row = trElem;
     this.testName = $(tdList[0]).text().replace(/\n/g,"");
 };
@@ -43,20 +49,32 @@ var Filter = function(bodyElem)
         this.categories.push(new Category(Colors[i]));
 
     this.numTestsVisible = -1;   // initiated on apply()
+    this.filterStrategy = STRATEGY_LAST_TEST;
     this.textFilter = null;      
     this.onUpdateCallbacks = []; 
+};
+
+// Check if row matches filter for specific category
+Filter.prototype.matchesCategoryFilter = function(cat, testRow)
+{
+    if (this.filterStrategy === STRATEGY_LAST_TEST)
+        return cat.appliesTo(testRow.lastCol);
+    else if (this.filterStrategy === STRATEGY_ANY_TESTS)
+        return testRow.allCols.some((col) => cat.appliesTo(col));
+    console.log('Unknown filter strategy');
+    return true;
 };
 
 // Hide/Show a single row
 Filter.prototype.setRowVisibility = function(testRow, textFilterRegExp)
 {
-    var visible = true;
+    var visible = false;
     for (var i = 0; i < this.categories.length; ++i)
     {
 	var cat = this.categories[i];
-	if (cat.appliesTo(testRow.lastCol))
+	if (cat.isVisible && this.matchesCategoryFilter(cat, testRow))
 	{
-	    visible = cat.isVisible;
+	    visible = true;
 	    break;
 	}
     }
@@ -103,6 +121,21 @@ Filter.prototype.apply = function()
     this.fireOnUpdate();
 };
 
+Filter.prototype.setFilterStrategy = function(filterStrategy)
+{
+    this.filterStrategy = filterStrategy;
+    // Older reports will not have ColorsLastCol defined and hence
+    // will show all filter buttons as options
+    if (window.ColorsLastCol !== undefined)
+    {
+        $(".colortoggle").each((i, element) => {
+            const visible = (filterStrategy !== STRATEGY_LAST_TEST || ColorsLastCol.includes(element.dataset.color));
+            $(element.parentNode).toggle(visible);
+        });
+    }
+    this.apply();
+};
+
 Filter.prototype.showOnly = function(category)
 {
     for (var i = 0; i < this.categories.length; ++i)
@@ -129,10 +162,27 @@ Filter.prototype.reset = function()
     this.apply();
 };
 
+// Create html and behavior to choose filter strategy
+var createFilterStrategySelector = function(filter) {
+    var selector = $('<select title=\'Select filter strategy\'></select>');
+    selector.css({
+        'padding': '0px 10px',
+        'height': '100%'
+    });
+    selector.append($(`<option value=${STRATEGY_LAST_TEST} title="Show row if last run matches any active filter">Last run</option>`));
+    selector.append($(`<option value=${STRATEGY_ANY_TESTS} title="Show row if any run matches any active filter">Any run</option>`));
+    selector.change(function()
+    {
+        const strategy = $(this).find(":selected").val();
+        filter.setFilterStrategy(strategy);
+    });
+    return selector;
+};
+
 // Create html and behavior of a category toggler
 var createCategoryToggler = function(filter, category, id)
 {
-    var toggler = $('<div title="Toggle this category" id=color' + id + '></div>');
+    var toggler = $('<div title="Toggle this category" class=colortoggle id=color' + id + ' data-color="' + category.color + '"></div>');
     toggler.css({
             'position' : 'relative',
 	    'background-color': category.color,
@@ -189,6 +239,10 @@ var init = function()
     // The filter instance
     var filter = new Filter(document.body);
 
+    var levelTd = $('<td height=30></td>');
+    levelTd.append(createFilterStrategySelector(filter));
+    layoutRow.append(levelTd);
+
     // Populate toolbar with category togglers
     for (var i = 0; i < filter.categories.length; ++i)
     {
@@ -225,6 +279,7 @@ var init = function()
     toolbarContent.append(layoutTable);
     $(document.body).append(toolbarContent);
 
+    filter.setFilterStrategy(STRATEGY_LAST_TEST);
     filter.apply();
 };
 

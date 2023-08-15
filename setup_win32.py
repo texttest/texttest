@@ -2,57 +2,17 @@
 
 import glob
 import os.path
+import pathlib
 import platform
 import sys
 import sysconfig
 import certifi
-import setuptools  # setuptools patches distutils, which needs to be finished before cx_Freeze to avoid https://bugs.python.org/issue23102
+#import setuptools  # setuptools patches distutils, which needs to be finished before cx_Freeze to avoid https://bugs.python.org/issue23102
 
 import cx_Freeze
 from cx_Freeze import Executable, setup
 
-import meld.build_helpers
-import meld.conf
 from texttestlib.texttest_version import version
-
-
-def load_matplotlib(finder: cx_Freeze.finder.ModuleFinder, module: cx_Freeze.module.Module) -> None:
-    """The matplotlib package requires mpl-data subdirectory."""
-    data_path = module.path[0] / "mpl-data"
-    target_path = Path("lib", module.name, "mpl-data")
-    # After matplotlib 3.4 mpl-data is guaranteed to be a subdirectory.
-    if not data_path.is_dir():
-        data_path = __import__("matplotlib").get_data_path()
-        need_patch = True
-    else:
-        need_patch = not module.in_file_system
-    finder.IncludeFiles(data_path, target_path, copy_dependent_files=False)
-    finder.IncludePackage("matplotlib")
-    finder.ExcludeModule("matplotlib.tests")
-    finder.ExcludeModule("matplotlib.testing")
-    if not need_patch or module.code is None:
-        return
-    CODE_STR = f"""
-def _get_data_path():
-    return os.path.join(os.path.dirname(sys.executable), "{target_path!s}")
-"""
-    for code_str in [CODE_STR, CODE_STR.replace("_get_data_", "get_data_")]:
-        new_code = compile(code_str, str(module.file), "exec")
-        co_func = new_code.co_consts[0]
-        name = co_func.co_name
-        code = module.code
-        consts = list(code.co_consts)
-        for i, c in enumerate(consts):
-            if isinstance(c, type(code)) and c.co_name == name:
-                consts[i] = co_func
-                break
-        module.code = code_object_replace(code, co_consts=consts)
-
-if hasattr(cx_Freeze, "version") and cx_Freeze.version == "6.8.1":
-    import cx_Freeze.hooks
-    from pathlib import Path
-    from cx_Freeze.common import code_object_replace
-    cx_Freeze.hooks.load_matplotlib = load_matplotlib
 
 
 def get_non_python_libs():
@@ -72,9 +32,11 @@ def get_non_python_libs():
 
     if 'mingw' in sysconfig.get_platform():
         # dll imported by dll dependencies expected to be auto-resolved later
-        inst_root = [os.path.join(local_bin, 'libgtksourceview-3.0-1.dll'),
-                     os.path.join(local_bin, "diff.exe"),
-                    ]
+        inst_root = [os.path.join(local_bin, 'libgtksourceview-4-0.dll'),
+                     os.path.join(local_bin, "diff.exe")]
+
+        # required for communicating multiple instances
+        inst_lib.append(os.path.join(local_bin, 'gdbus.exe'))
 
         # gspawn-helper is needed for Gtk.show_uri function
         if platform.architecture()[0] == '32bit':
@@ -83,10 +45,10 @@ def get_non_python_libs():
             inst_lib.append(os.path.join(local_bin, 'gspawn-win64-helper.exe'))
 
     return [
-            (f, os.path.basename(f)) for f in inst_root
-        ] + [
-            (f, os.path.join('lib', os.path.basename(f))) for f in inst_lib
-        ]
+        (f, os.path.basename(f)) for f in inst_root
+    ] + [
+        (f, os.path.join('lib', os.path.basename(f))) for f in inst_lib
+    ]
 
 
 gtk_data_dirs = [
@@ -96,7 +58,7 @@ gtk_data_dirs = [
     'lib/girepository-1.0',
     'share/fontconfig',
     'share/glib-2.0',
-    'share/gtksourceview-3.0',
+    'share/gtksourceview-4',
     'share/icons',
 ]
 
@@ -108,15 +70,19 @@ for data_dir in gtk_data_dirs:
         data_subdir = os.path.relpath(local_data_subdir, local_data_dir)
         gtk_data_files.append((
             os.path.join(data_dir, data_subdir),
-            [os.path.join(local_data_subdir, file) for file in files]
+            [os.path.join(local_data_subdir, file) for file in files],
         ))
 
-# add libgdk_pixbuf-2.0-0.dll manually to forbid auto-pulling of gdiplus.dll
 manually_added_libs = {
+    # add libgdk_pixbuf-2.0-0.dll manually to forbid auto-pulling of gdiplus.dll
     "libgdk_pixbuf-2.0-0.dll": os.path.join(sys.prefix, 'bin'),
+    # librsvg is needed for SVG loading in gdkpixbuf
     "librsvg-2-2.dll": os.path.join(sys.prefix, 'bin'),
     "libcroco-0.6-3.dll": os.path.join(sys.prefix, 'bin'),
     "libsigsegv-2.dll": os.path.join(sys.prefix, 'bin'),
+    # the following is only here because of https://github.com/marcelotduarte/cx_Freeze/issues/1651
+    # which happened again in https://github.com/marcelotduarte/cx_Freeze/issues/1850
+    "libwinpthread-1.dll": os.path.join(sys.prefix, 'bin'),
     }
 
 for lib, possible_path in manually_added_libs.items():
@@ -125,9 +91,9 @@ for lib, possible_path in manually_added_libs.items():
         gtk_data_files.append((os.path.dirname(lib), [local_lib]))
 
 build_exe_options = {
-    "includes": ['_sysconfigdata__win32_', 'xmlrpc.server'] if 'mingw' in sysconfig.get_platform() else ['xmlrpc.server'],
+    "includes": ['gi', '_sysconfigdata__win32_', 'xmlrpc.server'] if 'mingw' in sysconfig.get_platform() else ['gi', 'xmlrpc.server'],
     "excludes": ["tkinter"],
-    "packages": ["gi", "weakref", "filecmp", "cgi", "certifi", "texttestlib"],
+    "packages": ["gi", "weakref", "filecmp", "cgi", "certifi", "texttestlib", "yaml"],
     "include_files": get_non_python_libs(),
     "bin_excludes": list(manually_added_libs.keys()),
     "zip_exclude_packages": [],
@@ -145,14 +111,14 @@ registry_table = [
 # Provide the locator and app search to give MSI the existing install directory
 # for future upgrades
 reg_locator_table = [
-    ('MeldInstallDirLocate', 2, r'SOFTWARE\Meld', 'InstallDir', 0)
+    ('MeldInstallDirLocate', 2, r'SOFTWARE\Meld', 'InstallDir', 0),
 ]
 app_search_table = [('TARGETDIR', 'MeldInstallDirLocate')]
 
 msi_data = {
     'Registry': registry_table,
     'RegLocator': reg_locator_table,
-    'AppSearch': app_search_table
+    'AppSearch': app_search_table,
 }
 
 bdist_msi_options = {
@@ -194,6 +160,18 @@ if 'mingw' in sysconfig.get_platform():
          "targetName": "texttestc.exe",
          "shortcutName": "Texttestc",
     })
+
+# Copy conf.py in place if necessary
+base_path = pathlib.Path(__file__).parent
+conf_path = base_path / 'meld' / 'conf.py'
+
+if not conf_path.exists():
+    import shutil
+    shutil.copyfile(conf_path.with_suffix('.py.in'), conf_path)
+
+import meld.build_helpers  # noqa: E402
+import meld.conf  # noqa: E402
+
  
 setup(
     name="TextTest",
@@ -209,6 +187,7 @@ setup(
         'Intended Audience :: Developers',
         'License :: OSI Approved :: GNU Lesser General Public License v2 or later (LGPLv2+)',
         'Programming Language :: Python',
+        'Programming Language :: Python :: 3 :: Only',
         'Topic :: Desktop Environment :: Gnome',
         'Topic :: Software Development',
     ],
@@ -240,16 +219,13 @@ setup(
                                 "etc/*", "etc/.*", "libexec/*", "log/*", "images/*.*", "images/retro/*"],
         "texttestlib.default.batch": ["testoverview_javascript/*"]
     },
-    scripts=['bin/meld', "bin/texttest", "bin/filter_rundependent.py", "bin/filter_fpdiff.py"],
+    scripts=['bin/meld', "bin/texttest"],
     data_files=[
         ('share/man/man1',
-         ['meld.1']
+         ['data/meld.1']
          ),
         ('share/doc/meld-' + meld.conf.__version__,
          ['COPYING', 'NEWS']
-         ),
-        ('share/meld',
-         ['data/meld.css', 'data/gschemas.compiled']
          ),
         ('share/meld/icons',
          glob.glob("data/icons/*.png") +

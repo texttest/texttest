@@ -209,7 +209,7 @@ class ViewInEditor(FileViewAction):
         env = self.getViewerEnvironment(cmdArgs)
         interpreter = plugins.getInterpreter(program)
         if interpreter:
-            cmdArgs = [interpreter] + cmdArgs
+            cmdArgs = plugins.splitcmd(interpreter) + cmdArgs
 
         if guiplugins.guiConfig.getCompositeValue("view_file_on_remote_machine", self.getStem(fileName)):
             cmdArgs = self.getRemoteArgs(cmdArgs)

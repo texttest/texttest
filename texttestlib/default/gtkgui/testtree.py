@@ -716,6 +716,8 @@ class TestTreeGUI(guiutils.ContainerGUI):
     def sortByTestCases(self, model, iter1, iter2, *args):
         test1 = self.model.get_value(iter1, 2)[0]
         test2 = self.model.get_value(iter2, 2)[0]
+        if test1.parent is None or test2.parent is None:
+            return 0
         index1 = test1.parent.testcases.index(test1)
         index2 = test2.parent.testcases.index(test2)
         return -1 if index1 < index2 else 1

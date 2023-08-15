@@ -626,7 +626,8 @@ class OptionGroupGUI(ActionGUI):
             # dialogs that have been closed
             def get_text():
                 text = widget.get_text()
-                return float(text) if widget.get_digits() else int(text)
+                # many locales have commas for decimal point: don't fail here if so
+                return float(text.replace(",", ".")) if widget.get_digits() else int(text)
             return get_text
         elif isinstance(widget, Gtk.Entry):
             return widget.get_text
@@ -763,7 +764,7 @@ class OptionGroupGUI(ActionGUI):
             else:
                 return self.createRadioButtonCollection(switch, optionGroup)
         else:
-            return self.createCheckBox(switch, autoEnableInfo)
+            return self.createCheckBoxWidget(switch, autoEnableInfo)
 
     def createCheckBox(self, switch, autoEnableInfo):
         self.updateForConfig(switch)
@@ -782,6 +783,14 @@ class OptionGroupGUI(ActionGUI):
         checkButton.show()
         return checkButton
 
+    def createCheckBoxWidget(self, *args):
+        # ensure the checkbox doesn't expand to fill the whole width, otherwise clicking in the space enables it
+        checkButton = self.createCheckBox(*args)
+        hbox = Gtk.HBox()
+        hbox.pack_start(checkButton, False, False, 0)
+        hbox.show_all()
+        return hbox
+        
     def createComboBoxEntry(self, option):
         # may need review MB 2018-12-04
         combobox = Gtk.ComboBoxText.new_with_entry()
@@ -796,6 +805,9 @@ class OptionGroupGUI(ActionGUI):
         text = model.get_value(iter, 0)
         return text == "-" * 10
 
+    def stopScrollInSpinButton(self, widget, *args):
+        widget.stop_emission("scroll_event")
+
     def createOptionWidget(self, option):
         optionName = option.name.strip()
         if option.multilineEntry:
@@ -809,6 +821,8 @@ class OptionGroupGUI(ActionGUI):
                 digits = int(isinstance(value, float))
                 widget = Gtk.SpinButton.new(adjustment, 0., digits)
                 widget.set_numeric(True)
+                widget.connect("scroll_event", self.stopScrollInSpinButton)
+        
                 entry = widget
             elif option.usePossibleValues():
                 widget, entry = self.createComboBoxEntry(option)

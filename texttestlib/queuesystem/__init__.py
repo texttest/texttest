@@ -61,6 +61,10 @@ class QueueSystemConfig(default.Config):
                     defaultValue = 2
                 if "l" in self.optionMap:
                     defaultValue = self.optionIntValue("l")
+                recTrafficOption = None
+                if "rectraffic" in group.options:
+                    # Move capturemock control to the end so it doesn't end up between checkboxes.
+                    recTrafficOption = group.options.pop("rectraffic")
                 if localQueueSystem:
                     group.addSwitch("l", "Run tests sequentially", value=defaultValue)
                 else:
@@ -68,6 +72,8 @@ class QueueSystemConfig(default.Config):
                     replayOptions = [opt for opt, _ in self.getInteractiveReplayOptions()]
                     group.addSwitch("l", title, value=defaultValue, options=options,
                                     description=descriptions, autoEnable=replayOptions)
+                if recTrafficOption:
+                    group.options["rectraffic"] = recTrafficOption
             elif group.name.startswith("Grid") and useGrid:
                 self.addDefaultOption(group, "R", "Request grid resource", possibleValues=self.getPossibleResources())
                 self.addDefaultOption(group, "q", "Request grid queue", possibleValues=self.getPossibleQueues())
@@ -138,6 +144,9 @@ class QueueSystemConfig(default.Config):
                 # GUI gives us a numeric value, can also get it from the command line
                 return self.optionValue("reconnfull") in ["2", "grid"]
             else:
+                for app in allApps:
+                    if any(("dbtext-setup-" + pathName.lower() in self.optionMap for pathName in app.getConfigValue("dbtext_database_path"))):
+                        return False
                 return True
 
     def getRemoteTestTmpDir(self, test):

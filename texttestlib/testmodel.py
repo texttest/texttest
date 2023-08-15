@@ -2160,7 +2160,7 @@ class Application(object):
     def get_cache_files(self):
         stems = self._get_cache_stems()
         if not stems:
-            return[]
+            return []
         files = []
         for stem in stems:
             files += self.getFileNamesFromFileStructure(stem)

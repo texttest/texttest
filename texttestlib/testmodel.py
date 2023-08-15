@@ -1925,7 +1925,7 @@ class Application(object):
                               "Additional directories to search for TextTest files")
         self.setConfigDefault("filename_convention_scheme", "classic",
                               "Naming scheme to use for files for stdin,stdout and stderr")
-        self.setConfigDefault("cache_file_stems", None, "Cache files for faster test selection in GUI")
+        self.setConfigDefault("cache_file_stems", "", "Cache files for faster test selection in GUI")
         self.setConfigAlias("test_data_searchpath", "extra_search_directory")
         self.setConfigAlias("extra_config_directory", "extra_search_directory")
 

@@ -1816,13 +1816,14 @@ class GrepFilter(plugins.TextFilter):
                 return self.findAllStdFiles(test)
         return logFiles
 
-    def matches(self, filePath, test):
+    def matches(self, logFile, test):
         if test.app.hasFileCache:
-            content = test.app.fileCache.get_file_content(filePath)
-        else:
-            with open(filePath, "rb") as f:
-                content = f.read().decode()
-        return self.stringContainsText(content)
+            return self.stringContainsText(test.app.fileCache.get_file_content(logFile)) #This will return the entire file at one and a regex search will therefore produce a slightly different result. 
+        for line in open(logFile, errors="ignore"):
+            if self.stringContainsText(line):
+                return True
+        return False
+
 
 
 class TestDescriptionFilter(plugins.TextFilter):

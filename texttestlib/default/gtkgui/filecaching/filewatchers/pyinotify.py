@@ -24,6 +24,8 @@ class InotifyWatcher(FileWatcher):
         self.watcher_thread = StoppableThread(target=self._start, daemon=True)
         
     def _start(self):
+        if self.on_start:
+            self.on_start()
         while self.watcher_thread.should_keep_running():
             self.notifier.process_events()
             if self.notifier.check_events():

@@ -22,6 +22,9 @@ class GeneralFileWatcher(FileWatcher):
         self.watcher_thread = StoppableThread(target=self._start)
 
     def _start(self):
+        if self.on_start:
+            self.on_start()
+            
         event_handler = FileChangeHandler(self.modification_callback)
 
         observer = Observer()

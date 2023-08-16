@@ -9,11 +9,17 @@ class Poller:
         super().__init__()
         self.timeout = timeout
         self.poller_thread = StoppableThread(target=self._start)
+        self.on_start = None
 
     def _start(self):
+        if self.on_start:
+            self.on_start()
         while self.poller_thread.should_keep_running():
             self.poll()
             time.sleep(self.timeout)
+
+    def set_on_start(self, callback):
+        self.on_start = callback
 
     def start(self):
         self.poller_thread.start()
@@ -65,7 +71,10 @@ class BasicFileWatcher(FileWatcher):
     """
     def __init__(self, directory_path, modification_callback):
         super().__init__(directory_path, modification_callback)
-        self.directory_observer = DirectoryObserver(directory_path, modification_callback, timeout=30)
+        self.directory_observer = DirectoryObserver(directory_path, modification_callback, timeout=5)
+
+    def set_on_start(self, callback):
+        self.directory_observer.set_on_start(callback)
 
     def start(self):
         self.directory_observer.start()

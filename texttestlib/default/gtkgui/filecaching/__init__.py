@@ -33,12 +33,10 @@ class FileCache:
             self._cache[file_path] = content
 
     def init(self):
-        self.populate_cache_thread = Thread(target=self._populate_cache)
-        self.populate_cache_thread.start()
+        self.file_watcher.set_on_start(self._populate_cache)
         self.file_watcher.start()
     
     def clear(self):
-        self.populate_cache_thread.join()
         self.file_watcher.stop()
     
     def get_file_content(self, file_path):

@@ -144,6 +144,9 @@ class GUIController(plugins.Responder, plugins.Observable):
         self.topWindowGUI = self.createTopWindowGUI(allApps, runName, optionMap.get("rerun"))
 
         self.fileCache = None
+        self.allowFileCache = False
+        if "enablecache" in optionMap:
+            self.allowFileCache = True
 
     def createNewApplication(self, optionMap):
         from .default_gui import ImportApplication
@@ -306,15 +309,16 @@ class GUIController(plugins.Responder, plugins.Observable):
         return list(set(array))
 
     def _startCache(self):
-        files = []
-        for app in self.initialApps:
-            files.extend(app.get_cache_files())
-        files = self._makeListUnique(files)
-        if len(files):
-            from texttestlib.default.gtkgui.filecaching import FileCache
-            self.fileCache = FileCache(files)
-            self.fileCache.init()
-            for app in self.initialApps: app.addFileCache(self.fileCache)
+        if self.allowFileCache:
+            files = []
+            for app in self.initialApps:
+                files.extend(app.get_cache_files())
+            files = self._makeListUnique(files)
+            if len(files):
+                from texttestlib.default.gtkgui.filecaching import FileCache
+                self.fileCache = FileCache(files)
+                self.fileCache.init()
+                for app in self.initialApps: app.addFileCache(self.fileCache)
 
     def _cleanupCache(self):
         if self.fileCache:

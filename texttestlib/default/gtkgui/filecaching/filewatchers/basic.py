@@ -71,7 +71,7 @@ class BasicFileWatcher(FileWatcher):
     """
     def __init__(self, directory_path, modification_callback):
         super().__init__(directory_path, modification_callback)
-        self.directory_observer = DirectoryObserver(directory_path, modification_callback, timeout=5)
+        self.directory_observer = DirectoryObserver(directory_path, modification_callback, timeout=900)
 
     def set_on_start(self, callback):
         self.directory_observer.set_on_start(callback)

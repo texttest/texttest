@@ -146,19 +146,19 @@ texttestc_executable_options = {
 if 'mingw' in sysconfig.get_platform():
     executable_options.update({
          "base": "Win32GUI",  # comment to build console version to see stderr
-         "targetName": "Meld.exe",
-         "shortcutName": "Meld",
-         "shortcutDir": "ProgramMenuFolder",
+         "target_name": "Meld.exe",
+         "shortcut_name": "Meld",
+         "shortcut_dir": "ProgramMenuFolder",
     })
     texttest_executable_options.update({
          "base": "Win32GUI",
-         "targetName": "texttest.exe",
-         "shortcutName": "Texttest",
-         "shortcutDir": "ProgramMenuFolder",
+         "target_name": "texttest.exe",
+         "shortcut_name": "Texttest",
+         "shortcut_dir": "ProgramMenuFolder",
     })
     texttestc_executable_options.update({
-         "targetName": "texttestc.exe",
-         "shortcutName": "Texttestc",
+         "target_name": "texttestc.exe",
+         "shortcut_name": "Texttestc",
     })
 
 # Copy conf.py in place if necessary

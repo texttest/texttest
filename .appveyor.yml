@@ -15,16 +15,16 @@ install:
     - pacman --noconfirm -Syyuu --overwrite '*'
     - taskkill /F /FI "MODULES eq msys-2.0.dll"
     - pacman --noconfirm -Syyuu --overwrite '*'
-    - pacman --noconfirm -S --refresh --needed  --overwrite '*' mingw-w64-%MSYS2_ARCH%-python3-cx_Freeze mingw-w64-%MSYS2_ARCH%-python3-gobject mingw-w64-%MSYS2_ARCH%-python3-pytest mingw-w64-%MSYS2_ARCH%-python3-pip mingw-w64-%MSYS2_ARCH%-python-matplotlib mingw-w64-%MSYS2_ARCH%-python-certifi mingw-w64-%MSYS2_ARCH%-python-psutil mingw-w64-%MSYS2_ARCH%-gtksourceview3 mingw-w64-%MSYS2_ARCH%-gsettings-desktop-schemas mingw-w64-%MSYS2_ARCH%-diffutils glib2-devel intltool
+    - pacman --noconfirm -S --refresh --needed  --overwrite '*' mingw-w64-%MSYS2_ARCH%-python3-cx_Freeze mingw-w64-%MSYS2_ARCH%-python3-gobject mingw-w64-%MSYS2_ARCH%-python3-pytest mingw-w64-%MSYS2_ARCH%-python3-distro mingw-w64-%MSYS2_ARCH%-python-matplotlib mingw-w64-%MSYS2_ARCH%-python-certifi mingw-w64-%MSYS2_ARCH%-python-psutil mingw-w64-%MSYS2_ARCH%-gtksourceview3 mingw-w64-%MSYS2_ARCH%-gsettings-desktop-schemas mingw-w64-%MSYS2_ARCH%-diffutils glib2-devel intltool
     - gdk-pixbuf-query-loaders --update-cache
-    - python -m pip install distro
 
 build_script:
+    - patch -p0 -R < meld_build_helpers.patch
     - cp -a bin texttestlib setup_win32.py %MELD%
     - cp wininstall/*.ico %MELD%/data/icons
     - cd %MELD%
     - glib-compile-schemas data
-    - python setup_win32.py bdist_dumb bdist_msi
+    - python3 setup_win32.py bdist_dumb bdist_msi
     - mv dist %APPVEYOR_BUILD_FOLDER%
 
 artifacts:

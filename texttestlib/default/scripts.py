@@ -475,7 +475,7 @@ class InsertShortcuts(plugins.ScriptWithArgs):
             tmpFile = os.path.join(test.getDirectory(temporary=1), unversionedFileName)
             storytextHome = test.getEnvironment("STORYTEXT_HOME")
             recordScript = self.getRecordScript(tmpFile, storytextHome)
-            with open(stdFile, "rU") as readFile:
+            with open(stdFile) as readFile:
                 for line in readFile:
                     recordScript.record(line.strip("\n"))
 

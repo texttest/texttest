@@ -148,7 +148,7 @@ class ModifyTraffic(plugins.ScriptWithArgs):
         # Copied from CaptureMock ReplayInfo, easier than trying to reuse it
         trafficList = []
         currTraffic = ""
-        for line in open(fileName, "rU"):
+        for line in open(fileName):
             if line.startswith("<-") or line.startswith("->"):
                 if currTraffic:
                     trafficList.append(currTraffic)

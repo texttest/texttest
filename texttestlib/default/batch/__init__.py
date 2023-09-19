@@ -272,10 +272,17 @@ class MailSender:
             else:
                 plugins.log.info("not sent: all tests succeeded or had known bugs.")
 
-    def exceptionOutput(self):
-        exctype, value = sys.exc_info()[:2]
-        from traceback import format_exception_only
-        return "".join(format_exception_only(exctype, value))
+    def exceptionOutput(self, e):
+        if sys.version_info.minor >= 10:
+            # Ignore the notes, generally just an ugly default printout
+            from traceback import TracebackException
+            te = TracebackException(type(e), e, None, compact=True)
+            te.__notes__ = None
+            return "".join(te.format_exception_only())
+        else:
+            from traceback import format_exception_only
+            exctype, value = sys.exc_info()[:2]
+            return "".join(format_exception_only(exctype, value))
 
     def sendMail(self, app, mailContents):
         smtpServer = app.getConfigValue("smtp_server")
@@ -293,18 +300,18 @@ class MailSender:
         smtp = smtplib.SMTP()
         try:
             smtp.connect(smtpServer)
-        except Exception:  # Can't use SMTPException, because this raises socket.error usually
-            return "Could not connect to SMTP server at " + smtpServer + "\n" + self.exceptionOutput()
+        except Exception as e:  # Can't use SMTPException, because this raises socket.error usually
+            return "Could not connect to SMTP server at " + smtpServer + "\n" + self.exceptionOutput(e)
         if smtpUsername:
             try:
                 smtp.login(smtpUsername, smtpPassword)
-            except smtplib.SMTPException:
+            except smtplib.SMTPException as e:
                 return "Failed to login as '" + smtpUsername + "' to SMTP server at " + smtpServer + \
-                    "\n" + self.exceptionOutput()
+                    "\n" + self.exceptionOutput(e)
         try:
             smtp.sendmail(fromAddress, toAddresses, mailContents)
-        except smtplib.SMTPException:
-            return "Mail could not be sent\n" + self.exceptionOutput()
+        except smtplib.SMTPException as e:
+            return "Mail could not be sent\n" + self.exceptionOutput(e)
         smtp.quit()
 
     def getNoRecipientsMessage(self, app):

@@ -5,7 +5,6 @@ import time
 from texttestlib import plugins
 from .comparefile import FileComparison
 
-
 from functools import cmp_to_key
 
 # This module won't work without an external module creating a file called performance.app
@@ -82,7 +81,7 @@ def parseTimeExpression(timeExpression):
     if timeExpression.startswith(">"):
         return ">", plugins.getNumberOfSeconds(timeExpression[1:])
     else:
-        raise plugins.TextTestError("Could not parse time expression '" + timeExpression +
+        raise plugins.TextTestError("Could not parse time expression '" + timeExpression + 
                                     "' : all expressions must begin with '<' or '>'.")
 
 
@@ -195,7 +194,7 @@ class PerformanceFileComparison(FileComparison):
     def saveResults(self, tmpFile, destFile):
         # Here we save the average of the old and new performance, assuming fluctuation
         avgPerformance = self.perfComparison.getAverage()
-        self.diag.info("Found average performance = " + str(avgPerformance) +
+        self.diag.info("Found average performance = " + str(avgPerformance) + 
                        ", new performance = " + str(self.perfComparison.newPerformance))
         line = open(tmpFile).readlines()[0]
         lineToWrite = line.replace(str(self.perfComparison.newPerformance), str(avgPerformance))
@@ -326,14 +325,14 @@ class FastestFilter(TimeGroupFilter):
     option = "fastest"
 
     def comparePerformance(self, perf1, perf2):
-        return perf1-perf2
+        return perf1 - perf2
 
 
 class SlowestFilter(TimeGroupFilter):
     option = "slowest"
 
     def comparePerformance(self, perf1, perf2):
-        return perf2-perf1
+        return perf2 - perf1
 
 
 class PerformanceStatistics(plugins.ScriptWithArgs):

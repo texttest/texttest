@@ -30,16 +30,24 @@ def trySetupCaptureMock():
 def loadRealSiteCustomize(fileName):  # pragma: no cover - coverage not set up yet
     # must do this before setting up coverage as real sitecustomize might
     # manipulate PYTHONPATH in such a way that coverage can be found
-    import imp
+    import importlib.util
     myDir = os.path.dirname(fileName)
     pos = sys.path.index(myDir)
     try:
-        file, pathname, description = imp.find_module("sitecustomize", sys.path[pos + 1:])
-        if os.path.basename(os.path.dirname(pathname)) == "traffic_intercepts":
-            # For the self-tests: don't load another copy ourselves recursively
-            loadRealSiteCustomize(pathname)
+        for finder in sys.meta_path:
+            spec = finder.find_spec("sitecustomize", sys.path[pos + 1:])
+            if spec is not None:
+                break
         else:
-            imp.load_module("sitecustomize", file, pathname, description)
+            return
+                
+        if os.path.basename(os.path.dirname(spec.origin)) == "traffic_intercepts":
+            # For the self-tests: don't load another copy ourselves recursively
+            loadRealSiteCustomize(spec.origin)
+        else:
+            module = importlib.util.module_from_spec(spec)
+            sys.modules["sitecustomize"] = module
+            spec.loader.exec_module(module)
     except ImportError:
         pass
 

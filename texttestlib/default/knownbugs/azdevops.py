@@ -31,7 +31,7 @@ def _parseReply(json_dict, location, bugId):
                          _getEntry("System.AreaPath", fields),
                          _getEntry("System.CreatedDate", fields),
                          _getEntry("System.ChangedDate", fields),
-                         _getEntry("Microsoft.VSTS.Common.Severity", fields),
+                         _getEntry("Microsoft.VSTS.Common.Severity", fields, fallback="N/A"),
                          ruler,
                          "\nView bug " + bugId + " using AZ Devops URL=" \
                          + _makeURL(location, str(bugId)) + "\n"]
@@ -39,7 +39,7 @@ def _parseReply(json_dict, location, bugId):
         status = _encodeString(fields["System.State"])
     
         message = "\n".join(message_rows)
-        isResolved = status in [ "Done", "Ready for test", "Testing" ]
+        isResolved = status in [ "Done", "Ready for test", "Testing", "Rejected" ]
         return status, message, isResolved, bugId
 
 def findBugInfoWithoutLogin(bugId, location):

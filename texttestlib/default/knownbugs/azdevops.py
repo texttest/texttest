@@ -39,7 +39,7 @@ def _parseReply(json_dict, location, bugId):
         status = _encodeString(fields["System.State"])
     
         message = "\n".join(message_rows)
-        isResolved = status in [ "Done", "Ready for test", "Testing", "Rejected" ]
+        isResolved = status in [ "Done", "Ready for test", "Testing", "Rejected", "Removed" ]
         return status, message, isResolved, bugId
 
 def findBugInfoWithoutLogin(bugId, location):

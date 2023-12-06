@@ -30,13 +30,14 @@ class Bug:
     rerunLine = "(NOTE: Test was run %d times in total and each time encountered this issue."
     prevResultLine = "Results of previous runs can be found in framework_tmp/backup.previous.* under the sandbox directory.)"
 
-    def __init__(self, priority, rerunCount, rerunOnly):
+    def __init__(self, priority, rerunCount, rerunOnly, allowAllRerunsFail):
         self.priority = priority
         self.rerunCount = rerunCount
         self.rerunOnly = rerunOnly
+        self.allowAllRerunsFail = allowAllRerunsFail
 
     def findCategory(self, internalError):
-        if internalError or self.rerunCount:
+        if internalError or (self.rerunCount and not self.allowAllRerunsFail):
             return "badPredict"
         else:
             return "bug"
@@ -133,10 +134,12 @@ class BugTrigger:
         prioStr = getOption("priority")
         rerunCount = int(getOption("rerun_count", "0"))
         rerunOnly = int(getOption("rerun_only", "0"))
+        allowAllRerunsFail = int(getOption("allow_all_reruns_fail", "0"))
         if bugSystem:
-            return BugSystemBug(bugSystem, getOption("bug_id"), prioStr, rerunCount, rerunOnly)
+            return BugSystemBug(bugSystem, getOption("bug_id"), prioStr, rerunCount, rerunOnly, allowAllRerunsFail)
         else:
-            return UnreportedBug(getOption("full_description"), getOption("brief_description"), self.reportInternalError, prioStr, rerunCount, rerunOnly)
+            return UnreportedBug(getOption("full_description"), getOption("brief_description"), 
+                                 self.reportInternalError, prioStr, rerunCount, rerunOnly, allowAllRerunsFail)
 
     def matchesText(self, line):
         return self.textTrigger.matches(line)

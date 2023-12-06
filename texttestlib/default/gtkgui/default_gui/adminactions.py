@@ -1658,6 +1658,7 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         self.optionGroup.addOption(
             "rerun_count", "Number of times to try to rerun the test if the issue is triggered", 0)
         self.optionGroup.addSwitch("rerun_only", "Skip known bug reporting - only use this to trigger reruns")
+        self.optionGroup.addSwitch("allow_all_reruns_fail", "If all reruns fail, report as 'known bug' anyway rather than 'internal error'")
 
     def isModal(self):
         return False  # Want to be able to select text from the main GUI while we're in the dialog

@@ -613,7 +613,10 @@ class OptionGroupGUI(ActionGUI):
         entryWidget.connect("destroy", self.destroyedEntry, (option, entryOrBuffer))
 
         def setText(t):
-            entryOrBuffer.set_text(str(t))
+            if isinstance(entryOrBuffer, Gtk.SpinButton):
+                entryOrBuffer.set_value(t)
+            else:
+                entryOrBuffer.set_text(str(t))
         setText(option.getValue())
         # Don't pass entry.set_text directly, it will mess up StoryText's programmatic method interception
         option.setMethods(self.getGetTextMethod(entryOrBuffer), setText)

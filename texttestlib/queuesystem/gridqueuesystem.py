@@ -10,7 +10,14 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
             raise plugins.TextTestError("Cannot submit TextTest tests to grid engine: '" + self.submitProg + "' not installed!")
         self.coreFileLocation = self.getCoreFileLocation(app)
 
+    def fixDisplay(self, env):
+        # Must make sure SGE jobs don't get a locally referencing DISPLAY
+        display = os.environ.get("DISPLAY")
+        if display and display.startswith(":"):
+            env["DISPLAY"] = plugins.gethostname() + display
+
     def submitSlaveJob(self, cmdArgs, slaveEnv, logDir, *args, **kw):
+        self.fixDisplay(slaveEnv)
         # Don't use log dir as working directory, it might not exist yet
         return abstractqueuesystem.QueueSystem.submitSlaveJob(self, cmdArgs, slaveEnv, self.coreFileLocation, *args, **kw)
 

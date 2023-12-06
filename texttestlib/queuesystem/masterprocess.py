@@ -428,12 +428,6 @@ class QueueSystemServer(BaseActionRunner):
         if withProxy and test.getConfigValue("queue_system_proxy_executable"):
             env["TEXTTEST_SUBMIT_COMMAND_ARGS"] = "?"
 
-    def fixDisplay(self, env):
-        # Must make sure SGE jobs don't get a locally referencing DISPLAY
-        display = os.environ.get("DISPLAY")
-        if display and display.startswith(":"):
-            env["DISPLAY"] = plugins.gethostname() + display
-
     def getPendingState(self, test):
         return Pending(freeText="Job pending in " + queueSystemName(test.app))
 
@@ -527,7 +521,6 @@ class QueueSystemServer(BaseActionRunner):
     def submitJob(self, test, submissionRules, commandArgs, slaveEnv, withProxy=True, jobType=""):
         self.diag.info("Submitting job at " + plugins.localtime() + ":" + repr(commandArgs))
         self.diag.info("Creating job at " + plugins.localtime())
-        self.fixDisplay(slaveEnv)
         self.fixConfigEnv(slaveEnv, test)
         self.fixProxyVar(slaveEnv, test, withProxy)
         cmdArgs = self.getSubmitCmdArgs(test, submissionRules, commandArgs, slaveEnv)

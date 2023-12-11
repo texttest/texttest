@@ -1,13 +1,10 @@
 #!/usr/bin/env python
 
-
-from distutils.core import setup
-from distutils.command.build_py import build_py
-from distutils.command.install_scripts import install_scripts
+from setuptools import setup
+from setuptools.command.build_py import build_py
+from setuptools.command.install_scripts import install_scripts
 
 import os
-import shutil
-
 
 class build_py_preserve_permissions(build_py):
     def copy_file(self, src, dst, preserve_mode=True, **kw):

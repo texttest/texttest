@@ -1366,6 +1366,8 @@ class Config:
     def defaultDisplayPriorities(self):
         prios = {}
         prios["default"] = 99
+        prios["errors"] = 1
+        prios["stderr"] = 1
         return prios
 
     def getDefaultCollations(self):

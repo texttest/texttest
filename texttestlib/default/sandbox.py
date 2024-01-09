@@ -831,7 +831,7 @@ class CollateFiles(plugins.Action):
         if self.collationProc:
             proc = self.collationProc
             self.collationProc = None
-            killSubProcessAndChildren(proc, cmd=test.getConfigValue("kill_command"))
+            killProcessAndChildren(proc, cmd=test.getConfigValue("kill_command"))
 
     def extract(self, test, sourceFiles, targetFile, collationErrFile):
         stem = os.path.splitext(os.path.basename(targetFile))[0]

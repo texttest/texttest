@@ -523,6 +523,8 @@ class QueueSystemServer(BaseActionRunner):
         self.diag.info("Creating job at " + plugins.localtime())
         self.fixConfigEnv(slaveEnv, test)
         self.fixProxyVar(slaveEnv, test, withProxy)
+        queueSystem = self.getQueueSystem(test)
+        queueSystem.prepareEnvForSubmit(slaveEnv)
         cmdArgs = self.getSubmitCmdArgs(test, submissionRules, commandArgs, slaveEnv)
         if withProxy:
             cmdArgs = self.modifyCommandForProxy(test, cmdArgs, slaveEnv)
@@ -536,7 +538,6 @@ class QueueSystemServer(BaseActionRunner):
                 return False
 
             self.lockDiag.info("Got lock for submission")
-            queueSystem = self.getQueueSystem(test)
             logDir = self.getSlaveLogDir(test)
             jobId, errorMessage = queueSystem.submitSlaveJob(cmdArgs, slaveEnv, logDir, submissionRules, jobType)
             if jobId is not None:

@@ -10,6 +10,9 @@ class QueueSystem(object):
     def __init__(self, *args):
         pass
 
+    def prepareEnvForSubmit(self, slaveEnv):
+        pass
+
     def submitSlaveJob(self, cmdArgs, slaveEnv, logDir, submissionRules, jobType):
         try:
             process = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.PIPE,

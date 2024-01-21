@@ -16,8 +16,10 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
         if display and display.startswith(":"):
             env["DISPLAY"] = plugins.gethostname() + display
 
-    def submitSlaveJob(self, cmdArgs, slaveEnv, logDir, *args, **kw):
+    def prepareEnvForSubmit(self, slaveEnv):
         self.fixDisplay(slaveEnv)
+
+    def submitSlaveJob(self, cmdArgs, slaveEnv, logDir, *args, **kw):
         # Don't use log dir as working directory, it might not exist yet
         return abstractqueuesystem.QueueSystem.submitSlaveJob(self, cmdArgs, slaveEnv, self.coreFileLocation, *args, **kw)
 

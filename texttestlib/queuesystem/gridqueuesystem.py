@@ -13,8 +13,8 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
     def fixDisplay(self, env):
         # Must make sure SGE jobs don't get a locally referencing DISPLAY
         display = os.environ.get("DISPLAY")
-        if display and display.startswith(":"):
-            env["DISPLAY"] = plugins.gethostname() + display
+        if display and (display.startswith(":") or display.startswith("localhost:")):
+            env["DISPLAY"] = plugins.gethostname() + ":" + display.split(":", 1)[1]
 
     def prepareEnvForSubmit(self, slaveEnv):
         self.fixDisplay(slaveEnv)

@@ -27,7 +27,7 @@ class CIPlatform:
 
     """
     Some old Jenkins instances don't always have a build number set as
-    and environment variable. This is a way to support backwards compat
+    an environment variable. This is a way to support backwards compat
     with those jobs, since build number can be fetched from tag name
     """
     def setCurrentTag(self, tag):

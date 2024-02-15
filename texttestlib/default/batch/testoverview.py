@@ -8,12 +8,12 @@ import sys
 import logging
 import locale
 from texttestlib.default.batch import HTMLgen, HTMLcolors
+from texttestlib.default.batch.ci import CIPlatform
 from texttestlib import plugins
 from collections import OrderedDict
 from glob import glob
 from datetime import datetime, timedelta
 from .batchutils import convertToUrl, getEnvironmentFromRunFiles
-from .ci import CIPlatform
 HTMLgen.PRINTECHO = 0
 
 
@@ -739,9 +739,9 @@ class TestTable:
         return runNameDirs
 
     def getCIPlatformForTableHead(self, runNameDirs, tag):
+        runEnv = getEnvironmentFromRunFiles(runNameDirs, tag)
         platformEnv = {}
         platformEnv.update(os.environ)
-        runEnv = getEnvironmentFromRunFiles(runNameDirs, tag)
         platformEnv.update(runEnv)
         ciPlatform = CIPlatform.getInstance(platformEnv)
         ciPlatform.setCurrentTag(tag)

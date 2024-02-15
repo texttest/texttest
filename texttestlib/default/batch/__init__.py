@@ -12,6 +12,7 @@ import stat
 from texttestlib.default.batch import testoverview
 from texttestlib import plugins
 from .summarypages import GenerateSummaryPage, GenerateGraphs  # only so they become package level entities
+from .ci import CIPlatform
 from collections import OrderedDict
 from .batchutils import getBatchRunName, BatchVersionFilter, parseFileName, convertToUrl
 import subprocess
@@ -561,10 +562,8 @@ class SaveState(plugins.Responder):
     def makeInitialRunFile(self, app, runFile):
         plugins.ensureDirExistsForFile(runFile)
         with open(runFile, "w") as f:
-            jenkinsVars = ["JENKINS_URL", "JOB_NAME", "BUILD_NUMBER"]
-            if not self.addVarsToRunFile(f, jenkinsVars):
-                azdoVars = ["SYSTEM_TEAMFOUNDATIONSERVERURI", "SYSTEM_TEAMPROJECT", "BUILD_BUILDID", "BUILD_BUILDNUMBER" ]
-                self.addVarsToRunFile(f, azdoVars)
+            runFileVars = CIPlatform.getInstance().getRunFileVars()
+            self.addVarsToRunFile(f, runFileVars)
             f.write(repr(app) + "\n")
 
     def runAlreadyExists(self, runFile, app):

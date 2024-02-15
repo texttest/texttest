@@ -12,9 +12,9 @@ from html.parser import HTMLParser
 from collections import OrderedDict
 from glob import glob
 from .batchutils import BatchVersionFilter, parseFileName, convertToUrl, getEnvironmentFromRunFiles
+from .ci import CIPlatform
 import datetime
 from functools import reduce
-import urllib.parse
 
 
 class GenerateFromSummaryData(plugins.ScriptWithArgs):
@@ -281,7 +281,10 @@ class SummaryDataFinder:
             date, actualTag = tag
             fullTag = time.strftime("%d%b%Y", date) + "_" + actualTag
             runEnv = getEnvironmentFromRunFiles([runDir], fullTag)
-            return runEnv.get("JENKINS_URL"), runEnv.get("JOB_NAME")
+            ciPlatform = CIPlatform.getInstance(runEnv)
+            if not ciPlatform.supportsEnvironmentComparison():
+                return None, None
+            return ciPlatform.getCiUrl(), ciPlatform.getJobName()
 
         groupedData = {}
         for tag in allTags:
@@ -427,20 +430,11 @@ class SummaryGenerator:
             return "test run" + suffix + " " + ", ".join(mostRecentTags)
 
     def generatePage(self, dataFinder, appsWithVersions, fileToUrl):
-        jobLink = ""
         creationDate = testoverview.TitleWithDateStamp("").__str__().strip()
-        if os.getenv("JENKINS_URL") and os.getenv("JOB_NAME") and os.getenv("BUILD_NUMBER"):
-            jobPath = os.path.join(os.getenv("JENKINS_URL"), "job", os.getenv("JOB_NAME"), os.getenv("BUILD_NUMBER"))
-            if jobPath:
-                jobLink = "<br>(built by Jenkins job '" + os.getenv("JOB_NAME") + "', " + "<a href='" + \
-                    jobPath + "'> " + "build number " + os.getenv("BUILD_NUMBER") + "</a>" + ")"
-                    
-        if os.getenv("SYSTEM_TEAMFOUNDATIONSERVERURI") and os.getenv("SYSTEM_DEFINITIONNAME") and os.getenv("BUILD_BUILDID"):
-            project = urllib.parse.quote(os.getenv("SYSTEM_TEAMPROJECT"))
-            jobPath = os.path.join(os.getenv("SYSTEM_TEAMFOUNDATIONSERVERURI"), project, "_build", "results?buildId=" + os.getenv("BUILD_BUILDID"))
-            if jobPath:
-                jobLink = "<br>(built by Azure Devops Pipeline '" + os.getenv("SYSTEM_DEFINITIONNAME") + "', " + "<a href='" + \
-                    jobPath + "'> " + "build number " + os.getenv("BUILD_BUILDNUMBER") + "</a>" + ")"
+        ciPlatform = CIPlatform.getInstance()
+        jobLink = ciPlatform.getPrettyJobLink() if ciPlatform.hasFullEnvironment() else None
+        if jobLink:
+            jobLink = f"<br>{jobLink}"
 
         summaryPageTimeStamp = dataFinder.summaryPageName + "." + plugins.startTimeString(self.timeFormat)
         with open(summaryPageTimeStamp, "w") as f:

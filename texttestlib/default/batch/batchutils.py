@@ -2,6 +2,7 @@ import datetime
 import time
 import os
 from texttestlib import plugins
+from .ci import CIPlatform
 
 
 class BatchVersionFilter:
@@ -29,13 +30,10 @@ def getBatchRunName(optionMap):
     if name is not None:
         return name
 
-    if "BUILD_BUILDNUMBER" in os.environ:
-        ciBuildNumber = os.getenv("BUILD_BUILDNUMBER").split(".")[-1] # Azure Devops, which includes the date
-    else:
-        ciBuildNumber = os.getenv("BUILD_NUMBER") # Jenkins, which does not include the date
+    ciBuildNumber = CIPlatform.getInstance().getBuildNumber()
     timeToUse = plugins.globalStartTime
     if ciBuildNumber is None:
-        # If we're not using Jenkins, assume some kind of nightjob set up (mostly for historical reasons)
+        # If we're not using a CI system, assume some kind of nightjob set up (mostly for historical reasons)
         # Here we use a standardised date that give a consistent answer for night-jobs.
         # Hence midnight is a bad cutover point. The day therefore starts and ends at 8am :)
         timeToUse -= datetime.timedelta(hours=8)

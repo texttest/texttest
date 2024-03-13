@@ -7,14 +7,13 @@ import html
 import sys
 import logging
 import locale
-from texttestlib.default.batch import HTMLgen, HTMLcolors, jenkinschanges
+from texttestlib.default.batch import HTMLgen, HTMLcolors
+from texttestlib.default.batch.ci import CIPlatform
 from texttestlib import plugins
 from collections import OrderedDict
 from glob import glob
-from pprint import pformat
 from datetime import datetime, timedelta
 from .batchutils import convertToUrl, getEnvironmentFromRunFiles
-import urllib.parse
 HTMLgen.PRINTECHO = 0
 
 
@@ -500,10 +499,9 @@ class TestTable:
         table = HTMLgen.TableLite(border=0, cellpadding=4, cellspacing=2, width="100%")
         table.append(self.generateTableHead(repositoryDirs))
         table.append(self.generateSummaries())
-        if os.getenv("JENKINS_URL"):
-            changeRow = self.generateJenkinsChanges(pageDir)
-            if changeRow:
-                table.append(changeRow)
+        changeRow = self.generateCIChanges(pageDir)
+        if changeRow:
+            table.append(changeRow)
         hasRows = False
         for extraVersion, testInfo in list(loggedTests.items()):
             currRows = []
@@ -533,42 +531,17 @@ class TestTable:
             table.append(HTMLgen.BR())
             return table
 
-    def findJenkinsChanges(self, prevTag, tag, cacheDir):
-        buildNumber = self.getCiBuildNumber(tag)
-        cacheFileOldName = os.path.join(cacheDir, buildNumber)
-        cacheFile = os.path.join(cacheDir, tag)
-        if os.path.isfile(cacheFileOldName):
-            os.rename(cacheFileOldName, cacheFile)
-        if os.path.isfile(cacheFile):
-            return eval(open(cacheFile).read().strip())
-        else:
-            bugSystemData = self.getConfigValue("bug_system_location", allSubKeys=True)
-            markedArtefacts = self.getConfigValue("batch_jenkins_marked_artefacts")
-            fileFinder = self.getConfigValue("batch_jenkins_archive_file_pattern")
-            prevBuildNumber = self.getCiBuildNumber(prevTag) if prevTag else None
-            if buildNumber.isdigit() and prevBuildNumber is not None:
-                try:
-                    allChanges = jenkinschanges.getChanges(
-                        prevBuildNumber, buildNumber, bugSystemData, markedArtefacts, fileFinder, cacheDir)
-                    plugins.ensureDirectoryExists(cacheDir)
-                    with open(cacheFile, "w") as f:
-                        f.write(pformat(allChanges) + "\n")
-                    return allChanges
-                except jenkinschanges.JobStillRunningException:
-                    pass  # don't write to cache in this case
-            return []
+    def generateCIChanges(self, pageDir):
+        ciPlatform = CIPlatform.getInstance()
+        if not ciPlatform.getCiUrl():
+            return
 
-    def getCiBuildNumber(self, tag):
-        return tag.split(".")[-1]
-
-    def generateJenkinsChanges(self, pageDir):
-        cacheDir = os.path.join(os.path.dirname(pageDir), "jenkins_changes")
         bgColour = self.colourFinder.find("changes_header_bg")
         row = [HTMLgen.TD("Changes", bgcolor=bgColour)]
         hasData = False
         prevTag = None
         for tag in self.tags:
-            allChanges = self.findJenkinsChanges(prevTag, tag, cacheDir)
+            allChanges = ciPlatform.findChanges(prevTag, tag, pageDir, self.getConfigValue)
             cont = HTMLgen.Container()
             aborted = False
             for i, (authorOrMessage, target, bugs) in enumerate(allChanges):
@@ -765,38 +738,33 @@ class TestTable:
             runNameDirs.add(os.path.join(os.path.dirname(os.path.dirname(dir)), "run_names"))
         return runNameDirs
 
-    def getRunEnv(self, runEnv, key):
-        return runEnv.get(key, os.getenv(key))
+    def getCIPlatformForTableHead(self, runNameDirs, tag):
+        runEnv = getEnvironmentFromRunFiles(runNameDirs, tag)
+        platformEnv = {}
+        platformEnv.update(os.environ)
+        platformEnv.update(runEnv)
+        ciPlatform = CIPlatform.getInstance(platformEnv)
+        ciPlatform.setCurrentTag(tag)
+        return ciPlatform
 
-    def getCiLinkData(self, runEnv, buildNumber):
-        jenkinsUrl = self.getRunEnv(runEnv, "JENKINS_URL")
-        if jenkinsUrl:
-            target = os.path.join(jenkinsUrl, "job", self.getRunEnv(runEnv, "JOB_NAME"), buildNumber)
-            title = "Jenkins " + buildNumber
-        else:
-            azdoUrl = self.getRunEnv(runEnv, "SYSTEM_TEAMFOUNDATIONSERVERURI")
-            if azdoUrl:
-                project = urllib.parse.quote(self.getRunEnv(runEnv, "SYSTEM_TEAMPROJECT"))
-                target = os.path.join(azdoUrl, project, "_build", "results?buildId=" + self.getRunEnv(runEnv, "BUILD_BUILDID"))   
-                title = "AZ DevOps " + self.getRunEnv(runEnv, "BUILD_BUILDNUMBER")
-        return title, target
 
     def generateTableHead(self, repositoryDirs):
         head = [HTMLgen.TH("Test")]
-        ciUrl = os.getenv("JENKINS_URL") or os.getenv("SYSTEM_TEAMFOUNDATIONSERVERURI")
-        runNameDirs = self.getRunNameDirs(repositoryDirs) if ciUrl else []
+        runNameDirs = self.getRunNameDirs(repositoryDirs)
         for tag in self.tags:
+            ciPlatform = self.getCIPlatformForTableHead(runNameDirs, tag)
+            ciUrl = ciPlatform.getCiUrl()
             tagColour = self.findTagColour(tag)
             linkTarget = getDetailPageName(self.pageVersion, tag)
             linkText = HTMLgen.Font(getDisplayText(tag), color=tagColour)
-            buildNumber = self.getCiBuildNumber(tag)
+            buildNumber = ciPlatform.getBuildNumber()
             if ciUrl and buildNumber.isdigit():
-                runEnv = getEnvironmentFromRunFiles(runNameDirs, tag)
                 container = HTMLgen.Container()
-                tooltip = jenkinschanges.getTimestamp(buildNumber)
+                tooltip = ciPlatform.getJobTooltip()
                 container.append(HTMLgen.Href(linkTarget, linkText, title=tooltip))
                 container.append(HTMLgen.BR())
-                ciTitle, ciTarget = self.getCiLinkData(runEnv, buildNumber)
+                ciTitle = ciPlatform.getJobTitle()
+                ciTarget = ciPlatform.getJobUrl()
                 ciText = HTMLgen.Emphasis(HTMLgen.Font("(" + ciTitle + ")", size=1))
                 container.append(HTMLgen.Href(ciTarget, ciText, title=tooltip))
                 head.append(HTMLgen.TH(container))

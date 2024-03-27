@@ -411,7 +411,7 @@ class TestComparison(BaseTestComparison):
                 comparison.overwrite(test, exact, versionString, backupVersions)
 
     def saveFileEdits(self, test, versionString):
-        tmpFileEditDir = test.makeTmpFileName("file_edits", forComparison=0)
+        tmpFileEditDir = os.path.join(self.appWriteDir, test.getWriteDirRelPath(), "file_edits")
         fileEditDir = test.dircache.pathName("file_edits")
         if versionString:
             fileEditDir += "." + versionString

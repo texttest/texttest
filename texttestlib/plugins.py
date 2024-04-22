@@ -12,7 +12,7 @@ import shlex
 import types
 import fnmatch
 import subprocess
-from collections import OrderedDict
+from collections import OrderedDict, deque
 from traceback import format_exception
 from threading import currentThread, RLock
 from queue import Queue, Empty
@@ -1560,6 +1560,7 @@ class MultiEntryDictionary(OrderedDict):
         self.importFileFinder = importFileFinder
         self.allowSectionHeaders = allowSectionHeaders
         self.fileTrackSections = fileTrackSections
+        self._currentFiles = deque()
 
     def __reduce__(self):
         # Need this because of __reduce__ in OrderedDict
@@ -1590,6 +1591,7 @@ class MultiEntryDictionary(OrderedDict):
 
     def readFromFile(self, filename, *args, **kwargs):
         self.diag.info("Reading file " + filename)
+        self._currentFiles.append(filename)
         currSectionName = ""
         for line in readList(filename):
             if self.allowSectionHeaders and self.isSectionHeader(line):
@@ -1597,15 +1599,18 @@ class MultiEntryDictionary(OrderedDict):
             elif ":" in line:
                 self.parseConfigLine(line, currSectionName, filename, *args, **kwargs)
             else:
-                self.warn("Could not parse config line " + line)
+                self.warn(f"Could not parse config line '{line}'")
+        self._currentFiles.pop()
 
     def isSectionHeader(self, line):
         return line.startswith("[") and line.endswith("]")
 
     def warn(self, message):
-        if message not in self.warnings:
-            self.warnings.append(message)
-            printWarning(message)
+        currentFile = self._currentFiles[-1] if self._currentFiles else None
+        fullMessage = f"{message} (see {currentFile})" if currentFile else message
+        if fullMessage not in self.warnings:
+            self.warnings.append(fullMessage)
+            printWarning(fullMessage)
 
     def getFileDefining(self, sectionName, entryName, value, envMapping=os.environ):
         valueDict = self.fileTrackSections.get(sectionName)
@@ -1644,12 +1649,12 @@ class MultiEntryDictionary(OrderedDict):
                     self[name] = OrderedDict(value)
                     return name
                 else:
-                    self.warn("Config entry name '" + name + "' incorrectly used as a section marker.")
+                    self.warn(f"Config entry name '{name}' incorrectly used as a section marker.")
             elif insert:
                 self[name] = OrderedDict()
                 return name
             elif errorOnUnknown:
-                self.warn("Config section name '" + name + "' not recognised.")
+                self.warn(f"Config section name '{name}' not recognised.")
         return ""
 
     def addEntry(self, entryName, entry, sectionName="", *args, **kwargs):
@@ -1682,7 +1687,7 @@ class MultiEntryDictionary(OrderedDict):
                 self.diag.info("Inserting " + entryName + "=" + repr(entry))
                 currDict[entryName] = self.castEntry(entryName, entry, currDict)
             elif errorOnUnknown:
-                self.warn("Config entry name '" + entryName + "' not recognised.")
+                self.warn(f"Config entry name '{entryName}' not recognised.")
 
     def getDictionaryValueType(self, currDict):
         val = list(currDict.values())
@@ -1727,7 +1732,7 @@ class MultiEntryDictionary(OrderedDict):
             if "default" in newCurrDict:
                 self.insertEntry("default", entry, newCurrDict)
             else:
-                self.warn("Config entry name '" + entryName + "' is only valid as a section marker.")
+                self.warn(f"Config entry name '{entryName}' is only valid as a section marker.")
         else:
             currDict[entryName] = type(currEntry)(entry)
 

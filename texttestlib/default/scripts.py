@@ -158,11 +158,12 @@ class DocumentConfig(plugins.ScriptWithArgs):
 
     def interpretArgument(self, arg):
         argStr = pformat(arg, width=1000) if isinstance(arg, dict) else str(arg)
+        source_lib = str(plugins.installationRoots[0])
         if os.sep == "\\":
             # in python strings get double backslashes, handle this
-            doubleBackslashRoot = plugins.installationRoots[0].replace("\\", "\\\\")
+            doubleBackslashRoot = source_lib.replace("\\", "\\\\")
             argStr = argStr.replace(doubleBackslashRoot, "<source library>")
-        return argStr.replace(plugins.installationRoots[0], "<source library>")
+        return argStr.replace(source_lib, "<source library>")
 
 
 class DocumentEnvironment(plugins.Action):

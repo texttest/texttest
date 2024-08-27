@@ -9,16 +9,16 @@ import time
 import re
 import stat
 import shlex
-import types
 import fnmatch
 import subprocess
+import importlib.resources
 from collections import OrderedDict, deque
 from traceback import format_exception
 from threading import currentThread, RLock
 from queue import Queue, Empty
 from glob import glob
 from datetime import datetime
-from pickle import Unpickler, UnpicklingError
+from pickle import Unpickler
 from locale import getpreferredencoding
 
 
@@ -42,12 +42,8 @@ class Callable:
 
 
 def findInstallationRoots():
-    packageDir = os.path.dirname(__file__)
-    if getattr(sys, 'frozen', False):
-        roots = glob(os.path.join(os.path.dirname(sys.executable), "lib", "python*", "site-packages", "texttestlib"))
-    else:
-        roots = [packageDir]
-    installationRoot = os.path.dirname(packageDir)
+    installationRoot = importlib.resources.files()
+    roots = [ installationRoot ]
     if os.path.basename(installationRoot) == "generic":
         siteRoot = os.path.dirname(installationRoot)
         roots.append(siteRoot)

@@ -246,7 +246,7 @@ class DocumentEnvironment(plugins.Action):
 
     def findVarsInFile(self, path, vars, prefixes):
         import re
-        regexes = [re.compile("([^/ \"'\.,\(]*)[\(]?[\"'](" + prefix + "[^/ \"'\.,]*)") for prefix in prefixes]
+        regexes = [re.compile(r"([^/ \"'\.,\(]*)[\(]?[\"'](" + prefix + r"[^/ \"'\.,]*)") for prefix in prefixes]
         for line in open(path):
             for regex in regexes:
                 match = regex.search(line)

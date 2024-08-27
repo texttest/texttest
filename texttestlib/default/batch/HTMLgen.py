@@ -549,7 +549,7 @@ class StringTemplate:
             raise ValueError("delimiter argument must be a pair of strings")
         self.delimiter_width = len(self.delimiters[0])
         delimiters = list(map(re.escape, self.delimiters))
-        self.subpatstr = delimiters[0] + "[\w_]+" + delimiters[1]
+        self.subpatstr = delimiters[0] + r"[\w_]+" + delimiters[1]
         self.subpat = re.compile(self.subpatstr)
         self.substitutions = substitutions or {}
         self.set_template(template)
@@ -2582,7 +2582,7 @@ def markup_re(text, rex=None, marker=None, collapse=0):
     Returns tuple pair of the marked text and the number of matching text groups.
     """
     if rex is None:
-        rex = re.compile('\(([^)]*)\)')
+        rex = re.compile(r'\(([^)]*)\)')
     if marker is None:
         marker = Emphasis()
     if type(rex) == StringType:

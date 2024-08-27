@@ -232,7 +232,7 @@ def printWarning(message, stdout=False):
 
 
 # Useful stuff to handle regular expressions
-regexChars = re.compile("[\^\$\[\]\{\}\\\*\?\|\+]")
+regexChars = re.compile(r"[\^\$\[\]\{\}\\\*\?\|\+]")
 
 
 def isRegularExpression(text):

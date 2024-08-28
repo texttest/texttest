@@ -156,8 +156,12 @@ class DocumentConfig(plugins.ScriptWithArgs):
                 value = app.configDir[realKey]
                 print(key + "|" + self.interpretArgument(value) + "|" + docOutput)
 
+    def convert_to_string(self, arg):
+        argToUse = dict(arg) if isinstance(arg, OrderedDict) else arg
+        return pformat(argToUse, width=1000) if isinstance(argToUse, dict) else str(arg)
+
     def interpretArgument(self, arg):
-        argStr = pformat(arg, width=1000) if isinstance(arg, dict) else str(arg)
+        argStr = self.convert_to_string(arg)
         source_lib = str(plugins.installationRoots[0])
         if os.sep == "\\":
             # in python strings get double backslashes, handle this

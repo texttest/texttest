@@ -40,12 +40,8 @@ def parseReply(reply, location, id):
         ruler = "*" * 30 + "\n"
         message = ruler + "Summary: " + summary + "\nBug Status: " + status + "\n\n"
         for fieldName, value in internals:
-            message += fieldName + ": "
-            if type(value) == dict:
-                message += str(OrderedDict(sorted(value.items())))
-            else:
-                message += str(value)
-            message += "\n"
+            valueToUse = dict(sorted(value.items())) if isinstance(value, dict) else value
+            message += fieldName + ": " + str(valueToUse) + "\n"
         message += ruler
         message += "\nView bug " + str(bugId) + " using bugzilla URL=" + location + \
             "/show_bug.cgi?id=" + str(bugId) + "\n"

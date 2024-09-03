@@ -42,7 +42,7 @@ class Callable:
 
 
 def findInstallationRoots():
-    installationRoot = importlib.resources.files("texttestlib")
+    installationRoot = importlib.resources.files()
     roots = [ installationRoot ]
     if os.path.basename(installationRoot) == "generic":
         siteRoot = os.path.dirname(installationRoot)

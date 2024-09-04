@@ -10,7 +10,7 @@ class SetUpCaptureMockHandlers(plugins.Action):
     def __init__(self, recordSetting):
         self.recordSetting = recordSetting
         libexecDir = plugins.installationDir("libexec")
-        self.siteCustomizeFile = os.path.join(libexecDir, "sitecustomize.py")
+        self.siteCustomizeFile = os.path.join(libexecDir, "sitecustomize.pyx")
 
     def __call__(self, test):
         pythonCustomizeFiles = test.getAllPathNames("testcustomize.py")
@@ -93,7 +93,7 @@ class SetUpCaptureMockHandlers(plugins.Action):
                     "Test requires CaptureMock to be installed, but the capturemock module could not be found\nError was: " + str(e) + "\nSearched in " + repr(sys.path))
 
     def intercept(self, moduleFile, interceptDir):
-        interceptName = os.path.join(interceptDir, os.path.basename(moduleFile))
+        interceptName = os.path.join(interceptDir, os.path.basename(moduleFile).replace(".pyx", ".py"))
         plugins.ensureDirExistsForFile(interceptName)
         self.copyOrLink(moduleFile, interceptName)
 

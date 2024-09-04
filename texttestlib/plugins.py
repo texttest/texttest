@@ -20,6 +20,7 @@ from datetime import datetime
 from pickle import Unpickler
 from locale import getpreferredencoding
 import importlib.resources
+import sre_parse
 
 
 class Callable:
@@ -1468,11 +1469,27 @@ class MatchAggregator:
 
     def expand(self, template):
         if self.match is not None:
-            # ?? This is not documented, but has remained unchanged across many Python versions
-            # Better ideas welcome. The match objects are defined in C, the class name isn't public and hence they cannot be subclassed or monkey patched
-            return re._expand(self.patternAggregator, self, template)
+            # Was originally calling re._expand, removed in Python 3.12
+            # Tried to use new parsing and copied expand function below to preserve behaviour
+            parsed_template = sre_parse.parse_template(template, self.patternAggregator)
+            if hasattr(sre_parse, "expand_template"):
+                return sre_parse.expand_template(parsed_template, self)
+            else:
+                return self.expand_template(parsed_template)
         else:
             return template
+        
+    def expand_template(self, template):
+        g = self.group
+        empty = self.string[:0]
+        groups = [ (ix, item) for (ix, item) in enumerate(template) if isinstance(item, int) ]            
+        literals = template[:]
+        try:
+            for index, group in groups:
+                literals[index] = g(group) or empty
+        except IndexError:
+            raise re.error("invalid group reference %d" % index)
+        return empty.join(literals)
 
     def __getattr__(self, name):
         return getattr(self.match, name)

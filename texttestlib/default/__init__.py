@@ -1568,7 +1568,7 @@ class Config:
                     args[-1] = args[-1].replace(app.writeDirectory, remoteTmp)
                 for i in range(len(args)):
                     # Remote shells cause spaces etc to be interpreted several times
-                    args[i] = args[i].replace(" ", "\ ")
+                    args[i] = args[i].replace(" ", r"\ ")
             return args
 
     def getFullDisplay(self):

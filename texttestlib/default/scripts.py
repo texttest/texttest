@@ -200,7 +200,7 @@ class DocumentEnvironment(plugins.Action):
                 for dir in toRemove:
                     dirs.remove(dir)
             for file in files:
-                if file.endswith(".py"):
+                if file.endswith(".py") or file.endswith(".pyx"):
                     path = os.path.join(root, file)
                     self.findVarsInFile(path, allVars, prefixes)
         return allVars

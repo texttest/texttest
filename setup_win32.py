@@ -96,7 +96,7 @@ build_exe_options = {
     "packages": ["gi", "weakref", "filecmp", "cgi", "certifi", "texttestlib", "yaml"],
     "include_files": get_non_python_libs(),
     "bin_excludes": list(manually_added_libs.keys()),
-    "zip_exclude_packages": ["texttest*"],
+    "zip_exclude_packages": ["texttestlib"],
     "zip_include_packages": ["*"],
 }
 

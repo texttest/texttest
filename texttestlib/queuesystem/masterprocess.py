@@ -563,10 +563,10 @@ class QueueSystemServer(BaseActionRunner):
 
     def handleErrorState(self, test, previouslySubmitted=False):
         with self.counterLock:
-            if self.maxCapacity > 1:
-                self.maxCapacity -= 1
             if previouslySubmitted:
                 self.testsSubmitted -= 1
+                if self.maxCapacity > 1:
+                    self.maxCapacity -= 1
             else:
                 self.testCount -= 1
         self.diag.info(repr(test) + " in error state" + self.remainStr())

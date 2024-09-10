@@ -533,7 +533,7 @@ class QueueSystemServer(BaseActionRunner):
         self.diag.info("Creating job " + jobName + " with command arguments : " + " ".join(cmdArgs))
         with self.lock:
             if self.exited:
-                self.cancel(test)
+                self.cancel(test, previouslySubmitted=False)
                 plugins.log.info("Q: Submission cancelled for " + repr(test) + " - exit underway")
                 return False
 
@@ -680,7 +680,7 @@ class QueueSystemServer(BaseActionRunner):
                 self.killTest(test, jobId, jobName, wantStatus=True)
         else:
             self.diag.info("No job info found from queue system server, changing state to cancelled")
-            return self.cancel(test)
+            return self.cancel(test, previouslySubmitted=False)
 
     def killTest(self, test, jobId, jobName, wantStatus):
         self.diag.info("Killing test " + repr(test) + " in state " + test.state.category)

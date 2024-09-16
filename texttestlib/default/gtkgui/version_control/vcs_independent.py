@@ -31,12 +31,16 @@ class VersionControlInterface:
         self.callProgram("help")  # throws if it's not installed
 
     def isVersionControlled(self, path):
-        basicArgs = self.getCmdArgs("status")
-        for file in self.getFileNames(path, recursive=True, forStatus=True):
-            status = self.getFileStatus(basicArgs, file)
-            if status != "Unknown" and status != "Ignored":
-                return True
-        return False
+        try:
+            basicArgs = self.getCmdArgs("status")
+            for file in self.getFileNames(path, recursive=True, forStatus=True):
+                status = self.getFileStatus(basicArgs, file)
+                if status != "Unknown" and status != "Ignored":
+                    return True
+            return False
+        except plugins.TextTestError:
+            # Version control not installed, cannot be used. 
+            return False
 
     def getFileStatus(self, basicArgs, file):
         output = self.getProcessResults(basicArgs + [file])[1]

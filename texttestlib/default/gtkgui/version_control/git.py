@@ -85,10 +85,14 @@ class GitInterface(vcs_independent.VersionControlInterface):
 
     def removePath(self, path):
         # Git doesn't remove unknown files
-        retCode = self.callProgram("rm", [path])
-        plugins.removePath(path)
-        return retCode == 0
-
+        try:
+            retCode = self.callProgram("rm", [path])
+            plugins.removePath(path)
+            return retCode == 0
+        except OSError:
+            # Git not installed, remove the file anyway. Git will work out what to do if installed in future. 
+            return plugins.removePath(path)
+            
     def hasLocalCommits(self, vcsDirectory):
         retCode, _, stderr = self.getProcessResults(["git", "push", "-n"], cwd=vcsDirectory)
         return retCode == 0 and stderr.strip() != "Everything up-to-date"

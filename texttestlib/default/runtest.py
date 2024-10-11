@@ -6,7 +6,7 @@ import logging
 import subprocess
 import sys
 import signal
-import pipes
+import shlex
 from texttestlib import plugins
 from texttestlib.jobprocess import killProcessAndChildren
 from time import sleep
@@ -304,7 +304,7 @@ class RunTest(plugins.Action):
             return args
 
     def quoteLocalArg(self, arg):
-        return arg if "$" in arg else pipes.quote(arg)
+        return arg if "$" in arg else shlex.quote(arg)
 
     def writeScriptLine(self, scriptFile, line):
         scriptFile.write(line.encode(getpreferredencoding()) + b"\n")

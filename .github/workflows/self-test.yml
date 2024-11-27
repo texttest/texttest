@@ -25,19 +25,19 @@ jobs:
 
     steps:
     - name: Cloning TextTest
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         path: texttest
 
     - name: Cloning SelfTests
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: texttest/selftest
         path: tests/selftest
 
     - name: Configuring Python
       if: matrix.build_env != 'msys'
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python }}
         architecture: x64
@@ -98,7 +98,7 @@ jobs:
 
     - name: Uploading test results
       if: failure()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: texttesttmp-${{ runner.os }}-Py${{ matrix.python }}
         path: ~/.texttest/ttt.zip

@@ -13,17 +13,17 @@ jobs:
 
     steps:
     - name: Cloning TextTest
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Cloning Meld
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: GNOME/meld
         ref: '3.22.0'
         path: meld
 
     - name: Cloning Adwaita Icons
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: GNOME/adwaita-icon-theme
         ref: '41.0'
@@ -51,12 +51,12 @@ jobs:
         glib-compile-schemas data
         python3 setup_win32.py bdist_dumb bdist_msi
 
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
-        name: Windows installer
+        name: Windows_installer
         path: meld/dist/*.msi
 
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
-        name: Windows zip
+        name: Windows_zip
         path: meld/dist/*.zip

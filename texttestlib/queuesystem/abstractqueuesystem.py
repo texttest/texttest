@@ -85,6 +85,9 @@ class QueueSystem(object):
         texttest = plugins.getTextTestProgram()
         if getattr(sys, 'frozen', False):
             return [texttest.replace("texttest.exe", "texttestc.exe")]
+        elif texttest.endswith("__main__.py"):
+            return [ sys.executable, "-m", "texttestlib" ]
+
         return [self.getWindowsExecutable(), texttest] if os.name == "nt" else [texttest]
 
     def makeSlaveEnvironment(self, env):

@@ -27,26 +27,13 @@ if getattr(sys, 'frozen', False):
         capturemock.process_startup()  # doesn't do anything unless CAPTUREMOCK_PROCESS_START is set
     except Exception:
         pass
-    from texttestlib import texttest_version
 else:
     try:
         # If there is a separate script "texttest", want to use the local tree
         fixSysPath(os.path.abspath(__file__))
-        from texttestlib import texttest_version
     except ImportError:
         # For RPMs etc, want to be able to have a link "texttest" somewhere totally different, i.e. /usr/bin
         fixSysPath(os.path.realpath(__file__))
-        from texttestlib import texttest_version
-
-major, minor, micro = sys.version_info[:3]
-reqMajor, reqMinor, reqMicro = texttest_version.required_python_version
-if (major, minor, micro) >= texttest_version.required_python_version:
-    from texttestlib.engine import TextTest
-    program = TextTest()
-    program.run()
-else:
-    strVersion = str(major) + "." + str(minor) + "." + str(micro)
-    reqVersion = str(reqMajor) + "." + str(reqMinor) + "." + str(reqMicro)
-    sys.stderr.write("Could not start TextTest due to Python version problems :\n" +
-                     "TextTest " + texttest_version.version + " requires at least Python " +
-                     reqVersion + ": found version " + strVersion + ".\n")
+        
+from texttestlib import main
+main()

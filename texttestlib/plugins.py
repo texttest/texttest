@@ -116,9 +116,18 @@ def installationDir(name):
     # Generic modules only, we're confident we know where they are
     return os.path.join(installationRoots[0], name)
 
+def isTextTestExe():
+    if os.name != "nt":
+        return False
+
+    if getattr(sys, 'frozen', False):
+        return True
+
+    localExe = os.path.basename(sys.executable)
+    return localExe in [ "texttest.exe", "texttestc.exe" ]
 
 def getTextTestProgram():
-    if getattr(sys, 'frozen', False):
+    if isTextTestExe():
         executable = sys.executable
     else:
         executable = os.path.abspath(sys.argv[0])

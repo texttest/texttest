@@ -83,7 +83,7 @@ class QueueSystem(object):
 
     def getTextTestArgs(self):
         texttest = plugins.getTextTestProgram()
-        if getattr(sys, 'frozen', False):
+        if plugins.isTextTestExe():
             return [texttest.replace("texttest.exe", "texttestc.exe")]
         elif texttest.endswith("__main__.py"):
             return [ sys.executable, "-m", "texttestlib" ]

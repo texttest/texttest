@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "TextTest"
+dynamic = ["version"]
+description = "A tool for text-based Approval Testing"
+readme = "README.txt"
+license = { file="LICENSE" }
+requires-python = ">=3.9"
+authors = [
+    { name = "Geoff Bache", email = "geoff.bache@pobox.com" },
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Environment :: Win32 (MS Windows)",
+    "Environment :: X11 Applications :: GTK",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Testing",
+]
+dependencies = [
+    "psutil",
+]
+
+[project.optional-dependencies]
+graphs = [
+    "matplotlib",
+]
+
+[project.urls]
+Homepage = "http://www.texttest.org"
+Documentation = "https://texttest.sourceforge.net/index.php?page=documentation_4_3"
+Repository = "https://github.com/texttest/texttest"
+Issues = "https://github.com/texttest/texttest/issues/"
+
+[project.scripts]
+texttest = "texttestlib:main"
+texttestc = "texttestlib:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["texttestlib"]
+namespaces = false
+
+[tool.setuptools.dynamic]
+version = {attr = "texttestlib.texttest_version.version"}

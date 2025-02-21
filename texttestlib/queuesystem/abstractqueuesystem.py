@@ -70,25 +70,14 @@ class QueueSystem(object):
     def slavesOnRemoteSystem(self):
         return False
 
-    def getWindowsExecutable(self):
-        # sys.executable could be something other than Python... like storytext. Don't involve that here
-        if os.path.basename(sys.executable) in ["python.exe", "python2.exe", "python3.exe"]:
-            return sys.executable
-        else:
-            path = os.path.join(sys.exec_prefix, "Scripts", "python.exe")
-            if os.path.isfile(path):
-                return path
-            else:
-                return os.path.join(sys.exec_prefix, "python.exe")
-
     def getTextTestArgs(self):
         texttest = plugins.getTextTestProgram()
         if plugins.isTextTestExe():
             return [texttest.replace("texttest.exe", "texttestc.exe")]
         elif texttest.endswith("__main__.py"):
             return [ sys.executable, "-m", "texttestlib" ]
-
-        return [self.getWindowsExecutable(), texttest] if os.name == "nt" else [texttest]
+        else:
+            return [texttest]
 
     def makeSlaveEnvironment(self, env):
         newEnv = plugins.copyEnvironment(ignoreVars=self.getSlaveVarsToBlock())

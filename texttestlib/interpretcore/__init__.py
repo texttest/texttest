@@ -201,11 +201,15 @@ def printCoreInfo(corefile):
     if compression:
         os.system("compress " + corefile)
 
-if len(sys.argv) != 2:
-    print("Usage: interpretcore <corefile>")
-else:
-    corefile = sys.argv[1]
-    if os.path.isfile(corefile):
-        printCoreInfo(corefile)
-    else:    
-        sys.stderr.write("File not found : " + corefile + "\n")
+def main():
+    if len(sys.argv) != 2:
+        print("Usage: interpretcore <corefile>")
+    else:
+        corefile = sys.argv[1]
+        if os.path.isfile(corefile):
+            printCoreInfo(corefile)
+        else:    
+            sys.stderr.write("File not found : " + corefile + "\n")
+
+if __name__ == "__main__":
+    main()

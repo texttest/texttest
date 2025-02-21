@@ -43,6 +43,7 @@ Issues = "https://github.com/texttest/texttest/issues/"
 [project.scripts]
 texttest = "texttestlib:main"
 texttestc = "texttestlib:main"
+interpretcore = "texttestlib.interpretcore:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

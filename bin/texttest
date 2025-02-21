@@ -1,39 +1,4 @@
 #!/usr/bin/env python3
-
-import sys
-import os
-import warnings
-
-
-def fixSysPath(fileName):
-    install_root = os.path.dirname(os.path.dirname(fileName))
-    # We pick up the basic libraries.
-    # Also accept a setup with a "site" subdirectory containing local modules,
-    # or a "generic" directory containing the TextTest core with local modules in the root
-    # Also allow tying a TextTest installation to a StoryText one
-    for subdir in ["", "lib", "site/lib", "storytext"]:
-        libDir = os.path.abspath(os.path.join(install_root, subdir))
-        if os.path.isdir(libDir):
-            sys.path.append(libDir)
-
-
-if sys.executable.endswith("pythonw.exe") or sys.stdout is None:
-    # cx_Freeze sets sys.stdout and stderr to None leading to exceptions in print()
-    sys.stdout = sys.stderr = open(os.devnull, "w")
-if getattr(sys, 'frozen', False):
-    # Make sure it works with Capturemock - frozen modules don't read PYTHONPATH
-    try:
-        import capturemock
-        capturemock.process_startup()  # doesn't do anything unless CAPTUREMOCK_PROCESS_START is set
-    except Exception:
-        pass
-else:
-    try:
-        # If there is a separate script "texttest", want to use the local tree
-        fixSysPath(os.path.abspath(__file__))
-    except ImportError:
-        # For RPMs etc, want to be able to have a link "texttest" somewhere totally different, i.e. /usr/bin
-        fixSysPath(os.path.realpath(__file__))
         
 from texttestlib import main
 main()

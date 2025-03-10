@@ -1215,7 +1215,7 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
 
     def findValues(self, logFile, entryFinder):
         values = []
-        for line in open(logFile):
+        for line in open(logFile, errors="ignore"):
             value = self.getValue(line, entryFinder)
             if value is not None:
                 self.diag.info(" found value: " + str(value))

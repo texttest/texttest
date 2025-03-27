@@ -308,7 +308,7 @@ class BugMap(OrderedDict):
         parser = ConfigParser()
         # Default behaviour transforms to lower case: we want case-sensitive
         parser.optionxform = str
-        parser.readfp(f)
+        parser.read_file(f)
         return parser
 
     @staticmethod

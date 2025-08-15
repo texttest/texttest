@@ -23,7 +23,7 @@ class TextDisplayResponder(plugins.Responder):
             return ""
         elif category == "bug":
             return "Known Bugs"
-        elif category.startswith("faster") or category.startswith("slower") or category == "smaller" or category == "larger":
+        elif category.startswith("faster") or category.startswith("slower") or category.startswith("smaller") or category.startswith("larger"):
             return "Performance Differences"
         elif category in ["killed", "unrunnable", "cancelled", "abandoned"]:
             return "Incomplete"

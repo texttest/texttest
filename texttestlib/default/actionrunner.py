@@ -252,7 +252,7 @@ class ApplicationRunner:
         self.suitesSetUp[suite] = []
 
     def getActionSequence(self):
-        actionSequenceFromConfig = self.testSuite.app.getActionSequence()
+        actionSequenceFromConfig = self.testSuite.app.getActionSequence(self.testSuite.app)
         actionSequence = []
         # Collapse lists and remove None actions
         for action in actionSequenceFromConfig:

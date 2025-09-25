@@ -127,7 +127,7 @@ class ExternalFormatApplicationData:
                       execution_id=self.make_guid(),
                       test_name=test.name,
                       suite_name=self._suiteName(test),
-                      encoding=getpreferredencoding(),
+                      encoding=self.get_encoding(),
                       time=str(t),
                       start_time=startTime.isoformat(),
                       end_time=endTime.isoformat(),
@@ -146,6 +146,13 @@ class ExternalFormatApplicationData:
             result["outcome"] = result["outcome"].lower()
 
         self.testResults[test.getRelPath().replace(os.sep, ".")] = result
+
+    def get_encoding(self):
+        enc = getpreferredencoding()
+        if enc.startswith("cp"):
+            return enc.replace("cp", "windows-")
+        else:
+            return enc
 
     def formatDuration(self, duration, extFormat):
         if extFormat == "jetbrains":

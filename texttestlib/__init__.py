@@ -1,5 +1,6 @@
 
 from . import texttest_version
+import os
 import sys
 
 def main():

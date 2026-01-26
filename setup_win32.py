@@ -171,7 +171,7 @@ texttestc_executable_options = {
 
 if 'mingw' in sysconfig.get_platform():
     executable_options.update({
-         "base": "GUI",  # comment to build console version to see stderr
+         # "base": "GUI",  # comment to build console version to see stderr
          "target_name": "Meld.exe",
          "shortcut_name": "Meld",
          "shortcut_dir": "ProgramMenuFolder",

@@ -95,7 +95,7 @@ for lib, possible_path in manually_added_libs.items():
 build_exe_options = {
     "includes": ['gi', '_sysconfigdata__win32_', 'xmlrpc.server', 'http.cookies'] if 'mingw' in sysconfig.get_platform() else ['gi', 'xmlrpc.server', 'http.cookies'],
     "excludes": ["tkinter"],
-    "packages": ["gi", "weakref", "filecmp", "cgi", "certifi", "texttestlib", "yaml"],
+    "packages": ["gi", "weakref", "filecmp", "certifi", "texttestlib", "yaml"],
     "include_files": get_non_python_libs(),
     "bin_excludes": list(manually_added_libs.keys()),
     "zip_exclude_packages": ["texttestlib"],

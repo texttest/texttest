@@ -15,6 +15,30 @@ from cx_Freeze import Executable, setup
 from texttestlib.texttest_version import version
 
 
+def get_sysconfigdata_name():
+    """Get the correct _sysconfigdata module name for the current platform.
+    
+    In Python 3.13+, the module name format changed from _sysconfigdata__win32_
+    to a triplet-based name like _sysconfigdata__mingw_x86_64_w64_mingw32.
+    """
+    # First, try to find an already imported _sysconfigdata module
+    for name in sys.modules:
+        if name.startswith('_sysconfigdata'):
+            return name
+    
+    # Otherwise, try to import sysconfig which should load the _sysconfigdata module
+    import sysconfig as _sc
+    _sc.get_config_vars()  # This triggers loading of _sysconfigdata
+    
+    # Check again after triggering the load
+    for name in sys.modules:
+        if name.startswith('_sysconfigdata'):
+            return name
+    
+    # Legacy fallback for older Python versions
+    return '_sysconfigdata__win32_'
+
+
 def get_non_python_libs():
     """Returns list of tuples containing extra dependencies required to run
     meld on current platform.
@@ -93,7 +117,7 @@ for lib, possible_path in manually_added_libs.items():
         gtk_data_files.append((os.path.dirname(lib), [local_lib]))
 
 build_exe_options = {
-    "includes": ['gi', '_sysconfigdata__win32_', 'xmlrpc.server', 'http.cookies'] if 'mingw' in sysconfig.get_platform() else ['gi', 'xmlrpc.server', 'http.cookies'],
+    "includes": ['gi', get_sysconfigdata_name(), 'xmlrpc.server', 'http.cookies'] if 'mingw' in sysconfig.get_platform() else ['gi', 'xmlrpc.server', 'http.cookies'],
     "excludes": ["tkinter"],
     "packages": ["gi", "weakref", "filecmp", "certifi", "texttestlib", "yaml"],
     "include_files": get_non_python_libs(),

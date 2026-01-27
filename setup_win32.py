@@ -18,24 +18,18 @@ from texttestlib.texttest_version import version
 def get_sysconfigdata_name():
     """Get the correct _sysconfigdata module name for the current platform.
     
-    In Python 3.13+, the module name format changed from _sysconfigdata__win32_
-    to a triplet-based name like _sysconfigdata__mingw_x86_64_w64_mingw32.
+    In Python 3.13+ on MSYS2/MinGW, the module name may differ from the
+    traditional _sysconfigdata__win32_.
     """
-    # First, try to find an already imported _sysconfigdata module
+    # Trigger sysconfig to load its data module
+    sysconfig.get_config_vars()
+    
+    # Find the loaded _sysconfigdata module
     for name in sys.modules:
         if name.startswith('_sysconfigdata'):
             return name
     
-    # Otherwise, try to import sysconfig which should load the _sysconfigdata module
-    import sysconfig as _sc
-    _sc.get_config_vars()  # This triggers loading of _sysconfigdata
-    
-    # Check again after triggering the load
-    for name in sys.modules:
-        if name.startswith('_sysconfigdata'):
-            return name
-    
-    # Legacy fallback for older Python versions
+    # Fallback for older Python versions
     return '_sysconfigdata__win32_'
 
 

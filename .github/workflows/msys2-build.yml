@@ -38,7 +38,10 @@ jobs:
       shell: msys2 {0}
       run: |
         patch -p0 -R < meld_build_helpers.patch
-        patch -p1 -d meld < python313_compat.patch
+        # Fix Python 3.13 compatibility: pipes module was removed in Python 3.13
+        # Replace 'import pipes' and 'pipes.quote' with shlex equivalents
+        sed -i 's/^import pipes$/# import pipes  # Removed in Python 3.13/' meld/meld/melddoc.py
+        sed -i 's/pipes\.quote/shlex.quote/g' meld/meld/melddoc.py
         cp -a bin texttestlib setup_win32.py meld
         cp wininstall/*.ico meld/data/icons
         cp -aL adwaita/Adwaita /usr/share/icons

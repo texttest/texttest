@@ -1,0 +1,21 @@
+diff --git a/meld/melddoc.py b/meld/melddoc.py
+--- a/meld/melddoc.py
++++ b/meld/melddoc.py
+@@ -17,7 +17,7 @@
+ import enum
+ import logging
+ import os
+-import pipes
++import shlex
+ import subprocess
+ from typing import Optional, Sequence
+ 
+@@ -158,7 +158,7 @@ class MeldDoc(GObject.GObject):
+         cmd = [custom_command]
+         if file:
+             cmd.append(file)
+-        return ' '.join(pipes.quote(tok) for tok in cmd)
++        return ' '.join(shlex.quote(tok) for tok in cmd)
+ 
+     def get_custom_commands(self, file: str = None) -> Sequence[str]:
+         """Generate list of entries for the custom tool menu

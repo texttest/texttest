@@ -104,7 +104,7 @@ class BasicRunningAction:
             return filterFileOverride
 
     def getInterpreterArgs(self):
-        if getattr(sys, 'frozen', False):
+        if getattr(sys, 'frozen', False) or (sys.argv[0].endswith("texttest") and os.path.exists(sys.argv[0] + ".exe")):
             return []
         interpreterArg = os.getenv("TEXTTEST_DYNAMIC_GUI_INTERPRETER", "") # Alternative interpreter for the dynamic GUI : mostly useful for coverage / testing
         if interpreterArg:

@@ -21,6 +21,9 @@ class ProcessTerminationMonitor(plugins.Observable):
         plugins.Observable.__init__(self)
         self.processesForKill = OrderedDict()
         self.exitHandlers = OrderedDict()
+        # Tracks GLib child-watch source IDs for every spawned process so they can be
+        # removed when the parent GUI closes, regardless of killOnTermination (#68).
+        self.childWatchSources = {}
 
     def listQueryKillProcesses(self):
         processesToCheck = guiConfig.getCompositeValue("query_kill_processes", "", modeDependent=True)
@@ -38,7 +41,7 @@ class ProcessTerminationMonitor(plugins.Observable):
         return running
 
     def getProcesses(self):
-        return [(process, description) for process, description, _ in self.processesForKill.values()]
+        return list(self.processesForKill.values())
 
     def getProcessIdentifier(self, process):
         # Unfortunately the child_watch_add method needs different ways to
@@ -52,14 +55,14 @@ class ProcessTerminationMonitor(plugins.Observable):
         process = subprocess.Popen(cmdArgs, stdin=open(os.devnull), **kwargs)
         pidOrHandle = self.getProcessIdentifier(process)
         self.exitHandlers[int(pidOrHandle)] = (exitHandler, exitHandlerArgs)
-        source_id = GObject.child_watch_add(pidOrHandle, self.processExited, process.pid)
+        # Track the source ID for every process so it can be removed on shutdown (#68).
+        self.childWatchSources[int(pidOrHandle)] = GObject.child_watch_add(pidOrHandle, self.processExited, process.pid)
         if killOnTermination:
-            self.processesForKill[int(pidOrHandle)] = (process, description, source_id)
-        # When killOnTermination is False the process is not forcibly killed, so its handle
-        # stays valid until it exits naturally.  GLib auto-removes the one-shot child-watch
-        # source when processExited fires, so no explicit cleanup is needed in that path.
+            self.processesForKill[int(pidOrHandle)] = (process, description)
 
     def processExited(self, pidOrHandle, condition, pid):
+        # GLib auto-removes the one-shot child-watch source; clean up our tracking entry.
+        self.childWatchSources.pop(pidOrHandle, None)
         output = ""
         self.notify("ProcessExited", pid)
         if pidOrHandle in self.processesForKill:
@@ -77,22 +80,25 @@ class ProcessTerminationMonitor(plugins.Observable):
                     self.notify(command, arg)
 
     def notifyKillProcesses(self, sig=None):
-        # Don't leak processes
-        if len(self.processesForKill) == 0:
-            return
         diag = logging.getLogger("kill processes")
-        self.notify("Status", "Terminating all external viewers ...")
-        for pid, (process, description, source_id) in list(self.processesForKill.items()):
-            if pid in self.exitHandlers:
-                self.exitHandlers.pop(pid)  # don't call exit handlers in this case, we're terminating
-            self.notify("ActionProgress")
-            diag.info("Killing '" + description + "' interactive process")
-            killProcessAndChildren(process.pid, sig)
-            # Remove the GLib child-watch source so its Win32 HANDLE is deregistered from
-            # GLib's poll array before the main loop resumes.  Leaving it registered causes
-            # MsgWaitForMultipleObjectsEx to report ERROR_INVALID_HANDLE on Windows (#68).
+        if self.processesForKill:
+            self.notify("Status", "Terminating all external viewers ...")
+            for pid, (process, description) in list(self.processesForKill.items()):
+                if pid in self.exitHandlers:
+                    self.exitHandlers.pop(pid)  # don't call exit handlers in this case, we're terminating
+                self.notify("ActionProgress")
+                diag.info("Killing '" + description + "' interactive process")
+                killProcessAndChildren(process.pid, sig)
+            self.processesForKill.clear()
+        # Deregister every remaining GLib child-watch source so that their Win32 HANDLEs
+        # are removed from GLib's poll array before the main loop resumes.  This covers
+        # both killOnTermination=True processes (killed above) and killOnTermination=False
+        # rerun GUIs that were never put in processesForKill.  Skipping this step leaves
+        # stale handles in GLib's MsgWaitForMultipleObjectsEx call, causing
+        # "ERROR_INVALID_HANDLE" warnings on Windows (#68).
+        for source_id in self.childWatchSources.values():
             GObject.source_remove(source_id)
-        self.processesForKill.clear()
+        self.childWatchSources.clear()
 
 
 processMonitor = ProcessTerminationMonitor()

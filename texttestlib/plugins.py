@@ -574,11 +574,13 @@ class ThreadedNotificationHandler:
         self.source = None
 
     def blockEventsExcept(self, allowedEvents):
-        self.allowedEvents = allowedEvents
+        with self.mutex:
+            self.allowedEvents = allowedEvents
 
     def enablePoll(self, idleHandleMethod, **kwargs):
-        self.active = True
-        self.idleHandler = lambda : idleHandleMethod(self.pollQueue, **kwargs)
+        with self.mutex:
+            self.active = True
+            self.idleHandler = lambda : idleHandleMethod(self.pollQueue, **kwargs)
 
     def disablePoll(self, idleHandleRemover):
         with self.mutex:

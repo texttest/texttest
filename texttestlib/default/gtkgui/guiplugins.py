@@ -21,8 +21,12 @@ class ProcessTerminationMonitor(plugins.Observable):
         plugins.Observable.__init__(self)
         self.processesForKill = OrderedDict()
         self.exitHandlers = OrderedDict()
-        # Tracks GLib child-watch source IDs for every spawned process so they can be
-        # removed when the parent GUI closes, regardless of killOnTermination (#68).
+        # Maps pidOrHandle → (source_id, process) for every spawned process.
+        # Keeping a reference to `process` (Popen) is critical on Windows: GLib does NOT
+        # duplicate the Win32 HANDLE passed to child_watch_add — it stores our integer
+        # directly.  If the Popen object is garbage-collected, Python calls CloseHandle and
+        # the stored integer becomes invalid, causing MsgWaitForMultipleObjectsEx to fail
+        # with ERROR_INVALID_HANDLE (#68).  Holding the reference here prevents that.
         self.childWatchSources = {}
 
     def listQueryKillProcesses(self):
@@ -55,13 +59,16 @@ class ProcessTerminationMonitor(plugins.Observable):
         process = subprocess.Popen(cmdArgs, stdin=open(os.devnull), **kwargs)
         pidOrHandle = self.getProcessIdentifier(process)
         self.exitHandlers[int(pidOrHandle)] = (exitHandler, exitHandlerArgs)
-        # Track the source ID for every process so it can be removed on shutdown (#68).
-        self.childWatchSources[int(pidOrHandle)] = GObject.child_watch_add(pidOrHandle, self.processExited, process.pid)
+        # Store (source_id, process) so the Popen object — and its Win32 handle — stays alive
+        # until processExited fires and we pop this entry (#68).
+        source_id = GObject.child_watch_add(pidOrHandle, self.processExited, process.pid)
+        self.childWatchSources[int(pidOrHandle)] = (source_id, process)
         if killOnTermination:
             self.processesForKill[int(pidOrHandle)] = (process, description)
 
     def processExited(self, pidOrHandle, condition, pid):
-        # GLib auto-removes the one-shot child-watch source; clean up our tracking entry.
+        # GLib auto-removes the one-shot child-watch source; drop our reference to the
+        # Popen object (it is now safe to let Python close the Win32 handle).
         self.childWatchSources.pop(pidOrHandle, None)
         output = ""
         self.notify("ProcessExited", pid)
@@ -91,13 +98,17 @@ class ProcessTerminationMonitor(plugins.Observable):
                 killProcessAndChildren(process.pid, sig)
             self.processesForKill.clear()
         # Deregister every remaining GLib child-watch source so that their Win32 HANDLEs
-        # are removed from GLib's poll array before the main loop resumes.  This covers
-        # both killOnTermination=True processes (killed above) and killOnTermination=False
-        # rerun GUIs that were never put in processesForKill.  Skipping this step leaves
-        # stale handles in GLib's MsgWaitForMultipleObjectsEx call, causing
-        # "ERROR_INVALID_HANDLE" warnings on Windows (#68).
-        for source_id in self.childWatchSources.values():
+        # are removed from GLib's poll array before the main loop resumes, THEN release
+        # the Popen references so Python can close the handles safely.  Order matters:
+        # source_remove must come before we let the Popen be GC'd, otherwise GLib could
+        # still hold an about-to-be-closed handle.  This covers both killOnTermination=True
+        # processes (killed above) and killOnTermination=False rerun GUIs that were never
+        # put in processesForKill (#68).
+        for source_id, _ in self.childWatchSources.values():
             GObject.source_remove(source_id)
+        # clear() releases all Popen references (the loop only iterates — it doesn't pop).
+        # Releasing AFTER source_remove ensures GLib no longer holds the handles when Python
+        # calls CloseHandle via Popen.__del__.
         self.childWatchSources.clear()
 
 

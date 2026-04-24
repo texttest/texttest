@@ -21,6 +21,8 @@ class ProcessTerminationMonitor(plugins.Observable):
         plugins.Observable.__init__(self)
         self.processesForKill = OrderedDict()
         self.exitHandlers = OrderedDict()
+        # store the process object, otherwise garbage collection would create an invalid handle (#68)
+        self.childWatches = {}  # pidOrHandle -> (source_id, process)
 
     def listQueryKillProcesses(self):
         processesToCheck = guiConfig.getCompositeValue("query_kill_processes", "", modeDependent=True)
@@ -52,11 +54,13 @@ class ProcessTerminationMonitor(plugins.Observable):
         process = subprocess.Popen(cmdArgs, stdin=open(os.devnull), **kwargs)
         pidOrHandle = self.getProcessIdentifier(process)
         self.exitHandlers[int(pidOrHandle)] = (exitHandler, exitHandlerArgs)
+        source_id = GObject.child_watch_add(pidOrHandle, self.processExited, process.pid)
+        self.childWatches[int(pidOrHandle)] = (source_id, process)
         if killOnTermination:
             self.processesForKill[int(pidOrHandle)] = (process, description)
-        GObject.child_watch_add(pidOrHandle, self.processExited, process.pid)
 
     def processExited(self, pidOrHandle, condition, pid):
+        self.childWatches.pop(pidOrHandle, None)
         output = ""
         self.notify("ProcessExited", pid)
         if pidOrHandle in self.processesForKill:
@@ -74,17 +78,19 @@ class ProcessTerminationMonitor(plugins.Observable):
                     self.notify(command, arg)
 
     def notifyKillProcesses(self, sig=None):
-        # Don't leak processes
-        if len(self.processesForKill) == 0:
-            return
         diag = logging.getLogger("kill processes")
-        self.notify("Status", "Terminating all external viewers ...")
-        for pid, (process, description) in list(self.processesForKill.items()):
-            if pid in self.exitHandlers:
-                self.exitHandlers.pop(pid)  # don't call exit handlers in this case, we're terminating
-            self.notify("ActionProgress")
-            diag.info("Killing '" + description + "' interactive process")
-            killProcessAndChildren(process.pid, sig)
+        for source_id, _ in self.childWatches.values():
+            GObject.source_remove(source_id)
+        self.childWatches.clear()
+        if self.processesForKill:
+            self.notify("Status", "Terminating all external viewers ...")
+            for pid, (process, description) in list(self.processesForKill.items()):
+                if pid in self.exitHandlers:
+                    self.exitHandlers.pop(pid)
+                self.notify("ActionProgress")
+                diag.info("Killing '" + description + "' interactive process")
+                killProcessAndChildren(process.pid, sig)
+            self.processesForKill.clear()
 
 
 processMonitor = ProcessTerminationMonitor()

@@ -107,7 +107,7 @@ jobs:
 
     - name: Uploading test results
       if: failure()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: texttesttmp-${{ runner.os }}-Py${{ matrix.python }}
         path: ~/.texttest/ttt.zip

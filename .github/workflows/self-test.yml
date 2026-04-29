@@ -75,11 +75,17 @@ jobs:
         python -m venv venv
         venv/Scripts/pip install capturemock $PWD/texttest
 
-    - name: Running Linux / macOS Tests
-      if: runner.os == 'Linux' || runner.os == 'macOS'
+    - name: Running Linux Tests
+      if: runner.os == 'Linux'
       run: |
         export TEXTTEST_HOME=$PWD/tests
         venv/bin/texttest -c $PWD/venv -b ci -v ci
+
+    - name: Running macOS Tests
+      if: runner.os == 'macOS'
+      run: |
+        export TEXTTEST_HOME=$PWD/tests
+        venv/bin/texttest -c $PWD/venv -b ci -v darwin.ci
 
     - name: Compressing Test Results
       if: failure() && (runner.os == 'Linux' || runner.os == 'macOS')

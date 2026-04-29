@@ -20,6 +20,11 @@ jobs:
           - os: windows-latest
             build_env: msys
             python: msys
+        exclude:
+          - os: macos-latest
+            python: 3.9
+          - os: macos-latest
+            python: '3.10'
 
     runs-on: ${{ matrix.os }}
 
@@ -70,14 +75,14 @@ jobs:
         python -m venv venv
         venv/Scripts/pip install capturemock $PWD/texttest
 
-    - name: Running Linux Tests
-      if: runner.os == 'Linux'
+    - name: Running Linux / macOS Tests
+      if: runner.os == 'Linux' || runner.os == 'macOS'
       run: |
         export TEXTTEST_HOME=$PWD/tests
         venv/bin/texttest -c $PWD/venv -b ci -v ci
 
-    - name: Compressing Test Results (Linux)
-      if: failure() && runner.os == 'Linux'
+    - name: Compressing Test Results
+      if: failure() && (runner.os == 'Linux' || runner.os == 'macOS')
       run: |
         zip -r ~/.texttest/ttt.zip ~/.texttest/tmp/
 

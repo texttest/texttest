@@ -57,8 +57,8 @@ jobs:
           mingw-w64-x86_64-python-certifi mingw-w64-x86_64-python-psutil mingw-w64-x86_64-python-yaml
           mingw-w64-x86_64-gtksourceview4 mingw-w64-x86_64-gsettings-desktop-schemas diffutils glib2-devel intltool
 
-    - name: Preparing Virtual Environment (Linux) 
-      if: runner.os == 'Linux'
+    - name: Preparing Virtual Environment (Linux / macOS) 
+      if: runner.os == 'Linux' || runner.os == 'macOS'
       run: |
         python -m venv venv
         venv/bin/pip install capturemock $PWD/texttest

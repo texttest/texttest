@@ -57,6 +57,10 @@ jobs:
           mingw-w64-x86_64-python-certifi mingw-w64-x86_64-python-psutil mingw-w64-x86_64-python-yaml
           mingw-w64-x86_64-gtksourceview4 mingw-w64-x86_64-gsettings-desktop-schemas diffutils glib2-devel intltool
 
+    - name: Installing proper diff (macOS) 
+      if: runner.os == 'macOS'
+      run: brew install diffutils
+
     - name: Preparing Virtual Environment (Linux / macOS) 
       if: runner.os == 'Linux' || runner.os == 'macOS'
       run: |

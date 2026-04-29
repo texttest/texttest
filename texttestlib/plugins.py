@@ -54,9 +54,10 @@ def findInstallationRoots():
 def compactHostRepr(hosts):
     """Convert list ['a', 'a', 'b'] -> 'a*2, b'"""
     hostCount = dict((host, hosts.count(host)) for host in set(hosts))
+    hostAbbr = dict((host, host[:22] + "..." + host[-10:]) for host in hosts if len(host) > 35)
     hostCountStrings = \
-        (('*'.join([str(hostCount[host]), host])
-          if hostCount[host] > 1 else host
+        (('*'.join([str(hostCount[host]), hostAbbr.get(host, host)])
+          if hostCount[host] > 1 else hostAbbr.get(host, host)
           for host in hostCount))
     return ', '.join(sorted(hostCountStrings))
 

@@ -27,7 +27,8 @@ def getIPAddress(apps):
     except socket.error:
         # Relies on being online, but seems there is no other way...
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(('8.8.8.8', 0))  # Google's DNS server. Should always be there :)
+        # Google's DNS server. Should always be there :)
+        s.connect(('8.8.8.8', 80))  # binding to port 0 fails on macOS, see #154
         return s.getsockname()[0]
 
 

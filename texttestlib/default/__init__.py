@@ -1443,6 +1443,8 @@ class Config:
             "binary_file", [], "Which output files are known to be binary, and hence should not be shown/diffed?")
 
         app.setConfigDefault("discard_file", [], "List of generated result files which should not be compared")
+        app.setConfigDefault("discard_file_if_empty", [],
+                             "List of generated result files which should not be compared if they are empty (contain no non-whitespace text)")
         app.setConfigDefault("discard_file_text", {
                              "default": []}, "List of generated result files which should not be compared if they contain the given patterns")
         app.setConfigDefault("capturemock_path", "", "Path to local CaptureMock installation, in case newer one is required with frozen TextTest")

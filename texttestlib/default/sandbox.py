@@ -718,6 +718,20 @@ class CollateFiles(plugins.Action):
                     return True
         return False
 
+    def isEmptyFile(self, filePath):
+        # A file counts as empty if it has zero size or contains only whitespace.
+        # Missing or unreadable (e.g. binary) files are not treated as empty, so they are kept.
+        try:
+            if os.path.getsize(filePath) == 0:
+                return True
+            with open(filePath) as f:
+                for line in f:
+                    if line.strip():
+                        return False
+            return True
+        except (EnvironmentError, UnicodeDecodeError):
+            return False
+
     def removeUnwantedFile(self, filePath):
         self.diag.info("Trying to remove generated file " + os.path.basename(filePath))
         try:
@@ -730,6 +744,11 @@ class CollateFiles(plugins.Action):
         for stem in test.getConfigValue("discard_file"):
             filePath = test.makeTmpFileName(stem)
             self.removeUnwantedFile(filePath)
+
+        for stem in test.getConfigValue("discard_file_if_empty"):
+            filePath = test.makeTmpFileName(stem)
+            if self.isEmptyFile(filePath):
+                self.removeUnwantedFile(filePath)
 
         for stemPattern, texts in list(test.getConfigValue("discard_file_text").items()):
             if not texts:

@@ -4,6 +4,7 @@ import re
 import stat
 import subprocess
 import glob
+import hashlib
 import logging
 import difflib
 import time
@@ -23,6 +24,19 @@ def getScriptArgs(script):
         args = [instScript] + args[1:]
 
     return args
+
+
+def getFileChecksum(fullPath):
+    # SHA256 of the file contents, or None if it can't be read. Used to spot programs
+    # that edit a file's contents without updating its modified time (e.g. win32 CopyFile).
+    hasher = hashlib.sha256()
+    try:
+        with open(fullPath, "rb") as f:
+            for chunk in iter(lambda: f.read(128 * 1024), b""):
+                hasher.update(chunk)
+    except (IOError, OSError):
+        return None
+    return hasher.hexdigest()
 
 
 class MakeWriteDirectory(plugins.Action):
@@ -755,20 +769,30 @@ class CollateFiles(plugins.Action):
         sourcePaths = os.path.join(plugins.quote(tmpDir), "*")
         test.app.copyFileRemotely(sourcePaths, machine, test.getDirectory(temporary=1), "localhost")
 
+    def editSignature(self, test, fullPath):
+        # What we compare before and after the run to decide if a file was edited.
+        # By content checksum if requested (catches edits that preserve the modified
+        # time, e.g. via win32 CopyFile), otherwise by modified time as usual.
+        if test.getConfigValue("detect_file_changes_by_checksum") == "true":
+            checksum = getFileChecksum(fullPath)
+            if checksum is not None:
+                return checksum
+        return plugins.modifiedTime(fullPath)
+
     def getFilesPresent(self, test):
         files = OrderedDict()
         for sourcePatterns in list(test.getConfigValue("collate_file").values()):
             for sourcePattern in sourcePatterns:
                 for fullPath in self.findPaths(test, sourcePattern)[1]:
                     self.diag.info("Pre-existing file found " + fullPath)
-                    files[fullPath] = plugins.modifiedTime(fullPath)
+                    files[fullPath] = self.editSignature(test, fullPath)
         return files
 
     def testEdited(self, test, fullPath):
         filesBefore = self.filesPresentBefore[test]
         if fullPath not in filesBefore:
             return True
-        return filesBefore[fullPath] != plugins.modifiedTime(fullPath)
+        return filesBefore[fullPath] != self.editSignature(test, fullPath)
 
     def alreadyCollated(self, test, path, sourcePattern):
         if "/" not in sourcePattern:
@@ -995,27 +1019,34 @@ class CreateCatalogue(plugins.Action):
     def findAllPaths(self, test):
         allPaths = OrderedDict()
         paths, ignoredPaths = test.listUnownedTmpPaths()
+        useChecksum = test.getConfigValue("detect_file_changes_by_checksum") == "true"
         for path in paths:
-            editInfo = self.getEditInfo(path)
+            editInfo = self.getEditInfo(path, useChecksum)
             self.diag.info("Path " + path + " edit info " + editInfo)
             allPaths[path] = editInfo
         return allPaths, ignoredPaths
 
-    def getEditInfo(self, fullPath):
-        # Check modified times for files and directories, targets for links
+    def getEditInfo(self, fullPath, useChecksum=False):
+        # Targets for links, content checksums for files (if requested), modified times otherwise.
+        # Checksums let us spot programs that edit file contents without updating the modified time,
+        # e.g. via the win32 CopyFile API.
         if os.path.islink(fullPath):
             return os.path.realpath(fullPath)
-        else:
-            return time.strftime(plugins.datetimeFormat, time.localtime(plugins.modifiedTime(fullPath)))
+        if useChecksum and os.path.isfile(fullPath):
+            checksum = getFileChecksum(fullPath)
+            if checksum is not None:
+                return checksum
+            # Couldn't read the file - fall back to the modified time
+        return time.strftime(plugins.datetimeFormat, time.localtime(plugins.modifiedTime(fullPath)))
 
     def findDifferences(self, oldPaths, newPaths, ignoredPaths, writeDir):
         pathsGained, pathsEdited, pathsLost = [], [], []
-        for path, modTime in list(newPaths.items()):
+        for path, editInfo in list(newPaths.items()):
             if path not in oldPaths:
                 pathsGained.append(self.outputPathName(path, writeDir))
-            elif oldPaths[path] != modTime:
+            elif oldPaths[path] != editInfo:
                 pathsEdited.append(self.outputPathName(path, writeDir))
-        for path, modTime in list(oldPaths.items()):
+        for path in list(oldPaths.keys()):
             if path not in newPaths:
                 pathsLost.append(self.outputPathName(path, writeDir))
         # Clear out duplicates

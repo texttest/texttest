@@ -1434,6 +1434,8 @@ class Config:
         app.setConfigDefault("create_catalogues", "false", "Do we create a listing of files created/removed by tests")
         app.setConfigAlias("collect_file_changes", "create_catalogues")
         app.setConfigAlias("collate_file_changes", "create_catalogues")
+        app.setConfigDefault("detect_file_changes_by_checksum", "false",
+                             "Identify edited files (for catalogues and collation) by content checksum (SHA256) rather than modification time")
 
         app.setConfigDefault("catalogue_process_string", "",
                              "String for catalogue functionality to identify processes created")

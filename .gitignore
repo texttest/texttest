@@ -17,3 +17,5 @@ TextTest.egg-info
 .#*
 .idea
 venv
+# Local, machine-specific developer notes (contains absolute paths for this machine)
+CLAUDE.md

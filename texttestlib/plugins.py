@@ -20,7 +20,10 @@ from datetime import datetime
 from pickle import Unpickler
 from locale import getpreferredencoding
 import importlib.resources
-import sre_parse
+try:
+    import re._parser as sre_parse
+except ImportError:  # Python < 3.11
+    import sre_parse
 
 
 class Callable:

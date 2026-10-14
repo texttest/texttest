@@ -1,7 +1,7 @@
 environment:
   APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
   matrix:
-    - MSYS2_ARCH: x86_64
+    - MSYS2_ARCH: ucrt-x86_64
       MSYSTEM: MINGW64
 #    - MSYS2_ARCH: i686
 #      MSYSTEM: MINGW32
@@ -15,7 +15,7 @@ install:
     - pacman --noconfirm -Syyuu --overwrite '*'
     - taskkill /F /FI "MODULES eq msys-2.0.dll"
     - pacman --noconfirm -Syyuu --overwrite '*'
-    - pacman --noconfirm -S --refresh --needed  --overwrite '*' mingw-w64-%MSYS2_ARCH%-python-cx-freeze mingw-w64-%MSYS2_ARCH%-python-gobject mingw-w64-%MSYS2_ARCH%-python-pytest mingw-w64-%MSYS2_ARCH%-python-distro mingw-w64-%MSYS2_ARCH%-python-matplotlib mingw-w64-%MSYS2_ARCH%-python-certifi mingw-w64-%MSYS2_ARCH%-python-psutil mingw-w64-%MSYS2_ARCH%-python-yaml mingw-w64-%MSYS2_ARCH%-gtksourceview4 mingw-w64-%MSYS2_ARCH%-gsettings-desktop-schemas mingw-w64-%MSYS2_ARCH%-diffutils glib2-devel intltool
+    - pacman --noconfirm -S --refresh --needed  --overwrite '*' mingw-w64-%MSYS2_ARCH%-python-cx-freeze mingw-w64-%MSYS2_ARCH%-python-gobject mingw-w64-%MSYS2_ARCH%-python-pytest mingw-w64-%MSYS2_ARCH%-python-distro mingw-w64-%MSYS2_ARCH%-python-matplotlib mingw-w64-%MSYS2_ARCH%-python-certifi mingw-w64-%MSYS2_ARCH%-python-psutil mingw-w64-%MSYS2_ARCH%-python-yaml mingw-w64-%MSYS2_ARCH%-gtksourceview4 mingw-w64-%MSYS2_ARCH%-gsettings-desktop-schemas diffutils glib2-devel intltool
     - gdk-pixbuf-query-loaders --update-cache
 
 build_script:

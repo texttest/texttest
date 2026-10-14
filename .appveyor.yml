@@ -2,7 +2,7 @@ environment:
   APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
   matrix:
     - MSYS2_ARCH: ucrt-x86_64
-      MSYSTEM: MINGW64
+      MSYSTEM: ucrt64
 #    - MSYS2_ARCH: i686
 #      MSYSTEM: MINGW32
 

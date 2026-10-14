@@ -31,8 +31,25 @@ jobs:
 
     - uses: msys2/setup-msys2@v2
       with:
+        msystem: UCRT64
         update: true
-        install: git mingw-w64-x86_64-python-setuptools mingw-w64-x86_64-python-cx-freeze mingw-w64-x86_64-python-gobject mingw-w64-x86_64-python-pytest mingw-w64-x86_64-python-pip mingw-w64-x86_64-python-matplotlib mingw-w64-x86_64-python-certifi mingw-w64-x86_64-python-psutil mingw-w64-x86_64-python-yaml mingw-w64-x86_64-gtksourceview4 mingw-w64-x86_64-gsettings-desktop-schemas mingw-w64-x86_64-diffutils glib2-devel intltool patch
+        install: >-
+          git
+          diffutils
+          glib2-devel
+          intltool
+          patch
+          mingw-w64-ucrt-x86_64-python-setuptools
+          mingw-w64-ucrt-x86_64-python-cx-freeze
+          mingw-w64-ucrt-x86_64-python-gobject
+          mingw-w64-ucrt-x86_64-python-pytest
+          mingw-w64-ucrt-x86_64-python-pip
+          mingw-w64-ucrt-x86_64-python-matplotlib
+          mingw-w64-ucrt-x86_64-python-certifi
+          mingw-w64-ucrt-x86_64-python-psutil
+          mingw-w64-ucrt-x86_64-python-yaml
+          mingw-w64-ucrt-x86_64-gtksourceview4
+          mingw-w64-ucrt-x86_64-gsettings-desktop-schemas
 
     - name: Moving meld code and icons into the right place
       shell: msys2 {0}

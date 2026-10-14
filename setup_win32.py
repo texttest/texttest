@@ -51,7 +51,7 @@ def get_non_python_libs():
     if 'mingw' in sysconfig.get_platform():
         # dll imported by dll dependencies expected to be auto-resolved later
         inst_root = [os.path.join(local_bin, 'libgtksourceview-4-0.dll'),
-                     os.path.join(local_bin, "diff.exe"),
+                     os.path.join(local_bin, "../../usr/bin/diff.exe"),
                      os.path.join(local_bin, "libiconv-2.dll"),
                      os.path.join(local_bin, "libintl-8.dll")]
 

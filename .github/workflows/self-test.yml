@@ -119,7 +119,7 @@ jobs:
       if: runner.os == 'Windows' && matrix.build_env != 'msys'
       run: |
         $env:TEXTTEST_HOME = "$pwd\tests"
-        venv\Scripts\texttest.exe -c $PWD\venv -b ci -v ci
+        venv\Scripts\texttest.exe -c $PWD\venv -b ci -v ci -finverse $PWD\tests\selftest\filter_files\encoding_windows
 
     - name: Running MSYS Tests
       if: matrix.build_env == 'msys'

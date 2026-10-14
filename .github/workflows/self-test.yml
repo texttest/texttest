@@ -34,6 +34,12 @@ jobs:
       with:
         path: texttest
 
+    - name: Cloning CaptureMock
+      uses: actions/checkout@v6
+      with:
+        repository: texttest/capturemock
+        path: capturemock
+
     - name: Cloning SelfTests
       uses: actions/checkout@v6
       with:
@@ -50,12 +56,25 @@ jobs:
     - uses: msys2/setup-msys2@v2
       if: matrix.build_env == 'msys'
       with:
+        msystem: UCRT64
         update: true
-        install: >
-          git mingw-w64-x86_64-python-setuptools mingw-w64-x86_64-python-cx-freeze mingw-w64-x86_64-python-gobject
-          mingw-w64-x86_64-python-pytest mingw-w64-x86_64-python-pip mingw-w64-x86_64-python-matplotlib
-          mingw-w64-x86_64-python-certifi mingw-w64-x86_64-python-psutil mingw-w64-x86_64-python-yaml
-          mingw-w64-x86_64-gtksourceview4 mingw-w64-x86_64-gsettings-desktop-schemas diffutils glib2-devel intltool
+        install: >-
+          git
+          diffutils
+          glib2-devel
+          intltool
+          patch
+          mingw-w64-ucrt-x86_64-python-setuptools
+          mingw-w64-ucrt-x86_64-python-cx-freeze
+          mingw-w64-ucrt-x86_64-python-gobject
+          mingw-w64-ucrt-x86_64-python-pytest
+          mingw-w64-ucrt-x86_64-python-pip
+          mingw-w64-ucrt-x86_64-python-matplotlib
+          mingw-w64-ucrt-x86_64-python-certifi
+          mingw-w64-ucrt-x86_64-python-psutil
+          mingw-w64-ucrt-x86_64-python-yaml
+          mingw-w64-ucrt-x86_64-gtksourceview4
+          mingw-w64-ucrt-x86_64-gsettings-desktop-schemas
 
     - name: Installing proper diff (macOS) 
       if: runner.os == 'macOS'
@@ -65,19 +84,19 @@ jobs:
       if: runner.os == 'Linux' || runner.os == 'macOS'
       run: |
         python -m venv venv
-        venv/bin/pip install capturemock $PWD/texttest
+        venv/bin/pip install $PWD/capturemock $PWD/texttest
 
     - name: Preparing Virtual Environment (Windows)
       if: runner.os == 'Windows' && matrix.build_env != 'msys'
       run: |
         python -m venv venv
-        venv\Scripts\pip.exe install capturemock $PWD/texttest
+        venv\Scripts\pip.exe install $PWD/capturemock $PWD/texttest
 
     - name: Preparing Virtual Environment (Msys2)
       if: matrix.build_env == 'msys'
       run: |
         python -m venv venv
-        venv/Scripts/pip install capturemock $PWD/texttest
+        venv/Scripts/pip install $PWD/capturemock $PWD/texttest
 
     - name: Running Linux Tests
       if: runner.os == 'Linux'

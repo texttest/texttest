@@ -220,13 +220,26 @@ class ReconnectConfig:
 
     @staticmethod
     def dateValue(version):
-        yearlessDatetime = datetime.datetime.strptime(version, "%d%b%H%M%S")
+        # Python 3.15+ strptime rejects a day-of-month directive without a year
+        # directive (ambiguous for leap days, see https://github.com/python/cpython/issues/70647).
+        # Parse with a placeholder leap year to satisfy that check; the real year
+        # is derived below and the placeholder itself is discarded.
+        yearlessDatetime = datetime.datetime.strptime("1904" + version, "%Y%d%b%H%M%S")
         now = datetime.datetime.now()
-        currYearDatetime = yearlessDatetime.replace(year=now.year)
+
+        def replaceYear(year):
+            # Step back a year at a time until this succeeds, to cope with 29 Feb not
+            # existing in every year.
+            while True:
+                try:
+                    return yearlessDatetime.replace(year=year)
+                except ValueError:
+                    year -= 1
+
+        currYearDatetime = replaceYear(now.year)
         if currYearDatetime > now:
-            return currYearDatetime.replace(year=now.year - 1)
-        else:
-            return currYearDatetime
+            return replaceYear(now.year - 1)
+        return currYearDatetime
 
     def checkSanity(self, app):
         if self.errorMessage:  # We failed already, basically

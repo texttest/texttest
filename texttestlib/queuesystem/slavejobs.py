@@ -133,7 +133,8 @@ class SocketResponder(plugins.Responder, plugins.Observable):
             if not self.connect(sendSocket):
                 return self.notify("NoMoreExtraTests")
             try:
-                response = self.sendData(sendSocket, fullData)
+                # File-push requests are line-delimited; other requests contain a self-delimiting pickle.
+                response = self.sendData(sendSocket, fullData, responseMethod is None)
                 return responseMethod(response, *args) if responseMethod else True
             except socket.error as e:
                 plugins.log.info("Failed to communicate with master process - waiting " +
@@ -147,9 +148,10 @@ class SocketResponder(plugins.Responder, plugins.Observable):
         plugins.log.info(message.strip())
         self.notify("NoMoreExtraTests")
 
-    def sendData(self, sendSocket, fullData):
+    def sendData(self, sendSocket, fullData, waitForRequestEnd=False):
         sendSocket.sendall(fullData)
-        sendSocket.shutdown(socket.SHUT_WR)
+        if waitForRequestEnd:
+            sendSocket.shutdown(socket.SHUT_WR)
         if self.synchFiles:
             # Remote socket, possibly firewalls that kill connections, possibly other things. Use timeout and be prepared to retry...
             # TCP timeout is typically 30 seconds, give up a bit before that

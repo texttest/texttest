@@ -133,8 +133,9 @@ class SocketResponder(plugins.Responder, plugins.Observable):
             if not self.connect(sendSocket):
                 return self.notify("NoMoreExtraTests")
             try:
-                # File-push requests are line-delimited; other requests contain a self-delimiting pickle.
-                response = self.sendData(sendSocket, fullData, responseMethod is None)
+                # CaptureMock uses EOF to delimit intercepted TCP requests.
+                waitForRequestEnd = responseMethod is None or bool(os.getenv("CAPTUREMOCK_SERVER"))
+                response = self.sendData(sendSocket, fullData, waitForRequestEnd)
                 return responseMethod(response, *args) if responseMethod else True
             except socket.error as e:
                 plugins.log.info("Failed to communicate with master process - waiting " +

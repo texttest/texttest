@@ -27,6 +27,8 @@ class Ec2Machine:
         self.remoteProcessInfo = {}
         self.remoteProcessInfoLock = Lock()
         self.thread = Thread(target=self.runThread)
+        self.threadLock = Lock()
+        self.stopRequested = False
         self.thread.setName("Machine_" + self.ip)
         self.startWaitCounter = 0
         self.diag = logging.getLogger("Ec2Machine")
@@ -133,9 +135,12 @@ class Ec2Machine:
     def cleanup(self, processes):
         # Return whether we are still using the machine in some way
         # i.e. if our thread is running or any of our processes are
-        if self.thread.is_alive():
-            self.queue.put((None, None))
-            return True
+        with self.threadLock:
+            if self.thread.is_alive():
+                if not self.stopRequested:
+                    self.queue.put((None, None))
+                    self.stopRequested = True
+                return True
 
         for localPid, _ in list(self.remoteProcessInfo.values()):
             if localPid in processes:
@@ -150,21 +155,27 @@ class Ec2Machine:
     def submitSlave(self, submitter, cmdArgs, slaveEnv, *args):
         jobId = self.getNextJobId()
         self.remoteProcessInfo[jobId] = None, None
-        if not self.thread.is_alive():
-            if self.startMethod:
-                self.diag.info("Starting EC2 instance with private IP address '" + self.ip + "'...")
-                try:
-                    self.startMethod()
-                except Exception as e:
-                    sys.stderr.write("WARNING: failed to start instance with private IP address '" +
-                                     self.ip + "'\n" + str(e))
-                    return
-                self.startMethod = self.waitForStart
-
-            self.thread.start()
         argsWithEnv = self.getCommandArgsWithEnvironment(cmdArgs, slaveEnv)
         remoteCmdArgs = self.app.getCommandArgsOn(self.fullMachine, argsWithEnv, agentForwarding=True)
-        self.queue.put((jobId, plugins.Callable(submitter, remoteCmdArgs, slaveEnv, *args)))
+        with self.threadLock:
+            if self.stopRequested:
+                self.thread.join()
+                self.thread = Thread(target=self.runThread)
+                self.thread.setName("Machine_" + self.ip)
+                self.stopRequested = False
+            if not self.thread.is_alive():
+                if self.startMethod:
+                    self.diag.info("Starting EC2 instance with private IP address '" + self.ip + "'...")
+                    try:
+                        self.startMethod()
+                    except Exception as e:
+                        sys.stderr.write("WARNING: failed to start instance with private IP address '" +
+                                         self.ip + "'\n" + str(e))
+                        return
+                    self.startMethod = self.waitForStart
+
+                self.thread.start()
+            self.queue.put((jobId, plugins.Callable(submitter, remoteCmdArgs, slaveEnv, *args)))
         return jobId
 
     def killRemoteProcess(self, jobId, sig):

@@ -567,6 +567,28 @@ class RerunTests(RunningAction, guiplugins.ActionDialogGUI):
     def startedFromDynamicGui(self, app):
         return not app.useStaticGUI() and not "dynamic_run" in os.path.basename(self.getLogRootDirectory(app))
 
+    def getExtraParent(self, app):
+        for other in self.validApps:
+            if app in other.extras:
+                return other
+
+    def getExtraVersions(self, app):
+        if app.extras or any((v.startswith("copy_") for v in app.versions)):
+            return []
+        extraParent = self.getExtraParent(app)
+        if extraParent:
+            return [v for v in app.versions if v not in extraParent.versions]
+        else:
+            extrasGiven = app.getConfigValue("extra_version")
+            return [v for v in app.versions if v in extrasGiven]
+
+    def getAppIdentifier(self, app):
+        if self.getVersionString():
+            versions = self.getExtraVersions(app)
+        else:
+            versions = [v for v in app.versions if not v.startswith("copy_")]
+        return ".".join([app.name] + versions)
+
     def checkTestRun(self, errFile, testSel, filterFile, usecase):
         # Don't do anything with the files, but do produce popups on failures and notify when complete
         self.checkErrorFile(errFile, testSel, usecase)

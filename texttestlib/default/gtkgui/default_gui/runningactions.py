@@ -583,8 +583,11 @@ class RerunTests(RunningAction, guiplugins.ActionDialogGUI):
             return [v for v in app.versions if v in extrasGiven]
 
     def getAppIdentifier(self, app):
-        parts = [app.name] + self.getExtraVersions(app)
-        return ".".join(parts)
+        if self.getVersionString():
+            versions = self.getExtraVersions(app)
+        else:
+            versions = [v for v in app.versions if not v.startswith("copy_")]
+        return ".".join([app.name] + versions)
 
     def checkTestRun(self, errFile, testSel, filterFile, usecase):
         # Don't do anything with the files, but do produce popups on failures and notify when complete

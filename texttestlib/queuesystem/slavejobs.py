@@ -133,7 +133,9 @@ class SocketResponder(plugins.Responder, plugins.Observable):
             if not self.connect(sendSocket):
                 return self.notify("NoMoreExtraTests")
             try:
-                response = self.sendData(sendSocket, fullData)
+                # CaptureMock uses EOF to delimit intercepted TCP requests.
+                signalEndOfRequest = responseMethod is None or bool(os.getenv("CAPTUREMOCK_SERVER"))
+                response = self.sendData(sendSocket, fullData, signalEndOfRequest)
                 return responseMethod(response, *args) if responseMethod else True
             except socket.error as e:
                 plugins.log.info("Failed to communicate with master process - waiting " +
@@ -147,9 +149,10 @@ class SocketResponder(plugins.Responder, plugins.Observable):
         plugins.log.info(message.strip())
         self.notify("NoMoreExtraTests")
 
-    def sendData(self, sendSocket, fullData):
+    def sendData(self, sendSocket, fullData, signalEndOfRequest=False):
         sendSocket.sendall(fullData)
-        sendSocket.shutdown(socket.SHUT_WR)
+        if signalEndOfRequest:
+            sendSocket.shutdown(socket.SHUT_WR)
         if self.synchFiles:
             # Remote socket, possibly firewalls that kill connections, possibly other things. Use timeout and be prepared to retry...
             # TCP timeout is typically 30 seconds, give up a bit before that

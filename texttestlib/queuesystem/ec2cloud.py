@@ -8,7 +8,7 @@ import os
 import sys
 from texttestlib import plugins
 from texttestlib.utils import getPortListenErrorCode, getUserName
-from threading import Thread, Lock
+from threading import Thread, Lock, current_thread
 from queue import Queue
 from fnmatch import fnmatch
 
@@ -27,6 +27,10 @@ class Ec2Machine:
         self.remoteProcessInfo = {}
         self.remoteProcessInfoLock = Lock()
         self.thread = Thread(target=self.runThread)
+        self.threadLock = Lock()
+        self.workerRunning = False
+        self.stopRequested = False
+        self.synchronised = False
         self.thread.setName("Machine_" + self.ip)
         self.startWaitCounter = 0
         self.diag = logging.getLogger("Ec2Machine")
@@ -99,31 +103,46 @@ class Ec2Machine:
                 time.sleep(1)
 
     def runThread(self):
-        if self.startMethod:
-            self.startMethod()  # should be self.waitForStart that is called here, not instance.start. Don't use boto methods in a thread!
-
-        if self.errorMessage:
-            return
         try:
-            self.diag.info("Synchronising files with EC2 instance with private IP address '" + self.ip + "'...")
-            self.synchronise()
-        except plugins.TextTestError as e:
-            self.errorMessage = "Failed to synchronise files with EC2 instance with private IP address '" + self.ip + "'\n" + \
-                "Intended usage is to start an ssh-agent, and add the keypair for this instance to it, in your shell before starting TextTest from it.\n\n(" + str(
-                    e) + ")\n"
+            if not self.synchronised:
+                if self.startMethod:
+                    self.startMethod()  # should be self.waitForStart that is called here, not instance.start. Don't use boto methods in a thread!
 
-        if self.errorMessage:
-            return
+                if self.errorMessage:
+                    return
+                try:
+                    self.diag.info("Synchronising files with EC2 instance with private IP address '" + self.ip + "'...")
+                    self.synchronise()
+                    self.synchronised = True
+                except plugins.TextTestError as e:
+                    self.errorMessage = "Failed to synchronise files with EC2 instance with private IP address '" + self.ip + "'\n" + \
+                        "Intended usage is to start an ssh-agent, and add the keypair for this instance to it, in your shell before starting TextTest from it.\n\n(" + str(
+                            e) + ")\n"
 
-        while True:
-            self.diag.info("Waiting for new job for IP '" + self.ip + "'...")
-            jobId, submitCallable = self.queue.get()
-            if jobId is None:
-                self.diag.info("No more tests for IP '" + self.ip + "', exiting.")
-                return
-            self.diag.info("Got job with ID " + jobId)
-            localPid = self.doSubmit(submitCallable)
-            self.setLocalProcessId(jobId, localPid)
+                if self.errorMessage:
+                    return
+
+            while True:
+                self.diag.info("Waiting for new job for IP '" + self.ip + "'...")
+                jobId, submitCallable = self.queue.get()
+                if jobId is None:
+                    with self.threadLock:
+                        shouldStop = self.stopRequested
+                        if shouldStop:
+                            self.workerRunning = False
+                            self.stopRequested = False
+                    if shouldStop:
+                        self.diag.info("No more tests for IP '" + self.ip + "', exiting.")
+                        return
+                    continue
+                self.diag.info("Got job with ID " + jobId)
+                localPid = self.doSubmit(submitCallable)
+                self.setLocalProcessId(jobId, localPid)
+        finally:
+            with self.threadLock:
+                if self.thread is current_thread():
+                    self.workerRunning = False
+                    self.stopRequested = False
 
     def doSubmit(self, submitCallable):
         with self.subprocessLock:
@@ -133,8 +152,14 @@ class Ec2Machine:
     def cleanup(self, processes):
         # Return whether we are still using the machine in some way
         # i.e. if our thread is running or any of our processes are
-        if self.thread.is_alive():
-            self.queue.put((None, None))
+        with self.threadLock:
+            if self.workerRunning:
+                if not self.stopRequested:
+                    self.queue.put((None, None))
+                    self.stopRequested = True
+                return True
+
+        if not self.remoteProcessInfo:
             return True
 
         for localPid, _ in list(self.remoteProcessInfo.values()):
@@ -150,21 +175,26 @@ class Ec2Machine:
     def submitSlave(self, submitter, cmdArgs, slaveEnv, *args):
         jobId = self.getNextJobId()
         self.remoteProcessInfo[jobId] = None, None
-        if not self.thread.is_alive():
-            if self.startMethod:
-                self.diag.info("Starting EC2 instance with private IP address '" + self.ip + "'...")
-                try:
-                    self.startMethod()
-                except Exception as e:
-                    sys.stderr.write("WARNING: failed to start instance with private IP address '" +
-                                     self.ip + "'\n" + str(e))
-                    return
-                self.startMethod = self.waitForStart
-
-            self.thread.start()
         argsWithEnv = self.getCommandArgsWithEnvironment(cmdArgs, slaveEnv)
         remoteCmdArgs = self.app.getCommandArgsOn(self.fullMachine, argsWithEnv, agentForwarding=True)
-        self.queue.put((jobId, plugins.Callable(submitter, remoteCmdArgs, slaveEnv, *args)))
+        with self.threadLock:
+            self.stopRequested = False
+            if not self.workerRunning:
+                if self.startMethod and not self.synchronised:
+                    self.diag.info("Starting EC2 instance with private IP address '" + self.ip + "'...")
+                    try:
+                        self.startMethod()
+                    except Exception as e:
+                        sys.stderr.write("WARNING: failed to start instance with private IP address '" +
+                                         self.ip + "'\n" + str(e))
+                        return
+                    self.startMethod = self.waitForStart
+
+                self.thread = Thread(target=self.runThread)
+                self.thread.setName("Machine_" + self.ip)
+                self.workerRunning = True
+                self.thread.start()
+            self.queue.put((jobId, plugins.Callable(submitter, remoteCmdArgs, slaveEnv, *args)))
         return jobId
 
     def killRemoteProcess(self, jobId, sig):

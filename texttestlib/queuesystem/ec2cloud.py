@@ -127,7 +127,7 @@ class Ec2Machine:
                 jobId, submitCallable = self.queue.get()
                 if jobId is None:
                     with self.threadLock:
-                        shouldStop = self.stopRequested
+                        shouldStop = self.stopRequested and self.queue.empty()
                         if shouldStop:
                             self.workerRunning = False
                             self.stopRequested = False

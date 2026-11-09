@@ -1114,7 +1114,7 @@ class Config:
         return self.expandCheckout(checkout, app)
 
     def expandCheckout(self, checkout, app):
-        if os.path.isabs(checkout):
+        if plugins.isAbsolutePath(checkout):
             return os.path.normpath(checkout)
         checkoutLocations = app.getCompositeConfigValue("checkout_location", checkout, expandVars=False)
         checkoutLocations.append(os.getcwd())

@@ -949,6 +949,12 @@ def hostsMatch(hostname, localhost):
         return parts[0] == localhost
 
 
+# Since Python 3.13, os.path.isabs on Windows rejects paths with exactly one leading slash.
+# Such paths may refer to a remote (POSIX) machine, so we still need to treat them as absolute
+def isAbsolutePath(path):
+    return os.path.isabs(path) or (os.name == "nt" and path.startswith("/"))
+
+
 # Hacking around os.path.getcwd not working with AMD automounter
 def abspath(path):
     if "PWD" in os.environ:

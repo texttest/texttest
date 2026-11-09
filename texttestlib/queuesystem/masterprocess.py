@@ -19,7 +19,6 @@ from texttestlib.default.knownbugs import CheckForBugs
 from texttestlib.default.actionrunner import BaseActionRunner
 from texttestlib.default.performance import getTestPerformance
 from glob import glob
-from locale import getpreferredencoding
 
 plugins.addCategory("abandoned", "abandoned", "were abandoned")
 
@@ -321,7 +320,7 @@ class QueueSystemServer(BaseActionRunner):
             serverAddress = (host, int(port))
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.connect(serverAddress)
-            sock.sendall(("SUT_SERVER:" + state + "\n").encode(getpreferredencoding()))
+            sock.sendall(("SUT_SERVER:" + state + "\n").encode("utf-8"))
             sock.close()
 
     def getTestForRunNormalMode(self, block):
@@ -954,7 +953,7 @@ class TestSubmissionRules(SubmissionRules):
 
 class SlaveRequestHandler(StreamRequestHandler):
     def handle(self):
-        identifier = str(self.rfile.readline().strip(), getpreferredencoding())
+        identifier = str(self.rfile.readline().strip(), "utf-8")
         if identifier == "TERMINATE_SERVER":
             return
 
@@ -963,7 +962,7 @@ class SlaveRequestHandler(StreamRequestHandler):
     def handleMessage(self, identifier):
         # Don't use port, it changes all the time
         identifier, sendFiles, getFiles, tryReuse, rerun = parseIdentifier(identifier)
-        testString = str(self.rfile.readline().strip(), getpreferredencoding())
+        testString = str(self.rfile.readline().strip(), "utf-8")
         test = self.server.getTest(testString)
         if test is None:
             clientHost = self.client_address[0]
@@ -994,7 +993,7 @@ class SlaveRequestHandler(StreamRequestHandler):
             return ipAddress
 
     def pushFiles(self, test):
-        encoding = getpreferredencoding()
+        encoding = "utf-8"
         userAndHost = str(self.rfile.readline().strip(), encoding)
         paths = []
         for line in self.rfile:
@@ -1006,7 +1005,7 @@ class SlaveRequestHandler(StreamRequestHandler):
         if newTest:
             response = socketSerialise(newTest)
             self.server.diag.info("Sending reuse response " + response)
-            self.wfile.write(response.encode(getpreferredencoding()))
+            self.wfile.write(response.encode("utf-8"))
 
     def handleRequestFromHost(self, test, pid, tryReuse, rerun):
         # The updates are only for testing against old slave traffic,
@@ -1086,7 +1085,7 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
         self.terminate = True
         sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sendSocket.connect(self.socket.getsockname())
-        sendSocket.sendall("TERMINATE_SERVER\n".encode(getpreferredencoding()))
+        sendSocket.sendall("TERMINATE_SERVER\n".encode("utf-8"))
         sendSocket.close()
 
     def getAddress(self):

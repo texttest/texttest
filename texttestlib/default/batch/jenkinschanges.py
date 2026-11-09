@@ -10,7 +10,6 @@ from collections import OrderedDict
 from glob import glob
 from pprint import pprint
 from xml.parsers.expat import ExpatError
-from locale import getpreferredencoding
 
 
 class AbortedException(RuntimeError):
@@ -116,13 +115,13 @@ class FingerprintVerifier:
     def getCachedFingerprint(self, jobName, buildName):
         cacheFileName = self.getCacheFileName(jobName, buildName)
         if os.path.isfile(cacheFileName):
-            return eval(open(cacheFileName).read())
+            return eval(open(cacheFileName, encoding="utf-8", errors="replace").read())
 
     def writeCache(self, jobName, buildName, updatedHashes):
         cacheFileName = self.getCacheFileName(jobName, buildName)
         from texttestlib import plugins
         plugins.ensureDirExistsForFile(cacheFileName)
-        with open(cacheFileName, "w") as f:
+        with open(cacheFileName, "w", encoding="utf-8") as f:
             pprint(updatedHashes, f)
 
     def md5sum(self, filename):
@@ -256,7 +255,7 @@ class ChangeSetFinder:
         # intended in this day and age. It's not clear why this is
         # needed, a standalone python program reading the same file
         # have no issues.
-        with open(fileName) as changelog:
+        with open(fileName, encoding="utf-8", errors="replace") as changelog:
             for line in changelog:
                 if "<" in line and "@" in line:
                     author = self.parseAuthor(line.split(": ")[-1])
@@ -290,7 +289,7 @@ class ChangeSetFinder:
 
     def parseAuthor(self, author):
         if isinstance(author, bytes):
-            author = str(author, locale.getpreferredencoding())
+            author = str(author, "utf-8", "replace")
 
         withoutEmail = author.split("<")[0].strip().split("@")[0]
         if "." in withoutEmail:
@@ -305,7 +304,7 @@ class ChangeSetFinder:
                       + str(locale.getdefaultlocale()) + ") due to:\n",
                       exception, "\nIgnoring this entry")
                 return None
-            return str(withoutEmail, locale.getpreferredencoding())
+            return str(withoutEmail, "ascii")
 
     def addUnique(self, items, newItems):
         for newItem in newItems:

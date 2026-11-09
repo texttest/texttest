@@ -2,7 +2,6 @@
 """ Base class for all the queue system implementations """
 
 import subprocess, os, sys
-from locale import getpreferredencoding
 from texttestlib import plugins
 
 
@@ -17,7 +16,7 @@ class QueueSystem(object):
         try:
             process = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                        cwd=logDir, env=self.getSlaveEnvironment(slaveEnv),
-                                       encoding=getpreferredencoding(), startupinfo=plugins.getHideStartUpInfo())
+                                       encoding=plugins.getLocaleEncoding(), startupinfo=plugins.getHideStartUpInfo())
             stdout, stderr = process.communicate()
             errorMessage = self.findErrorMessage(stderr, cmdArgs, jobType)
         except OSError:

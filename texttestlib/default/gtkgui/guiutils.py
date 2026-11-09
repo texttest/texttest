@@ -6,7 +6,6 @@ called from anywhere in the gtkgui package
 import os
 import sys
 import operator
-import locale
 from texttestlib import plugins
 from copy import copy
 from functools import reduce
@@ -37,49 +36,6 @@ def createApplicationEvent(name, category, **kw):
 
 
 guiConfig = None
-
-
-class Utf8Converter:
-    langVars = ('LC_ALL', 'LC_CTYPE', 'LANG', 'LANGUAGE')
-
-    def __init__(self):
-        self.encodings = self.getEncodings()
-
-    def getEncodings(self):
-        encodings = ['utf-8']
-        localeEncoding = locale.getdefaultlocale()[1]
-        if localeEncoding and not localeEncoding in encodings:
-            encodings.insert(0, localeEncoding)
-        return encodings
-
-    def convert(self, text, extraEncodingLookup=None):
-        unicodeInfo = self.decodeText(text, extraEncodingLookup)
-        return unicodeInfo.encode('utf-8', 'replace')
-
-    def getExtraEncodings(self, extraEncodingLookup):
-        # Calling undocumented method to save copying it, best not to crash if it has been renamed.
-        # Don't do this on Windows, the variables concerned don't apply there anyway
-        if extraEncodingLookup and os.name != "nt" and hasattr(locale, "_parse_localename"):
-            # Copied from locale.getdefaultlocale, would be nice if we could actually call this code
-            for variable in self.langVars:
-                localename = extraEncodingLookup(variable)
-                if localename:
-                    if variable == 'LANGUAGE':
-                        localename = localename.split(':')[0]
-                    extraEncoding = locale._parse_localename(localename)[1]
-                    if extraEncoding and extraEncoding not in self.encodings and extraEncoding.lower() not in self.encodings:
-                        return [extraEncoding]
-        return []
-
-    def decodeText(self, text, extraEncodingLookup):
-        encodingsToTry = self.encodings + self.getExtraEncodings(extraEncodingLookup)
-        for encoding in encodingsToTry:
-            try:
-                return str(text, encoding, errors="strict")
-            except Exception:
-                pass
-
-        return str(text, encodingsToTry[0], errors="replace")
 
 
 def getImageDir():

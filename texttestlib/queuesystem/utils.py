@@ -6,7 +6,6 @@ Utilities for both master and slave code
 import os
 import socket
 from texttestlib import plugins
-from locale import getpreferredencoding
 
 noReusePostfix = ".NO_REUSE"
 rerunPostfix = ".RERUN_TEST"
@@ -94,7 +93,8 @@ def directorySerialise(dirName, ignoreLinks=False):
             if not os.path.islink(path):
                 relpath = plugins.relpath(path, dirName)
                 text += fileText + " " + relpath + "\n"
-                with open(path) as f:
+                # latin-1 maps every byte to a character, so files arrive unchanged whatever their encoding
+                with open(path, encoding="latin-1") as f:
                     text += f.read()
                 if not text.endswith("\n"):
                     text += "\n"
@@ -106,7 +106,7 @@ def directorySerialise(dirName, ignoreLinks=False):
 def directoryUnserialise(rootDir, f):
     currFile = None
     for line in f:
-        lineStr = str(line, getpreferredencoding())
+        lineStr = str(line, "utf-8")
         if currFile is not None:
             if lineStr.startswith(endPrefix + fileText):
                 currFile.close()
@@ -118,6 +118,6 @@ def directoryUnserialise(rootDir, f):
                 fn = lineStr.strip().split()[-1]
                 path = os.path.join(rootDir, fn)
                 plugins.ensureDirExistsForFile(path)
-                currFile = open(path, "w")
+                currFile = open(path, "w", encoding="latin-1")
             elif lineStr.startswith(endPrefix + dirText):
                 break

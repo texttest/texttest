@@ -4,7 +4,6 @@ import os
 from collections import OrderedDict
 from .batchutils import getBatchRunName
 from string import Template
-from locale import getpreferredencoding
 from texttestlib import plugins
 from texttestlib.default.performance import getPerformance
 from xml.sax.saxutils import escape
@@ -74,7 +73,7 @@ class ExternalFormatResponder(plugins.Responder):
             else:
                 text = self.evaluate(result, "failure", writerFormat)
             testFileName = os.path.join(appResultsDir, testName + "." + fileExt)
-            with open(testFileName, "w") as f:
+            with open(testFileName, "w", encoding="utf-8") as f:
                 f.write(text)
                 
     def evaluate(self, result, outcome, writerFormat):
@@ -127,7 +126,7 @@ class ExternalFormatApplicationData:
                       execution_id=self.make_guid(),
                       test_name=test.name,
                       suite_name=self._suiteName(test),
-                      encoding=self.get_encoding(),
+                      encoding="UTF-8",
                       time=str(t),
                       start_time=startTime.isoformat(),
                       end_time=endTime.isoformat(),
@@ -146,13 +145,6 @@ class ExternalFormatApplicationData:
             result["outcome"] = result["outcome"].lower()
 
         self.testResults[test.getRelPath().replace(os.sep, ".")] = result
-
-    def get_encoding(self):
-        enc = getpreferredencoding()
-        if enc.startswith("cp"):
-            return enc.replace("cp", "windows-")
-        else:
-            return enc
 
     def formatDuration(self, duration, extFormat):
         if extFormat == "jetbrains":
@@ -201,7 +193,8 @@ class ExternalFormatApplicationData:
     def getStackTrace(self, state):
         fns = state.findComparisonsMatching("*stacktrace*")
         if len(fns) > 0:
-            return escape(open(fns[0].tmpFile).read())
+            with fns[0].getEncoding(fns[0].tmpFile).open(fns[0].tmpFile, errors="replace") as f:
+                return escape(f.read())
         else:
             return ""
                     
@@ -371,7 +364,7 @@ class ExternalFormatCollector(plugins.Responder):
         entries = {}
         summaryTags, entryTags = cls.getFormatTagInfo(extFormat)
         for fn in sourceFns:
-            with open(fn) as f:
+            with open(fn, encoding="utf-8", errors="replace") as f:
                 currTag = None
                 for rawline in f:
                     line = rawline.strip()
@@ -392,8 +385,8 @@ class ExternalFormatCollector(plugins.Responder):
                         currTag = None
 
         templateFn = sourceFns[0]
-        with open(targetFn, "w") as wf:
-            with open(templateFn) as f:
+        with open(targetFn, "w", encoding="utf-8") as wf:
+            with open(templateFn, encoding="utf-8", errors="replace") as f:
                 currTag = None
                 for rawline in f:
                     line = rawline.lstrip(" <").rstrip("/> \n")

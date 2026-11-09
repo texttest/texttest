@@ -331,7 +331,7 @@ class RunningAction(BasicRunningAction):
         tmpDir = os.path.join(writeDir, "temporary_settings")
         plugins.ensureDirectoryExists(tmpDir)
         fileName = os.path.join(tmpDir, fileType + "." + app.name + app.versionSuffix())
-        with open(fileName, "w") as f:
+        with plugins.openConfigFile(fileName, "w") as f:
             f.write(contents)
         return tmpDir
 
@@ -806,7 +806,7 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
         if self.shouldAddShortcuts():
             storytextDir = self.storytextDirs[self.currAppSelection[0]]
             self.createShortcutApps(writeDir)
-            with open(filterFileName, "a") as filterFile:
+            with plugins.openConfigFile(filterFileName, "a") as filterFile:
                 filterFile.write("appdata=shortcut\n")
                 filterFile.write(os.path.basename(storytextDir) + "\n")
         return filterFileName
@@ -854,7 +854,7 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
 
     def createConfigFile(self, app, writeDir):
         configFileName = os.path.join(writeDir, "config.shortcut")
-        with open(configFileName, "w") as configFile:
+        with plugins.openConfigFile(configFileName, "w") as configFile:
             configFile.write("executable:None\n")
             configFile.write("filename_convention_scheme:standard\n")
             configFile.write("use_case_record_mode:GUI\n")
@@ -863,7 +863,7 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
 
     def createTestSuiteFile(self, app, storyTextHome, writeDir):
         suiteFileName = os.path.join(writeDir, "testsuite.shortcut")
-        with open(suiteFileName, "w") as suiteFile:
+        with plugins.openConfigFile(suiteFileName, "w") as suiteFile:
             suiteFile.write(storyTextHome + "\n")
         return suiteFileName
 
@@ -906,7 +906,8 @@ class TestFileFilterHelper:
             os.remove(bakFileName)
         if os.path.isfile(tmpFileName):
             os.rename(tmpFileName, bakFileName)
-        with open(tmpFileName, "w") as tmpFile:
+        # The text was filtered from the file, so write it as the file is encoded
+        with plugins.getFileEncoding(fileName, test).open(tmpFileName, "w", errors="replace") as tmpFile:
             tmpFile.write(text)
 
         # Don't want people editing by mistake, remove write permissions
@@ -1142,7 +1143,7 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
                 fullPath = os.path.join(app.getDirectory(), fileName)
                 currSection = None
                 currNewLines = []
-                with open(fullPath) as f:
+                with plugins.openConfigFile(fullPath) as f:
                     for line in f:
                         if line.startswith("["):
                             currSection = self.getSectionName(line)
@@ -1157,7 +1158,7 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
                                 currNewLines = []
                             newFileLines.append(line)
 
-                with open(fullPath, "w") as f:
+                with plugins.openConfigFile(fullPath, "w") as f:
                     for line in newFileLines:
                         f.write(line)
 

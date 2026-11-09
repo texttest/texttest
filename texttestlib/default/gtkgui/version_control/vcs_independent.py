@@ -63,7 +63,7 @@ class VersionControlInterface:
     def getProcessResults(self, args, **kwargs):
         try:
             process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                       universal_newlines=True, **kwargs)
+                                       encoding=plugins.getLocaleEncoding(), errors="replace", **kwargs)
         except OSError:
             raise plugins.TextTestError("Could not run " + self.name + ": make sure you have it installed locally")
 
@@ -760,7 +760,7 @@ class FilteredDiffGUI(GenericDiffGUI):
 
     def writeTmpFile(self, text, tmpDir, fileName):
         path = os.path.join(tmpDir, fileName)
-        with open(path, "w") as f:
+        with open(path, "w", encoding=plugins.getLocaleEncoding(), errors="replace") as f:
             f.write(text)
         return path
 
@@ -775,7 +775,8 @@ class FilteredDiffGUI(GenericDiffGUI):
                 if errors:
                     self.storeResult(fileName, errors, test)
                     continue
-                proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+                proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                        encoding=plugins.getLocaleEncoding(), errors="replace")
                 output = proc.communicate()[0]
                 self.storeResult(fileName, output, test)
             shutil.rmtree(tmpDir)

@@ -637,10 +637,11 @@ class FindKnownBugs(guiplugins.ActionDialogGUI):
                 else:
                     self.removePath(bugFile)
             else:
-                parser.write(open(bugFile, "w"))
+                with plugins.openConfigFile(bugFile, "w") as f:
+                    parser.write(f)
 
         for fileName in newFileNames:
-            with open(fileName, "a") as f:
+            with plugins.openConfigFile(fileName, "a") as f:
                 newParser.write(f)
 
         applyBugsToTests(self.currTestSelection, bugMap)

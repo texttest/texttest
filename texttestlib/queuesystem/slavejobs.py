@@ -16,7 +16,6 @@ from texttestlib.default.sandbox import FindExecutionHosts, MachineInfoFinder
 from texttestlib.default.actionrunner import ActionRunner
 from texttestlib.utils import getUserName
 from pickle import dumps
-from locale import getpreferredencoding
 
 
 def importAndCallFromQueueSystem(app, *args):
@@ -123,7 +122,7 @@ class SocketResponder(plugins.Responder, plugins.Observable):
         fullData = self.getProcessIdentifier(test, sendFiles) + os.linesep + testData + os.linesep
         if sendFiles:
             fullData += directorySerialise(test.writeDirectory) + os.linesep
-        fullDataBytes = fullData.encode(getpreferredencoding()) + pickleData
+        fullDataBytes = fullData.encode("utf-8") + pickleData
         return self.sendAndInterpret(fullDataBytes, self.interpretResponse, state)
 
     def sendAndInterpret(self, fullData, responseMethod, *args):
@@ -159,7 +158,7 @@ class SocketResponder(plugins.Responder, plugins.Observable):
             sendSocket.settimeout(25)
         response = sendSocket.makefile('rb').read()
         sendSocket.close()
-        return str(response, getpreferredencoding())
+        return str(response, "utf-8")
 
     def interpretResponse(self, response, state):
         if len(response) > 0:
@@ -175,7 +174,7 @@ class SocketResponder(plugins.Responder, plugins.Observable):
                 plugins.log.info(test.getIndent() + "Fetching required test data at " + repr(path) + " ...")
             data = makeIdentifierLine(str(os.getpid()), getFiles=True) + "\n" + socketSerialise(test) + "\n" + \
                 getUserName() + "@" + getIPAddress([test]) + "\n" + "\n".join(paths)
-            self.sendAndInterpret(data.encode(getpreferredencoding()), None)  # Just wait, no response to interpret
+            self.sendAndInterpret(data.encode("utf-8"), None)  # Just wait, no response to interpret
 
 
 class SlaveActionRunner(ActionRunner):

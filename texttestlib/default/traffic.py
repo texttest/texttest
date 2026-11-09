@@ -4,7 +4,6 @@ import shutil
 import subprocess
 import sys
 from texttestlib import plugins
-from locale import getpreferredencoding
 
 class SetUpCaptureMockHandlers(plugins.Action):
     def __init__(self, recordSetting):
@@ -169,9 +168,9 @@ class ModifyTraffic(plugins.ScriptWithArgs):
             proc = subprocess.Popen(args, cwd=dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             stdout, stderr = proc.communicate()
             if len(stderr) > 0:
-                raise plugins.TextTestError("Couldn't modify traffic :\n " + str(stderr, getpreferredencoding()))
+                raise plugins.TextTestError("Couldn't modify traffic :\n " + str(stderr, plugins.getLocaleEncoding()))
             else:
-                return fullLine[:6] + str(stdout, getpreferredencoding())
+                return fullLine[:6] + str(stdout, plugins.getLocaleEncoding())
         else:
             return fullLine
 

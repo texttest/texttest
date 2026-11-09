@@ -494,7 +494,7 @@ class SaveSelection(guiplugins.ActionDialogGUI):
 
     def notifySaveSelection(self, fileName, writeCriteria=False):
         try:
-            file = open(fileName, "w")
+            file = plugins.openConfigFile(fileName, "w")
             if writeCriteria:
                 file.write(self.selectionCriteria + "\n")
             else:

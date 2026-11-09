@@ -254,7 +254,7 @@ class MailSender:
         collFile = os.path.join(app.writeDirectory, localFileName)
         self.diag.info("Adding mail report contents to " + collFile)
 
-        with plugins.openForWrite(collFile) as collateFile:
+        with plugins.openForWrite(collFile, encoding=plugins.FileEncoding("utf-8")) as collateFile:
             collateFile.write(mailContents)
             collateFile.close()
 
@@ -532,7 +532,7 @@ class SaveState(plugins.Responder):
         # Need to store teststate files for succeeded tests if we have resource pages
         if test.state.hasSucceeded() and len(test.app.getBatchConfigValue("historical_report_resources")) == 0:
             targetFile = os.path.join(targetDir, self.successFileName)
-            with open(targetFile, "a") as f:
+            with open(targetFile, "a", encoding="utf-8") as f:
                 writeSuccessLine(f, self.runPostfix, test.state)
         else:
             targetFile = os.path.join(targetDir, self.failureFileName)
@@ -561,14 +561,14 @@ class SaveState(plugins.Responder):
 
     def makeInitialRunFile(self, app, runFile):
         plugins.ensureDirExistsForFile(runFile)
-        with open(runFile, "w") as f:
+        with open(runFile, "w", encoding="utf-8") as f:
             runFileVars = CIPlatform.getInstance().getRunFileVars()
             self.addVarsToRunFile(f, runFileVars)
             f.write(repr(app) + "\n")
 
     def runAlreadyExists(self, runFile, app):
         text = repr(app)
-        with open(runFile) as f:
+        with open(runFile, encoding="utf-8", errors="replace") as f:
             for line in f:
                 if line.strip() == text:
                     return True
@@ -580,7 +580,7 @@ class SaveState(plugins.Responder):
     def registerRunName(self, repository, app):
         runFile = self.getRunFileName(repository)
         if os.path.isfile(runFile):
-            with open(runFile, "a") as f:
+            with open(runFile, "a", encoding="utf-8") as f:
                 f.write(repr(app) + "\n")
         else:
             try:
@@ -607,7 +607,7 @@ class MigrateBatchRepository(plugins.Action):
             dirname, fn = os.path.split(path)
             runTag = fn.replace("teststate_", "")
             successFile = os.path.join(dirname, self.successFileName)
-            with open(successFile, "a") as f:
+            with open(successFile, "a", encoding="utf-8") as f:
                 writeSuccessLine(f, runTag, state)
             os.remove(path)
 
@@ -766,7 +766,7 @@ class ArchiveRepository(ArchiveScript):
         appParts = set(repr(app).split("."))
         envVars, otherAppLines = [], []
         archived = False
-        with open(fullPath) as f:
+        with open(fullPath, encoding="utf-8", errors="replace") as f:
             for line in f:
                 if "=" in line:
                     envVars.append(line)
@@ -778,7 +778,7 @@ class ArchiveRepository(ArchiveScript):
                         otherAppLines.append(line)
         if archived:
             if otherAppLines:
-                with open(fullPath, "w") as f:
+                with open(fullPath, "w", encoding="utf-8") as f:
                     for line in envVars + otherAppLines:
                         f.write(line)
             else:
@@ -792,7 +792,7 @@ class ArchiveRepository(ArchiveScript):
             return ArchiveScript.archiveFile(self, fullPath, app)
         linesToKeep = []
         archived = False
-        with open(fullPath) as readFile:
+        with open(fullPath, encoding="utf-8", errors="replace") as readFile:
             for line in readFile:
                 tag = line.strip().split()[0]
                 if self.shouldArchiveGivenTag(tag, weekdays):
@@ -801,7 +801,7 @@ class ArchiveRepository(ArchiveScript):
                     linesToKeep.append(line)
 
         if archived:
-            with open(fullPath, "w") as writeFile:
+            with open(fullPath, "w", encoding="utf-8") as writeFile:
                 for line in linesToKeep:
                     writeFile.write(line)
         return archived
@@ -1292,7 +1292,7 @@ class CollectFilesResponder(plugins.Responder):
     def parseFile(self, fullname, app, totalValues):
         localName = os.path.basename(fullname)
         plugins.log.info("Found file called " + localName)
-        file = open(fullname)
+        file = open(fullname, encoding="utf-8", errors="replace")
         valuesLine = file.readline()
         runId = file.readline().strip()
         maxDays = app.getBatchConfigValue("batch_collect_max_age_days")

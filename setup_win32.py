@@ -151,7 +151,7 @@ for lib, possible_path in manually_added_libs.items():
         gtk_data_files.append((os.path.dirname(lib), [local_lib]))
 
 build_exe_options = {
-    "includes": ['gi', get_sysconfigdata_name(), 'http.cookies'] if 'mingw' in sysconfig.get_platform() else ['gi', 'http.cookies'],
+    "includes": ['gi', get_sysconfigdata_name()] if 'mingw' in sysconfig.get_platform() else ['gi'],
     "excludes": ["tkinter"],
     "packages": ["gi", "weakref", "filecmp", "certifi", "texttestlib", "yaml"],
     "include_files": get_non_python_libs(),

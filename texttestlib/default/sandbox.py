@@ -903,8 +903,15 @@ class CollateFiles(plugins.Action):
                 stdout = subprocess.PIPE
                 stderr = subprocess.STDOUT
 
+            prevProc = self.collationProc
             self.collationProc = self.runCollationScript(args, test, stdin, stdout, stderr)
             if not self.collationProc:
+                if prevProc:
+                    # An earlier script in the pipeline is already running, with its cwd in the
+                    # sandbox and the source files open. Stop it, or it will lock files on Windows.
+                    prevProc.stdout.close()
+                    killProcessAndChildren(prevProc.pid, cmd=test.getConfigValue("kill_command"))
+                    prevProc.wait()
                 if os.path.isfile(targetFile):
                     os.remove(targetFile)
                 errorMsg = "Could not find extract script '" + script + \

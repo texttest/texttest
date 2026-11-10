@@ -1423,7 +1423,9 @@ class Config:
         app.setConfigDefault("collect_traffic_python_ignore_callers", [], trafficText)
         app.setConfigDefault("collect_traffic_use_threads", "true", trafficText)
         app.setConfigDefault("collect_traffic_client_server", "false", trafficText)
-        app.setConfigDefault("file_encoding", {"default": "locale"},
+        # CaptureMock always writes its files in UTF-8
+        app.setConfigDefault("file_encoding", {"default": "locale", "externalmocks": "utf-8", "pythonmocks": "utf-8",
+                                               "httpmocks": "utf-8", "traffic": "utf-8"},
                              "Mapping of file stems to the encoding of the test's files. A byte order mark in a file overrides this")
         app.setConfigDefault("run_dependent_text", {"default": []},
                              "Mapping of patterns to remove from result files", trackFiles=True)

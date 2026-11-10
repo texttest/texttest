@@ -2,8 +2,8 @@
 Queue system module for HashiCorp Nomad (https://www.nomadproject.io).
 
 Each TextTest slave runs as a Nomad batch job with the raw_exec driver, talking to Nomad
-via its HTTP API. The standard Nomad environment variables NOMAD_ADDR (default
-http://127.0.0.1:4646) and NOMAD_TOKEN are respected.
+via its HTTP API (see nomadapi.py). The standard Nomad environment variables NOMAD_ADDR
+(default http://127.0.0.1:4646) and NOMAD_TOKEN are respected.
 
 TextTest's generic queue system settings are mapped onto Nomad concepts as follows:
 
@@ -22,73 +22,24 @@ TextTest's generic queue system settings are mapped onto Nomad concepts as follo
 The number of slaves (capacity) is how many such jobs fit on the eligible nodes of the node
 pool at once. Resource constraints are not considered when calculating this, so if they
 exclude some nodes, surplus jobs simply wait in Nomad until a slave becomes free.
+
+Nomad doesn't forward the master's environment: as with Condor, list any
+variables the slaves need in queue_system_environment. Slaves exit with a non-zero code
+when tests fail, so Nomad will show such jobs as failed.
 """
 
-import json
-import os
 import re
-import uuid
-import urllib.error
+import secrets
 import urllib.parse
-import urllib.request
 from . import gridqueuesystem
+# Not "from . import nomadapi", which bypasses the import hooks CaptureMock uses to intercept it in the self-tests
+import texttestlib.queuesystem.nomadapi as nomadapi
 from texttestlib import plugins
 
-DEFAULT_ADDRESS = "http://127.0.0.1:4646"
 DEFAULT_NODE_POOL = "default"
 TASK_NAME = "slave"
 JOB_PREFIX = "texttest-"
-REQUEST_TIMEOUT = 30
 STDERR_TAIL_BYTES = 4096
-
-
-class NomadError(Exception):
-    pass
-
-
-class NomadClient:
-    def __init__(self):
-        self.address = os.getenv("NOMAD_ADDR", DEFAULT_ADDRESS).rstrip("/")
-        self.token = os.getenv("NOMAD_TOKEN")
-
-    def get(self, path, **params):
-        return self.request("GET", path, params=params)
-
-    def request(self, method, path, body=None, params=None, parseJson=True):
-        url = self.address + path
-        if params:
-            url += "?" + urllib.parse.urlencode(params)
-        headers = {}
-        data = None
-        if body is not None:
-            data = json.dumps(body).encode("utf-8")
-            headers["Content-Type"] = "application/json"
-        if self.token:
-            headers["X-Nomad-Token"] = self.token
-        request = urllib.request.Request(url, data=data, headers=headers, method=method)
-        try:
-            response = urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT)
-            try:
-                text = response.read().decode("utf-8")
-            finally:
-                response.close()
-        except urllib.error.HTTPError as e:
-            raise NomadError(method + " " + url + " failed with HTTP status " + str(e.code) + ": " +
-                             self.readErrorBody(e))
-        except (urllib.error.URLError, OSError) as e:
-            raise NomadError("could not contact Nomad at " + self.address + ": " + str(getattr(e, "reason", e)))
-        if not parseJson:
-            return text
-        try:
-            return json.loads(text) if text else None
-        except ValueError:
-            raise NomadError("unexpected response from " + method + " " + url + ": " + text[:200])
-
-    def readErrorBody(self, error):
-        try:
-            return error.read().decode("utf-8", "replace").strip()
-        except OSError:
-            return ""
 
 
 class QueueSystem(gridqueuesystem.QueueSystem):
@@ -97,9 +48,8 @@ class QueueSystem(gridqueuesystem.QueueSystem):
     # in its own allocation directory.
     def __init__(self, testOrApp):
         self.app = getattr(testOrApp, "app", testOrApp)
-        self.client = NomadClient()
         # Identifies the jobs of this TextTest run, so that concurrent runs don't collide
-        self.runId = uuid.uuid4().hex[:8]
+        self.runId = secrets.token_hex(4)
 
     def getQueueSystemName(self):
         return "Nomad"
@@ -109,10 +59,13 @@ class QueueSystem(gridqueuesystem.QueueSystem):
 
     def getCapacity(self):
         processes = self.app.getConfigValue("queue_system_processes")
+        nodePool = self.findDefaultNodePool()
         try:
-            nodes = self.findEligibleNodes(self.findDefaultNodePool())
-        except NomadError as e:
+            nodes = self.findEligibleNodes(nodePool)
+        except nomadapi.NomadError as e:
             raise plugins.TextTestError("Cannot use Nomad: " + str(e))
+        if not nodes:
+            raise plugins.TextTestError("Cannot use Nomad: " + describeNoNodes(nodePool))
         cpu = self.getCpuRequest(nodes, processes)
         return sum((getAvailableCpu(node) // cpu for node in nodes))
 
@@ -126,7 +79,7 @@ class QueueSystem(gridqueuesystem.QueueSystem):
         return queue if queue and queue != "texttest_default" else DEFAULT_NODE_POOL
 
     def findEligibleNodes(self, nodePool, machines=[]):
-        nodes = self.client.get("/v1/nodes", resources="true")
+        nodes = nomadapi.get("/v1/nodes", resources="true")
         return [node for node in nodes if self.isEligible(node, nodePool, machines)]
 
     def isEligible(self, node, nodePool, machines):
@@ -138,8 +91,6 @@ class QueueSystem(gridqueuesystem.QueueSystem):
 
     def getCpuRequest(self, nodes, processes):
         """ CPU to request in MHz, for the given number of cores on the smallest node """
-        if not nodes:
-            return 1
         smallest = min(nodes, key=getAvailableCpu)
         cpuInfo = smallest["NodeResources"]["Cpu"]
         cores = cpuInfo.get("TotalCpuCores") or 1
@@ -148,23 +99,22 @@ class QueueSystem(gridqueuesystem.QueueSystem):
 
     def submitSlaveJob(self, cmdArgs, slaveEnv, logDir, submissionRules, jobType):
         jobId = self.makeJobId(submissionRules.getJobName())
+        nodePool = self.getNodePool(submissionRules.findQueue())
+        machines = submissionRules.findMachineList()
         try:
-            job = self.makeJob(jobId, cmdArgs, slaveEnv, submissionRules)
-            self.client.request("POST", "/v1/jobs", {"Job": job})
-        except NomadError as e:
+            nodes = self.findEligibleNodes(nodePool, machines)
+            if not nodes:
+                return None, self.getFullSubmitError(describeNoNodes(nodePool, machines), cmdArgs, jobType)
+            job = self.makeJob(jobId, cmdArgs, slaveEnv, submissionRules, nodePool, machines, nodes)
+            nomadapi.request("POST", "/v1/jobs", {"Job": job})
+        except nomadapi.NomadError as e:
             return None, self.getFullSubmitError(str(e), cmdArgs, jobType)
         return jobId, None
 
     def makeJobId(self, jobName):
         return JOB_PREFIX + self.runId + "-" + re.sub("[^A-Za-z0-9_.-]", "_", jobName)
 
-    def makeJob(self, jobId, cmdArgs, slaveEnv, submissionRules):
-        nodePool = self.getNodePool(submissionRules.findQueue())
-        machines = submissionRules.findMachineList()
-        nodes = self.findEligibleNodes(nodePool, machines)
-        if not nodes:
-            raise NomadError("no ready nodes with the raw_exec driver in node pool '" + nodePool + "'" +
-                             (" among machines " + ",".join(machines) if machines else ""))
+    def makeJob(self, jobId, cmdArgs, slaveEnv, submissionRules, nodePool, machines, nodes):
         constraints = [makeConstraint(resource) for resource in submissionRules.findResourceList()]
         if machines:
             constraints.append(makeMachineConstraint(machines))
@@ -188,8 +138,8 @@ class QueueSystem(gridqueuesystem.QueueSystem):
 
     def getStatusForAllJobs(self):
         try:
-            jobs = self.client.get("/v1/jobs", prefix=JOB_PREFIX + self.runId + "-")
-        except NomadError:
+            jobs = nomadapi.get("/v1/jobs", prefix=JOB_PREFIX + self.runId + "-")
+        except nomadapi.NomadError:
             return None  # Nomad unavailable for the moment, don't update the job status
         statusDict = {}
         for job in jobs:
@@ -202,17 +152,17 @@ class QueueSystem(gridqueuesystem.QueueSystem):
     def killJob(self, jobId):
         path = "/v1/job/" + urllib.parse.quote(jobId)
         try:
-            if self.client.get(path)["Status"] == "dead":
+            if nomadapi.get(path)["Status"] == "dead":
                 return False
-            self.client.request("DELETE", path)
+            nomadapi.request("DELETE", path)
             return True
-        except NomadError:
+        except nomadapi.NomadError:
             return False
 
     def _getJobFailureInfo(self, jobId):
         try:
-            allocations = self.client.get("/v1/job/" + urllib.parse.quote(jobId) + "/allocations")
-        except NomadError as e:
+            allocations = nomadapi.get("/v1/job/" + urllib.parse.quote(jobId) + "/allocations")
+        except nomadapi.NomadError as e:
             return "Could not get information about job " + jobId + " from Nomad: " + str(e)
         if not allocations:
             return "Nomad never placed job " + jobId + " on a node"
@@ -232,11 +182,18 @@ class QueueSystem(gridqueuesystem.QueueSystem):
 
     def getStderrTail(self, allocId):
         try:
-            return self.client.request("GET", "/v1/client/fs/logs/" + allocId, parseJson=False,
-                                       params={"task": TASK_NAME, "type": "stderr", "origin": "end",
-                                               "offset": STDERR_TAIL_BYTES, "plain": "true"})
-        except NomadError:
+            return nomadapi.request("GET", "/v1/client/fs/logs/" + allocId, parseJson=False,
+                                    params={"task": TASK_NAME, "type": "stderr", "origin": "end",
+                                            "offset": STDERR_TAIL_BYTES, "plain": "true"})
+        except nomadapi.NomadError:
             return ""
+
+
+def describeNoNodes(nodePool, machines=[]):
+    text = "no ready nodes with the raw_exec driver in node pool '" + nodePool + "'"
+    if machines:
+        text += " among machines " + ",".join(machines)
+    return text
 
 
 def getAvailableCpu(node):

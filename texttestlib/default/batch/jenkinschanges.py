@@ -4,7 +4,6 @@ import re
 import hashlib
 import time
 import codecs
-import locale
 from xml.dom.minidom import parse
 from collections import OrderedDict
 from glob import glob
@@ -295,16 +294,7 @@ class ChangeSetFinder:
         if "." in withoutEmail:
             return " ".join([part.capitalize() for part in withoutEmail.split(".")])
         else:
-            try:
-                withoutEmail = withoutEmail.encode("ascii", "xmlcharrefreplace")
-            except UnicodeDecodeError as exception:
-                print("FAILED to encode name '" + withoutEmail + "' (repr: " + repr(withoutEmail) + ", "
-                      + str(type(withoutEmail)) + ", default encoding: '"
-                      + sys.getdefaultencoding() + "', default locale: "
-                      + str(locale.getdefaultlocale()) + ") due to:\n",
-                      exception, "\nIgnoring this entry")
-                return None
-            return str(withoutEmail, "ascii")
+            return withoutEmail.encode("ascii", "xmlcharrefreplace").decode("ascii")
 
     def addUnique(self, items, newItems):
         for newItem in newItems:

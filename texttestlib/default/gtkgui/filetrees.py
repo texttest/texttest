@@ -365,7 +365,8 @@ class ApplicationFileGUI(FileViewGUI):
     def getImportedFiles(self, file, app=None):
         imports = []
         if os.path.isfile(file):
-            importLines = [l for l in open(file, "r").readlines() if l.startswith("import_config_file")]
+            with plugins.openConfigFile(file) as f:
+                importLines = [l for l in f if l.startswith("import_config_file")]
             for line in importLines:
                 try:
                     file = line.split(":")[1].strip()

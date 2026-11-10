@@ -985,7 +985,7 @@ class TestCase(Test):
         self.environment.checkPopulated()
         for var, value in list(self.properties.items()):
             propFileName = self.makeTmpFileName(var + ".properties", forComparison=0)
-            file = open(propFileName, "w")
+            file = open(propFileName, "w", encoding=plugins.getLocaleEncoding())
             for subVar, subValue in list(value.items()):
                 file.write(subVar + " = " + subValue + "\n")
 

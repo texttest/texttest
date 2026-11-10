@@ -1300,12 +1300,15 @@ class FileEncoding:
             raise TextTestError("Unknown encoding '" + name + "' found in config file setting 'file_encoding'")
         return name
 
-    def roundTripErrors(self):
+    def roundTripErrors(self, mode="r"):
         # surrogateescape preserves undecodable bytes exactly, but only works with ASCII-compatible encodings
-        return "replace" if self.name.startswith(("utf-16", "utf-32")) else "surrogateescape"
+        if self.name.startswith(("utf-16", "utf-32")):
+            return "replace"
+        else:
+            return "surrogateescape" if "r" in mode else "texttest-surrogateescape-or-replace"
 
     def open(self, path, mode="r", errors=None):
-        f = open(path, mode, encoding=self.name, errors=errors or self.roundTripErrors())
+        f = open(path, mode, encoding=self.name, errors=errors or self.roundTripErrors(mode))
         if self.hasBOM:
             if "r" in mode:
                 f.read(1)
@@ -1314,13 +1317,26 @@ class FileEncoding:
         return f
 
     def encode(self, text):
-        return text.encode(self.name, self.roundTripErrors())
+        return text.encode(self.name, self.roundTripErrors("w"))
 
 
-def openConfigFile(filename, mode="r"):
+def surrogateEscapeOrReplace(error):
+    # Writes back undecodable bytes that were read with surrogateescape, and replaces other characters
+    # the encoding can't represent, rather than failing after the file has been truncated
+    try:
+        return codecs.lookup_error("surrogateescape")(error)
+    except UnicodeError:
+        return codecs.lookup_error("replace")(error)
+
+
+codecs.register_error("texttest-surrogateescape-or-replace", surrogateEscapeOrReplace)
+
+
+def openConfigFile(filename, mode="r", errors="replace"):
     # Config files can't be governed by file_encoding, as they define it. So use the locale, unless there is a BOM
+    # Use errors="surrogateescape" when reading a file to rewrite it, so its undecodable bytes are preserved
     if "r" in mode:
-        return FileEncoding.forFile(filename).open(filename, mode, errors="replace")
+        return FileEncoding.forFile(filename).open(filename, mode, errors=errors)
     else:
         # Preserve the encoding of an existing file when rewriting it
         return openForWrite(filename, mode, FileEncoding.forFile(filename))
@@ -1336,7 +1352,7 @@ def getFileEncoding(fileName, configObj):
 
 
 def openTestDataFile(fileName, configObj, mode="r", errors=None):
-    if "r" in mode:
+    if "r" in mode or "a" in mode:
         return getFileEncoding(fileName, configObj).open(fileName, mode, errors)
     else:
         # Files TextTest creates for comparison, such as the catalogue, use the configured encoding

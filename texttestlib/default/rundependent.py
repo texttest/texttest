@@ -135,7 +135,8 @@ class FilterOnTempFile(FilterAction):
             if not os.path.isfile(origFile):
                 origFile = test.getFileName(stem)
             if origFile and os.path.isfile(origFile):
-                filters.append(FloatingPointFilter(origFile, floatTolerance, relTolerance, floatSplit))
+                encoding = plugins.getConfiguredFileEncoding(origFile, test)
+                filters.append(FloatingPointFilter(origFile, floatTolerance, relTolerance, floatSplit, encoding))
         return filters
 
 
@@ -185,14 +186,15 @@ class FilterResultRecompute(FilterOnTempFile):
 class FloatingPointFilter:
     postfix = "fpdiff"
 
-    def __init__(self, origFileName, tolerance, relative, split):
+    def __init__(self, origFileName, tolerance, relative, split, encoding="locale"):
         self.origFileName = origFileName
+        self.encoding = encoding
         self.tolerance = tolerance if tolerance else None
         self.relative = relative if relative else None
         self.split = split
 
     def filterFile(self, inFile, writeFile):
-        with plugins.FileEncoding.forFile(self.origFileName, inFile.encoding or "locale").open(self.origFileName) as f:
+        with plugins.FileEncoding.forFile(self.origFileName, self.encoding).open(self.origFileName) as f:
             fromlines = f.readlines()
         tolines = inFile.readlines()
         fpdiff.fpfilter(fromlines, tolines, writeFile, self.tolerance, self.relative, split=self.split)

@@ -397,7 +397,7 @@ class ImportTestCase(ImportTest):
         return os.path.join(testDir, name + "." + suite.app.name)
 
     def getWriteFile(self, name, suite, testDir):
-        return open(self.getWriteFileName(name, suite, testDir), "w")
+        return plugins.openConfigFile(self.getWriteFileName(name, suite, testDir), "w")
 
     def writeEnvironmentFile(self, suite, testDir):
         envDir = self.getEnvironment(suite)

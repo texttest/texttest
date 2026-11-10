@@ -610,7 +610,7 @@ class FindKnownBugs(guiplugins.ActionDialogGUI):
 
     def findBugInfo(self, bugStr):
         for bugFile in self.allKnownBugFiles:
-            parser = BugMap.makeParser(bugFile)
+            parser = BugMap.makeParser(bugFile, errors="surrogateescape")
             for section in parser.sections():
                 if (parser.has_option(section, "bug_id") and parser.get(section, "bug_id") == bugStr) or \
                    (parser.has_option(section, "brief_description") and parser.get(section, "brief_description") == bugStr):

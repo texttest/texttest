@@ -1063,7 +1063,7 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
         self.dialog.vbox.pack_start(Gtk.Separator.new(Gtk.Orientation.HORIZONTAL), False, True, 0)
         frame, self.textBuffer = self.createTextWidget("Filter Text View", scroll=True)
         frame.set_label("Text to filter (copied from " + os.path.basename(fileName) + ")")
-        with open(fileName) as f:
+        with plugins.openTestDataFile(fileName, test, errors="replace") as f:
             self.textBuffer.set_text(f.read())
         self.dialog.vbox.pack_start(frame, True, True, 0)
 
@@ -1143,7 +1143,7 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
                 fullPath = os.path.join(app.getDirectory(), fileName)
                 currSection = None
                 currNewLines = []
-                with plugins.openConfigFile(fullPath) as f:
+                with plugins.openConfigFile(fullPath, errors="surrogateescape") as f:
                     for line in f:
                         if line.startswith("["):
                             currSection = self.getSectionName(line)

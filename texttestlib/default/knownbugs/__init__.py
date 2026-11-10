@@ -314,13 +314,13 @@ class BugMap(OrderedDict):
         return parser
 
     @staticmethod
-    def makeParser(fileName):
+    def makeParser(fileName, errors="replace"):
         parser = ConfigParser()
         # Default behaviour transforms to lower case: we want case-sensitive
         parser.optionxform = lambda option: option
         try:
             if os.path.isfile(fileName):
-                with plugins.openConfigFile(fileName) as f:
+                with plugins.openConfigFile(fileName, errors=errors) as f:
                     parser.read_file(f)
             return parser
         except Exception as e:

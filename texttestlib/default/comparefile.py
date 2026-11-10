@@ -317,8 +317,11 @@ class FileComparison:
                 return self.previewGenerator.getWrappedLine(message)
 
             cmdArgs = plugins.splitcmd(self.textDiffTool) + [self.stdCmpFile, self.tmpCmpFile]
-            # The diff tool output consists of lines from the files, so decode it as they are encoded
+            # The diff tool output consists of lines from the files, so decode it as they are encoded.
+            # Except for UTF-16/32, where diff's own text (or "Binary files differ") can't be in that encoding
             encoding = self.getEncoding(self.tmpCmpFile)
+            if encoding.roundTripErrors() == "replace":
+                encoding = plugins.FileEncoding(plugins.getLocaleEncoding())
             proc = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                     encoding=encoding.name, errors="replace")
             return self.previewGenerator.getPreview(proc.stdout)

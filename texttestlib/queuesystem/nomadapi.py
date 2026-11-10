@@ -3,9 +3,12 @@ Minimal client for the HashiCorp Nomad HTTP API, used by the nomad queue system 
 
 Requests and responses are plain Python data. This is kept in its own module so that
 all traffic with Nomad can be intercepted as a whole, e.g. by CaptureMock in the self-tests.
+Import it as "import texttestlib.queuesystem.nomadapi": "from ... import" forms bypass the
+import hooks CaptureMock relies on, so the self-tests would contact Nomad for real.
 The standard Nomad environment variables NOMAD_ADDR and NOMAD_TOKEN are respected.
 """
 
+import http.client
 import json
 import os
 import urllib.error
@@ -44,10 +47,11 @@ def request(method, path, body=None, params=None, parseJson=True):
     httpRequest = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
         with urllib.request.urlopen(httpRequest, timeout=REQUEST_TIMEOUT) as response:
-            text = response.read().decode("utf-8")
+            # Log output may be cut in the middle of a character
+            text = response.read().decode("utf-8", "replace")
     except urllib.error.HTTPError as e:
         raise NomadError(method + " " + url + " failed with HTTP status " + str(e.code) + ": " + readErrorBody(e))
-    except (urllib.error.URLError, OSError) as e:
+    except (urllib.error.URLError, OSError, http.client.HTTPException) as e:
         raise NomadError("could not contact Nomad at " + address + ": " + str(getattr(e, "reason", e)))
     if not parseJson:
         return text

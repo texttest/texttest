@@ -3,8 +3,8 @@ Queue system module for HashiCorp Nomad (https://www.nomadproject.io).
 
 Each TextTest slave runs as a Nomad batch job with the raw_exec driver, talking to Nomad
 via its HTTP API (see nomadapi.py). The standard Nomad environment variables NOMAD_ADDR
-(default http://127.0.0.1:4646) and NOMAD_TOKEN are respected. Node pools need Nomad 1.6
-or later.
+(default http://127.0.0.1:4646) and NOMAD_TOKEN are respected, as are the TLS settings
+described in nomadapi.py. Node pools need Nomad 1.6 or later.
 
 TextTest's generic queue system settings are mapped onto Nomad concepts as follows:
 
@@ -73,6 +73,8 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
             raise plugins.TextTestError("Cannot use Nomad: " + str(e))
         if not nodes:
             raise plugins.TextTestError("Cannot use Nomad: " + describeNoNodes(nodePool))
+        # So that e.g. a CI pipeline can find and stop this run's jobs if the run is cancelled
+        plugins.log.info("Nomad job IDs for this run start with " + self.getJobIdPrefix())
         cpu = self.getCpuRequest(nodes, processes)
         return sum(getAvailableCpu(node) // cpu for node in nodes)
 
@@ -123,7 +125,10 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
 
     def makeJobId(self, jobName):
         number = str(next(self.jobCounter))
-        return JOB_PREFIX + self.runId + "-" + number + "-" + re.sub("[^A-Za-z0-9_.-]", "_", jobName)
+        return self.getJobIdPrefix() + number + "-" + re.sub("[^A-Za-z0-9_.-]", "_", jobName)
+
+    def getJobIdPrefix(self):
+        return JOB_PREFIX + self.runId + "-"
 
     def makeJob(self, jobId, cmdArgs, slaveEnv, submissionRules, nodePool, machines, nodes):
         constraints = [makeConstraint(resource) for setting in submissionRules.findResourceList()
@@ -151,7 +156,7 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
 
     def getStatusForAllJobs(self):
         try:
-            jobs = nomadapi.get("/v1/jobs", prefix=JOB_PREFIX + self.runId + "-")
+            jobs = nomadapi.get("/v1/jobs", prefix=self.getJobIdPrefix())
         except nomadapi.NomadError:
             return None  # Nomad unavailable for the moment, don't update the job status
         if not isinstance(jobs, list):

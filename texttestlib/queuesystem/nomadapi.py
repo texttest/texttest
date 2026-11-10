@@ -5,12 +5,17 @@ Requests and responses are plain Python data. This is kept in its own module so 
 all traffic with Nomad can be intercepted as a whole, e.g. by CaptureMock in the self-tests.
 Import it as "import texttestlib.queuesystem.nomadapi": "from ... import" forms bypass the
 import hooks CaptureMock relies on, so the self-tests would contact Nomad for real.
-The standard Nomad environment variables NOMAD_ADDR and NOMAD_TOKEN are respected.
+The standard Nomad environment variables NOMAD_ADDR and NOMAD_TOKEN are respected, as are
+NOMAD_CACERT or NOMAD_CAPATH (to trust a private certificate authority) and NOMAD_CLIENT_CERT
+with NOMAD_CLIENT_KEY (for servers that require client certificates) when using https.
+TLS 1.2 is the minimum version accepted.
 """
 
+import functools
 import http.client
 import json
 import os
+import ssl
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -46,7 +51,11 @@ def request(method, path, body=None, params=None, parseJson=True):
         headers["X-Nomad-Token"] = token
     httpRequest = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(httpRequest, timeout=REQUEST_TIMEOUT) as response:
+        context = getSslContext(*getTlsSettings()) if url.startswith("https:") else None
+    except (OSError, ValueError) as e:  # e.g. a missing certificate file, or a client key without a certificate
+        raise NomadError("could not set up TLS for Nomad at " + address + ": " + str(e))
+    try:
+        with urllib.request.urlopen(httpRequest, timeout=REQUEST_TIMEOUT, context=context) as response:
             # Log output may be cut in the middle of a character
             text = response.read().decode("utf-8", "replace")
     except urllib.error.HTTPError as e:
@@ -66,3 +75,18 @@ def readErrorBody(error):
         return error.read().decode("utf-8", "replace").strip()
     except OSError:
         return ""
+
+
+def getTlsSettings():
+    return tuple(os.getenv(var) or None for var in ["NOMAD_CACERT", "NOMAD_CAPATH", "NOMAD_CLIENT_CERT", "NOMAD_CLIENT_KEY"])
+
+
+@functools.lru_cache(maxsize=None)
+def getSslContext(caFile, caPath, clientCert, clientKey):
+    context = ssl.create_default_context(cafile=caFile, capath=caPath)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    if clientCert:
+        context.load_cert_chain(clientCert, clientKey)
+    elif clientKey:
+        raise ValueError("NOMAD_CLIENT_KEY is set but NOMAD_CLIENT_CERT is not")
+    return context

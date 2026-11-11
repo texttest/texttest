@@ -85,14 +85,18 @@ def runXvfb(logDir, extraArgs):
     proc = subprocess.Popen(startArgs, preexec_fn=ignoreSignals,
                             stdout=open(logFile, "w"), stderr=subprocess.STDOUT, stdin=open(os.devnull))
     # TEMPORARY DEBUG (macOS VirtualServerBadArgs investigation) - remove
+    # Only does anything on macOS, and must not reap the child (so no proc.poll())
     import time, threading
     _t0 = time.time()
-    def _dbg(msg):
+    def _dbg(getMsg):
         if sys.platform == "darwin":
+            # 'ps' doesn't reap the child, so its state (e.g. Z for zombie) is safe to inspect
+            childState = subprocess.run(["ps", "-o", "stat=", "-p", str(proc.pid)],
+                                        capture_output=True, text=True).stdout.strip()
             with open("startXvfb_debug.log", "a") as f:
-                f.write("%.3f pid=%d %s\n" % (time.time() - _t0, os.getpid(), msg))
-    _dbg("python " + sys.version.replace("\n", " ") + " args=" + repr(startArgs) +
-         " Xvfb_ready=" + repr(Xvfb_ready) + " child_poll=" + repr(proc.poll()) +
+                f.write("%.3f pid=%d child_state=%r %s\n" % (time.time() - _t0, os.getpid(), childState, getMsg()))
+    _dbg(lambda: "python " + sys.version.replace("\n", " ") + " args=" + repr(startArgs) +
+         " Xvfb_ready=" + repr(Xvfb_ready) +
          " threads=" + repr([t.name for t in threading.enumerate()]) +
          " SIGCHLD=" + repr(signal.getsignal(signal.SIGCHLD)) + " SIGINT=" + repr(signal.getsignal(signal.SIGINT)))
     try:
@@ -101,20 +105,20 @@ def runXvfb(logDir, extraArgs):
         if not Xvfb_ready:
             signal.alarm(int(os.getenv("TEXTTEST_XVFB_WAIT", 15)))  # Time to wait for Xvfb to set up connections
             signal.pause()
-            _dbg("pause() RETURNED NORMALLY child_poll=" + repr(proc.poll()))
+            _dbg(lambda: "pause() RETURNED NORMALLY")
         else:
-            _dbg("Xvfb_ready already set before pause, child_poll=" + repr(proc.poll()))
+            _dbg(lambda: "Xvfb_ready already set before pause")
     except ConnectionTimeout:
-        _dbg("ConnectionTimeout (SIGALRM) child_poll=" + repr(proc.poll()))
+        _dbg(lambda: "ConnectionTimeout (SIGALRM)")
         # Kill it and tell TextTest we timed out. It will then start a new startXvfb.py process, with a new process ID
         # that will hopefully work better
         os.kill(proc.pid, signal.SIGTERM)
         return writeAndWait("Time Out!", proc, displayNum)
     except ConnectionComplete:
-        _dbg("ConnectionComplete (SIGUSR1) child_poll=" + repr(proc.poll()))
+        _dbg(lambda: "ConnectionComplete (SIGUSR1)")
         signal.alarm(0)  # cancel any alarms that were previously set up!
     except BaseException as e:
-        _dbg("other exception " + repr(e))
+        _dbg(lambda: "other exception " + repr(e))
         raise
 
     writeAndWait(displayNum + "," + str(proc.pid), proc, displayNum)

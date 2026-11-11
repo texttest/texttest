@@ -39,6 +39,14 @@ def connectionFailed(self, *args):
     raise ConnectionTimeout()
 
 
+class XvfbExited(BaseException):
+    pass
+
+
+def xvfbExited(self, *args):
+    raise XvfbExited()
+
+
 def ignoreSignals():
     for signum in [signal.SIGUSR1, signal.SIGUSR2, signal.SIGXCPU]:
         signal.signal(signum, signal.SIG_IGN)
@@ -84,44 +92,36 @@ def runXvfb(logDir, extraArgs):
     startArgs = ["Xvfb", "-ac"] + extraArgs + ["-audit", "2", ":" + displayNum]
     proc = subprocess.Popen(startArgs, preexec_fn=ignoreSignals,
                             stdout=open(logFile, "w"), stderr=subprocess.STDOUT, stdin=open(os.devnull))
-    # TEMPORARY DEBUG (macOS VirtualServerBadArgs investigation) - remove
-    # Only does anything on macOS, and must not reap the child (so no proc.poll())
-    import time, threading
-    _t0 = time.time()
-    def _dbg(getMsg):
-        if sys.platform == "darwin":
-            # 'ps' doesn't reap the child, so its state (e.g. Z for zombie) is safe to inspect
-            childState = subprocess.run(["ps", "-o", "stat=", "-p", str(proc.pid)],
-                                        capture_output=True, text=True).stdout.strip()
-            with open("startXvfb_debug.log", "a") as f:
-                f.write("%.3f pid=%d child_state=%r %s\n" % (time.time() - _t0, os.getpid(), childState, getMsg()))
-    _dbg(lambda: "python " + sys.version.replace("\n", " ") + " args=" + repr(startArgs) +
-         " Xvfb_ready=" + repr(Xvfb_ready) +
-         " threads=" + repr([t.name for t in threading.enumerate()]) +
-         " SIGCHLD=" + repr(signal.getsignal(signal.SIGCHLD)) + " SIGINT=" + repr(signal.getsignal(signal.SIGINT)))
+    started = True
     try:
         signal.signal(signal.SIGUSR1, connectionComplete)
         signal.signal(signal.SIGALRM, connectionFailed)
+        # If Xvfb exits before it's ready, it isn't going to start: don't wait for the timeout
+        signal.signal(signal.SIGCHLD, xvfbExited)
         if not Xvfb_ready:
             signal.alarm(int(os.getenv("TEXTTEST_XVFB_WAIT", 15)))  # Time to wait for Xvfb to set up connections
-            signal.pause()
-            _dbg(lambda: "pause() RETURNED NORMALLY")
-        else:
-            _dbg(lambda: "Xvfb_ready already set before pause")
-    except ConnectionTimeout:
-        _dbg(lambda: "ConnectionTimeout (SIGALRM)")
-        # Kill it and tell TextTest we timed out. It will then start a new startXvfb.py process, with a new process ID
-        # that will hopefully work better
-        os.kill(proc.pid, signal.SIGTERM)
-        return writeAndWait("Time Out!", proc, displayNum)
+            # pause() can return without any of our handlers having raised (on macOS it does so when Xvfb exits),
+            # so keep waiting until something definite happens. Also catches Xvfb exiting before the SIGCHLD handler was set.
+            while proc.poll() is None:
+                signal.pause()
+            raise XvfbExited()
+    except (ConnectionTimeout, XvfbExited):
+        started = False
     except ConnectionComplete:
-        _dbg(lambda: "ConnectionComplete (SIGUSR1)")
+        pass
+    finally:
+        # Our handlers must not fire from now on: Xvfb exiting later is handled by TextTest
+        signal.signal(signal.SIGCHLD, signal.SIG_DFL)
         signal.alarm(0)  # cancel any alarms that were previously set up!
-    except BaseException as e:
-        _dbg(lambda: "other exception " + repr(e))
-        raise
+        ignoreSignals()
 
-    writeAndWait(displayNum + "," + str(proc.pid), proc, displayNum)
+    if started:
+        writeAndWait(displayNum + "," + str(proc.pid), proc, displayNum)
+    else:
+        # Kill it if needed and tell TextTest we timed out. It will then start a new startXvfb.py process,
+        # with a new process ID that will hopefully work better
+        proc.terminate()  # does nothing if it has already exited
+        writeAndWait("Time Out!", proc, displayNum)
 
 
 if __name__ == "__main__":

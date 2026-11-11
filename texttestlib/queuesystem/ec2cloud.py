@@ -6,6 +6,7 @@ import errno
 import time
 import os
 import sys
+import subprocess
 from texttestlib import plugins
 from texttestlib.utils import getPortListenErrorCode, getUserName
 from threading import Thread, Lock, current_thread
@@ -307,6 +308,9 @@ class QueueSystem(local.QueueSystem):
 
     def cleanup(self, final=False):
         if final:
+            # Results arrive over the socket before the ssh processes exit, so they may still be running.
+            # Give them a chance to finish, so we don't leave orphaned ssh processes behind.
+            self.waitForLocalProcesses()
             # Processes might not be quite terminated, so we just hardcode that we release everything anyway
             self.releaseOwnership(self.machines)
         else:
@@ -320,6 +324,17 @@ class QueueSystem(local.QueueSystem):
             self.machines = usedMachines
             self.releasedMachines = unusedMachines
         return False  # Submission is not really complete, as it happens in threads
+
+    def waitForLocalProcesses(self, timeout=10):
+        deadline = time.time() + timeout
+        for proc in list(self.processes.values()):
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                break
+            try:
+                proc.wait(timeout=remaining)
+            except subprocess.TimeoutExpired:
+                break
 
     def matchesTag(self, instanceTags, tagName, tagPattern):
         tagValueForInstance = instanceTags.get(tagName, "")

@@ -228,7 +228,7 @@ class FileBugData:
         else:
             self.presentList.append(bugTrigger)
 
-    def findBugs(self, fileName, execHosts, isChanged, multipleDiffs):
+    def findBugs(self, test, fileName, execHosts, isChanged, multipleDiffs):
         if not self.checkUnchanged and not isChanged:
             self.diag.info("File not changed, ignoring all bugs")
             return []
@@ -241,7 +241,9 @@ class FileBugData:
 
         self.diag.info("Looking for bugs in " + fileName)
         dirname = os.path.dirname(fileName)
-        return self.findBugsInText(open(fileName).readlines(), execHosts=execHosts, isChanged=isChanged, multipleDiffs=multipleDiffs, tmpDir=dirname)
+        with plugins.openTestDataFile(fileName, test, errors="replace") as f:
+            lines = f.readlines()
+        return self.findBugsInText(lines, execHosts=execHosts, isChanged=isChanged, multipleDiffs=multipleDiffs, tmpDir=dirname)
 
     def findBugsInText(self, lines, **kw):
         currAbsent = copy(self.absentList)
@@ -312,12 +314,14 @@ class BugMap(OrderedDict):
         return parser
 
     @staticmethod
-    def makeParser(fileName):
+    def makeParser(fileName, errors="replace"):
         parser = ConfigParser()
         # Default behaviour transforms to lower case: we want case-sensitive
         parser.optionxform = lambda option: option
         try:
-            parser.read(fileName)
+            if os.path.isfile(fileName):
+                with plugins.openConfigFile(fileName, errors=errors) as f:
+                    parser.read_file(f)
             return parser
         except Exception as e:
             plugins.printWarning("Bug file at " + fileName + " could not be parsed, ignoring\n" + str(e))
@@ -353,13 +357,14 @@ class CheckForCrashes(plugins.Action):
                 os.remove(stackTraceFile)
 
     def parseStackTrace(self, test, stackTraceFile):
-        lines = open(stackTraceFile).readlines()
+        with plugins.openTestDataFile(stackTraceFile, test, errors="replace") as f:
+            lines = f.readlines()
         if len(lines) > 2:
             return lines[0].strip(), "".join(lines[2:])
         else:
             errFile = test.makeTmpFileName("stacktrace.collate_errs", forFramework=1)
             script = test.getCompositeConfigValue("collate_script", "stacktrace")[0]
-            return "core not parsed", "The core file could not be parsed. Errors from '" + script + "' follow :\n" + open(errFile).read()
+            return "core not parsed", "The core file could not be parsed. Errors from '" + script + "' follow :\n" + plugins.openTestDataFile(errFile, test, errors="replace").read()
 
 
 class CheckForBugs(plugins.Action):
@@ -454,7 +459,7 @@ class CheckForBugs(plugins.Action):
             bugs = []
             for comp in state.findComparisonsMatching(stem):
                 isChanged = not comp.hasSucceeded()
-                bugs += fileBugData.findBugs(comp.tmpFile, state.executionHosts, isChanged, multipleDiffs)
+                bugs += fileBugData.findBugs(test, comp.tmpFile, state.executionHosts, isChanged, multipleDiffs)
             return bugs
         return []
 
@@ -534,11 +539,11 @@ class MigrateFiles(plugins.Action):
 
     def updateFile(self, bugFileName, parser):
         newBugFileName = bugFileName + ".new"
-        newBugFile = open(newBugFileName, "w")
+        newBugFile = plugins.openConfigFile(newBugFileName, "w")
         self.writeNew(parser, newBugFile)
         newBugFile.close()
-        print("Old File:\n" + open(bugFileName).read())
-        print("New File:\n" + open(newBugFileName).read())
+        print("Old File:\n" + plugins.openConfigFile(bugFileName).read())
+        print("New File:\n" + plugins.openConfigFile(newBugFileName).read())
         shutil.move(newBugFileName, bugFileName)
 
     def writeNew(self, parser, newBugFile):

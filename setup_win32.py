@@ -51,7 +51,7 @@ def get_non_python_libs():
     if 'mingw' in sysconfig.get_platform():
         # dll imported by dll dependencies expected to be auto-resolved later
         inst_root = [os.path.join(local_bin, 'libgtksourceview-4-0.dll'),
-                     os.path.join(local_bin, "../../usr/bin/diff.exe"),
+                     os.path.join(local_bin, "diff.exe"),
                      os.path.join(local_bin, "libiconv-2.dll"),
                      os.path.join(local_bin, "libintl-8.dll")]
 
@@ -151,7 +151,7 @@ for lib, possible_path in manually_added_libs.items():
         gtk_data_files.append((os.path.dirname(lib), [local_lib]))
 
 build_exe_options = {
-    "includes": ['gi', get_sysconfigdata_name(), 'xmlrpc.server', 'http.cookies'] if 'mingw' in sysconfig.get_platform() else ['gi', 'xmlrpc.server', 'http.cookies'],
+    "includes": ['gi', get_sysconfigdata_name()] if 'mingw' in sysconfig.get_platform() else ['gi'],
     "excludes": ["tkinter"],
     "packages": ["gi", "weakref", "filecmp", "certifi", "texttestlib", "yaml"],
     "include_files": get_non_python_libs(),

@@ -11,7 +11,6 @@ from texttestlib import plugins
 from texttestlib.jobprocess import killProcessAndChildren
 from time import sleep
 from threading import Lock, Timer
-from locale import getpreferredencoding
 
 plugins.addCategory("killed", "killed", "were terminated before completion")
 
@@ -133,7 +132,7 @@ class RunTest(plugins.Action):
         self.lock.release()
 
     def storeReturnCode(self, test, code, postfix):
-        file = open(test.makeTmpFileName("exitcode" + postfix), "w")
+        file = plugins.openTestDataFile(test.makeTmpFileName("exitcode" + postfix), test, "w")
         file.write(str(code) + "\n")
         file.close()
 
@@ -307,7 +306,7 @@ class RunTest(plugins.Action):
         return arg if "$" in arg else shlex.quote(arg)
 
     def writeScriptLine(self, scriptFile, line):
-        scriptFile.write(line.encode(getpreferredencoding()) + b"\n")
+        scriptFile.write(line.encode(plugins.getLocaleEncoding()) + b"\n")
 
     def getRemoteExecuteCmdArgs(self, test, runMachine, localArgs, postfix):
         scriptFileName = test.makeTmpFileName("run_test" + postfix + ".sh", forComparison=0)

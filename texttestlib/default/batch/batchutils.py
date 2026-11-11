@@ -64,7 +64,7 @@ def getEnvironmentFromRunFiles(runNameDirs, tag):
     for dir in runNameDirs:
         path = os.path.join(dir, tag)
         if os.path.isfile(path):
-            with open(path) as f:
+            with open(path, encoding="utf-8", errors="replace") as f:
                 for line in f:
                     if "=" in line:
                         var, val = line.strip().split("=", 1)

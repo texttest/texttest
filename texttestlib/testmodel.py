@@ -18,7 +18,6 @@ from threading import Lock
 from tempfile import mkstemp, mkdtemp
 from copy import deepcopy
 from functools import reduce, cmp_to_key
-from locale import getpreferredencoding
 
 helpIntro = """
 Note: the purpose of this help is primarily to document derived configurations and how they differ from the
@@ -628,8 +627,9 @@ class Test(plugins.Observable):
         self.setDescription(newDescription)
 
     def updateRelPathReferences(self, targetFile, oldRelPath, newRelPath):
-        oldRelPath = (os.sep + oldRelPath).encode(getpreferredencoding())
-        newRelPath = (os.sep + newRelPath).encode(getpreferredencoding())
+        encoding = plugins.getFileEncoding(targetFile, self)
+        oldRelPath = encoding.encode(os.sep + oldRelPath)
+        newRelPath = encoding.encode(os.sep + newRelPath)
         # Binary mode, otherwise Windows line endings get transformed to UNIX ones (even on Windows!)
         # which will cause the test to fail...
         contents = open(targetFile, "rb").read()
@@ -915,7 +915,8 @@ class TestCase(Test):
         os.rename(newPath, os.path.join(os.path.dirname(newPath), "backup.aborted"))
         stateFile = self.getStateFile()
         if os.path.isfile(stateFile):
-            return plugins.getNewTestStateFromFile(open(stateFile))
+            with open(stateFile, "rb") as f:
+                return plugins.getNewTestStateFromFile(f)
 
     def backupPreviousTemporaryData(self, restoreLatest=False):
         writeDir = self.getDirectory(temporary=1)
@@ -984,7 +985,7 @@ class TestCase(Test):
         self.environment.checkPopulated()
         for var, value in list(self.properties.items()):
             propFileName = self.makeTmpFileName(var + ".properties", forComparison=0)
-            file = open(propFileName, "w")
+            file = open(propFileName, "w", encoding=plugins.getLocaleEncoding())
             for subVar, subValue in list(value.items()):
                 file.write(subVar + " = " + subValue + "\n")
 
@@ -1037,7 +1038,7 @@ class TestSuiteFileHandler:
         output = "\n".join(testEntries)
         if not output.endswith("\n"):
             output += "\n"
-        newFile = plugins.openForWrite(fileName)
+        newFile = plugins.openConfigFile(fileName, "w")
         newFile.write(output.lstrip())
         newFile.close()
 
@@ -1232,7 +1233,7 @@ class TestSuite(Test):
     def createContentFile(self):
         contentFile = self.dircache.pathName("testsuite." + self.app.name)
         try:
-            file = open(contentFile, "a")
+            file = plugins.openConfigFile(contentFile, "a")
             file.write("# Ordered list of tests in test suite. Add as appropriate\n\n")
             file.close()
             self.dircache.refresh()
@@ -1623,7 +1624,7 @@ class Application(object):
 
     def writeConfigEntries(self, configEntries):
         configFileName = self.dircache.pathName("config." + self.name)
-        configFile = open(configFileName, "w")
+        configFile = plugins.openConfigFile(configFileName, "w")
         for key, value in list(configEntries.items()):
             if key == "section_comment":
                 configFile.write("## " + value.replace("\n", "\n## ") + "\n\n")

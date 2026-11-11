@@ -397,7 +397,7 @@ class ImportTestCase(ImportTest):
         return os.path.join(testDir, name + "." + suite.app.name)
 
     def getWriteFile(self, name, suite, testDir):
-        return open(self.getWriteFileName(name, suite, testDir), "w")
+        return plugins.openConfigFile(self.getWriteFileName(name, suite, testDir), "w")
 
     def writeEnvironmentFile(self, suite, testDir):
         envDir = self.getEnvironment(suite)
@@ -443,7 +443,7 @@ class ImportTestSuite(ImportTest):
     def writeEnvironmentFiles(self, newSuite):
         if self.optionGroup.getSwitchValue("env"):
             envFile = os.path.join(newSuite.getDirectory(), "environment")
-            file = open(envFile, "w")
+            file = plugins.openConfigFile(envFile, "w")
             file.write("# Dictionary of environment to variables to set in test suite\n")
 
 
@@ -1772,7 +1772,7 @@ class ReportBugs(guiplugins.ActionDialogGUI):
             fileName = os.path.join(ancestor.getDirectory(), name)
             if not any((fileName.startswith(f) for f in fileNames)):
                 fileNames.append(fileName)
-        return [open(fileName, "a") for fileName in fileNames]
+        return [plugins.openConfigFile(fileName, "a") for fileName in fileNames]
 
     def getSizeAsWindowFraction(self):
         # size of the dialog

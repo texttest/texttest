@@ -56,7 +56,7 @@ class WriteDividedSelections(plugins.ScriptWithArgs):
             os.remove(fn)
         for i in range(int(argDict["count"])):
             fn = prefix + "_" + str(i + 1)
-            f = open(fn, "a")
+            f = plugins.openConfigFile(fn, "a")
             f.write("-tp ")
             cls.files.append(f)
         cls.counts = [0] * len(cls.files)
@@ -339,8 +339,9 @@ class ReplaceText(plugins.ScriptWithArgs):
         if "." not in unversionedFileName:
             unversionedFileName += "." + test.app.name
         tmpFile = os.path.join(test.getDirectory(temporary=1), unversionedFileName)
-        with open(tmpFile, "w") as writeFile:
-            with open(stdFile) as readFile:
+        encoding = plugins.getFileEncoding(stdFile, test)
+        with encoding.open(tmpFile, "w") as writeFile:
+            with encoding.open(stdFile) as readFile:
                 for line in readFile:
                     newLine = self.trigger.replace(line, self.newMultiLineText if not self.argsReplacement else self.replaceArgs)
                     writeFile.write(newLine)
@@ -480,7 +481,7 @@ class InsertShortcuts(plugins.ScriptWithArgs):
             tmpFile = os.path.join(test.getDirectory(temporary=1), unversionedFileName)
             storytextHome = test.getEnvironment("STORYTEXT_HOME")
             recordScript = self.getRecordScript(tmpFile, storytextHome)
-            with open(stdFile) as readFile:
+            with plugins.openTestDataFile(stdFile, test, errors="replace") as readFile:
                 for line in readFile:
                     recordScript.record(line.strip("\n"))
 

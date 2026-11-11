@@ -2,7 +2,14 @@
 
 import os, sys, subprocess, shutil
 from tempfile import mktemp
-from locale import getpreferredencoding
+import locale
+
+def getLocaleEncoding():
+    # Not getpreferredencoding, which gives UTF-8 in UTF-8 mode (the default from Python 3.15)
+    if hasattr(locale, "getencoding"):
+        return locale.getencoding()
+    else:
+        return locale.getpreferredencoding(False)
 
 def interpretCore(corefile):
     if os.path.getsize(corefile) == 0:
@@ -150,7 +157,7 @@ def parseFailure(errMsg, debugger):
     if len(errMsg) > 50000:
         return summary, "Over 50000 error characters printed - suspecting binary output"
     else:
-        return summary, debugger + " backtrace command failed : Stack trace not produced for crash\nErrors from " + debugger + ":\n" + str(errMsg, getpreferredencoding())
+        return summary, debugger + " backtrace command failed : Stack trace not produced for crash\nErrors from " + debugger + ":\n" + str(errMsg, getLocaleEncoding())
 
 
 def assembleInfo(signalDesc, summaryLine, stackLines, debugger):
@@ -169,7 +176,7 @@ def writeGdbStackTrace(corefile, binary):
     cmdArgs = [ "gdb", "-q", "-batch", "-x", fileName, binary, corefile ]
     proc = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     output, errors = proc.communicate()
-    signalDesc, summaryLine, stackLines = parseGdbOutput(str(output, getpreferredencoding()))
+    signalDesc, summaryLine, stackLines = parseGdbOutput(str(output, getLocaleEncoding()))
     os.remove(fileName)
     if summaryLine:
         return assembleInfo(signalDesc, summaryLine, stackLines, "GDB")
@@ -180,7 +187,7 @@ def writeDbxStackTrace(corefile, binary):
     cmdArgs = [ "dbx", "-f", "-q", "-c", "where; quit", binary, corefile ]
     proc = subprocess.Popen(cmdArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     output, errors = proc.communicate()
-    signalDesc, summaryLine, stackLines = parseDbxOutput(str(output, getpreferredencoding()))
+    signalDesc, summaryLine, stackLines = parseDbxOutput(str(output, getLocaleEncoding()))
     if summaryLine:
         return assembleInfo(signalDesc, summaryLine, stackLines, "DBX")
     else:

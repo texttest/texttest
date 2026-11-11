@@ -201,7 +201,7 @@ class GenerateTestSummary(guiplugins.ActionDialogGUI):
 
     def writeTextSummary(self, fileName):
         mailSender = MailSender()
-        with open(fileName, "w") as f:
+        with open(fileName, "w", encoding="utf-8") as f:
             for appList in list(self.allApps.values()):
                 batchDataList = list(map(self.batchAppData.get, appList))
                 f.write(mailSender.makeContents(batchDataList, False))

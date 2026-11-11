@@ -18,7 +18,8 @@ from queue import Queue, Empty
 from glob import glob
 from datetime import datetime
 from pickle import Unpickler
-from locale import getpreferredencoding
+import codecs
+import locale
 import importlib.resources
 
 
@@ -893,7 +894,7 @@ def getNewTestStateFromFile(file):
     try:
         return unpickler.load()
     except Exception:
-        encoding = getpreferredencoding()
+        encoding = getLocaleEncoding()
         from io import BytesIO
         file.seek(0)
         unpickler = TestStateUnpickler(BytesIO(file.read().replace(b"\r\n", b"\n")), encoding=encoding, errors="replace")
@@ -947,6 +948,12 @@ def hostsMatch(hostname, localhost):
     else:
         parts = hostname.split(".")
         return parts[0] == localhost
+
+
+# Since Python 3.13, os.path.isabs on Windows rejects paths with exactly one leading slash.
+# Such paths may refer to a remote (POSIX) machine, so we still need to treat them as absolute
+def isAbsolutePath(path):
+    return os.path.isabs(path) or (os.name == "nt" and path.startswith("/"))
 
 
 # Hacking around os.path.getcwd not working with AMD automounter
@@ -1186,7 +1193,7 @@ def getAggregateString(items, method):
 def readList(filename):
     try:
         items = []
-        for longline in open(filename, encoding=getpreferredencoding(), errors="replace").readlines():
+        for longline in openConfigFile(filename).readlines():
             line = longline.strip()
             if len(line) > 0 and not line.startswith("#"):
                 items.append(line)
@@ -1201,7 +1208,7 @@ def readListWithComments(filename, filterMethod=None):
     currComment = ""
     emptyLineSymbol = "__EMPTYLINE__"
 
-    for longline in open(filename, encoding=getpreferredencoding(), errors="replace").readlines():
+    for longline in openConfigFile(filename).readlines():
         line = longline.strip()
         if len(line) == 0:
             if currComment:
@@ -1237,9 +1244,120 @@ def uncomment(comment):
     return "\n".join([line[1:].lstrip() for line in lines if line.startswith("#")])
 
 
-def openForWrite(path, mode="w"):
+def openForWrite(path, mode="w", encoding=None):
     ensureDirExistsForFile(path)
-    return open(path, mode)
+    if encoding is None:
+        return open(path, mode)
+    else:
+        return encoding.open(path, mode)
+
+
+def getLocaleEncoding():
+    # The real locale encoding. Unlike getpreferredencoding, this ignores Python's UTF-8 mode,
+    # which is on by default from Python 3.15
+    if hasattr(locale, "getencoding"):  # Python 3.11 and later
+        return locale.getencoding()
+    else:
+        return locale.getpreferredencoding(False)
+
+
+class FileEncoding:
+    # Longest first: the UTF-32 LE BOM starts with the UTF-16 LE one
+    byteOrderMarks = [(codecs.BOM_UTF32_LE, "utf-32-le"), (codecs.BOM_UTF32_BE, "utf-32-be"),
+                      (codecs.BOM_UTF8, "utf-8"), (codecs.BOM_UTF16_LE, "utf-16-le"), (codecs.BOM_UTF16_BE, "utf-16-be")]
+
+    def __init__(self, name, hasBOM=False):
+        self.name = name
+        self.hasBOM = hasBOM
+
+    @classmethod
+    def forFile(cls, path, configured="locale"):
+        # A byte order mark in the file takes precedence over whatever encoding is configured
+        bomCodec = cls.findBOMCodec(path)
+        if bomCodec:
+            return cls(bomCodec, hasBOM=True)
+        else:
+            return cls(cls.resolve(configured))
+
+    @classmethod
+    def findBOMCodec(cls, path):
+        try:
+            with open(path, "rb") as f:
+                start = f.read(4)
+        except OSError:
+            return
+        for bom, codec in cls.byteOrderMarks:
+            if start.startswith(bom):
+                return codec
+
+    @staticmethod
+    def resolve(name):
+        if name == "locale":
+            return getLocaleEncoding()
+        try:
+            codecs.lookup(name)
+        except LookupError:
+            raise TextTestError("Unknown encoding '" + name + "' found in config file setting 'file_encoding'")
+        return name
+
+    def roundTripErrors(self, mode="r"):
+        # surrogateescape preserves undecodable bytes exactly, but only works with ASCII-compatible encodings
+        if self.name.startswith(("utf-16", "utf-32")):
+            return "replace"
+        else:
+            return "surrogateescape" if "r" in mode else "texttest-surrogateescape-or-replace"
+
+    def open(self, path, mode="r", errors=None):
+        f = open(path, mode, encoding=self.name, errors=errors or self.roundTripErrors(mode))
+        if self.hasBOM:
+            if "r" in mode:
+                f.read(1)
+            elif "w" in mode:
+                f.write("\ufeff")
+        return f
+
+    def encode(self, text):
+        return text.encode(self.name, self.roundTripErrors("w"))
+
+
+def surrogateEscapeOrReplace(error):
+    # Writes back undecodable bytes that were read with surrogateescape, and replaces other characters
+    # the encoding can't represent, rather than failing after the file has been truncated
+    try:
+        return codecs.lookup_error("surrogateescape")(error)
+    except UnicodeError:
+        return codecs.lookup_error("replace")(error)
+
+
+codecs.register_error("texttest-surrogateescape-or-replace", surrogateEscapeOrReplace)
+
+
+def openConfigFile(filename, mode="r", errors="replace"):
+    # Config files can't be governed by file_encoding, as they define it. So use the locale, unless there is a BOM
+    # Use errors="surrogateescape" when reading a file to rewrite it, so its undecodable bytes are preserved
+    if "r" in mode:
+        return FileEncoding.forFile(filename).open(filename, mode, errors=errors)
+    else:
+        # Preserve the encoding of an existing file when rewriting it
+        return openForWrite(filename, mode, FileEncoding.forFile(filename))
+
+
+def getConfiguredFileEncoding(fileName, configObj):
+    stem = os.path.basename(fileName).split(".")[0]
+    return configObj.getCompositeConfigValue("file_encoding", stem) or "locale"
+
+
+def getFileEncoding(fileName, configObj):
+    return FileEncoding.forFile(fileName, getConfiguredFileEncoding(fileName, configObj))
+
+
+def openTestDataFile(fileName, configObj, mode="r", errors=None):
+    if "r" in mode or "a" in mode:
+        return getFileEncoding(fileName, configObj).open(fileName, mode, errors)
+    else:
+        # Files TextTest creates for comparison, such as the catalogue, use the configured encoding
+        encoding = FileEncoding(FileEncoding.resolve(getConfiguredFileEncoding(fileName, configObj)))
+        return openForWrite(fileName, mode, encoding)
 
 # Make sure the dir exists
 

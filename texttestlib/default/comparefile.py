@@ -34,6 +34,7 @@ class FileComparison:
         # mechanism, such as the *nix 'file' command, but as the first implementation I've
         # chosen to use a manually created list instead.
         self.binaryFile = test.configValueMatches("binary_file", stemForConfig)
+        self.configuredEncoding = test.getCompositeConfigValue("file_encoding", stemForConfig) or "locale"
         self.previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength)
         self.textDiffTool = test.getConfigValue("text_diff_program")
         self.textDiffToolMaxSize = plugins.parseBytes(test.getCompositeConfigValue("max_file_size", self.textDiffTool))
@@ -45,6 +46,10 @@ class FileComparison:
 
     def stemForConfig(self):
         return self.stem
+
+    def getEncoding(self, fileName):
+        # Comparisons pickled by older TextTest versions won't have the attribute
+        return plugins.FileEncoding.forFile(fileName, getattr(self, "configuredEncoding", "locale"))
 
     def setStandardFile(self, standardFile):
         self.stdFile = standardFile
@@ -103,16 +108,18 @@ class FileComparison:
         plugins.ensureDirectoryExists(partsDir)
         initialFileName = os.path.join(partsDir, "initial")
         parts.append(initialFileName)
-        currWriteFile = open(initialFileName, "w")
+        # Each part gets the encoding of the whole file, including any BOM, so it can be read on its own
+        encoding = self.getEncoding(filename)
+        currWriteFile = encoding.open(initialFileName, "w")
         splitFileNames = []
-        with open(filename) as f:
+        with encoding.open(filename) as f:
             for line in f:
                 match = sepRegex.search(line)
                 if match:
                     currWriteFile.close()
                     newFileName = self.getSplitFileName(match, partsDir, splitFileNames)
                     parts.append(newFileName)
-                    currWriteFile = open(newFileName, "w")
+                    currWriteFile = encoding.open(newFileName, "w")
                 currWriteFile.write(line)
         currWriteFile.close()
         return parts
@@ -293,9 +300,9 @@ class FileComparison:
                       "Edit the configuration entry 'binary_file' and re-run if you suspect that this file contains only text.\n"
             return self.previewGenerator.getWrappedLine(message)
         elif self.newResult():
-            return self.previewGenerator.getPreview(open(self.tmpCmpFile, errors="ignore"))
+            return self.getPreview(self.tmpCmpFile)
         elif self.missingResult():
-            return self.previewGenerator.getPreview(open(self.stdCmpFile, errors="ignore"))
+            return self.getPreview(self.stdCmpFile)
 
         try:
             stdFileSize = os.path.getsize(self.stdCmpFile)
@@ -310,12 +317,22 @@ class FileComparison:
                 return self.previewGenerator.getWrappedLine(message)
 
             cmdArgs = plugins.splitcmd(self.textDiffTool) + [self.stdCmpFile, self.tmpCmpFile]
-            proc = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+            # The diff tool output consists of lines from the files, so decode it as they are encoded.
+            # Except for UTF-16/32, where diff's own text (or "Binary files differ") can't be in that encoding
+            encoding = self.getEncoding(self.tmpCmpFile)
+            if encoding.roundTripErrors() == "replace":
+                encoding = plugins.FileEncoding(plugins.getLocaleEncoding())
+            proc = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                    encoding=encoding.name, errors="replace")
             return self.previewGenerator.getPreview(proc.stdout)
         except OSError as e:
             self.diag.info("No diff report: full exception printout\n" + plugins.getExceptionString())
             return "No difference report could be created: could not find textual difference tool '" + self.textDiffTool + "'\n" + \
                    "(" + str(e) + ")"
+
+    def getPreview(self, fileName):
+        with self.getEncoding(fileName).open(fileName, errors="replace") as f:
+            return self.previewGenerator.getPreview(f)
 
     def updateAfterLoad(self, changedPaths):
         for oldPath, newPath in changedPaths:
@@ -372,9 +389,11 @@ class FileComparison:
         self.diag.info("writing split files back to " + self.stdFile)
         self.freeTextBody = None  # clear the cache which may well be wrong now...
         self.backupOrRemove(self.stdFile, backupVersionStrings)
-        with open(self.stdFile, "w") as f:
+        encoding = splitComps[0].getEncoding(splitComps[0].stdFile)
+        with encoding.open(self.stdFile, "w") as f:
             for splitComp in splitComps:
-                f.write(open(splitComp.stdFile).read())
+                with splitComp.getEncoding(splitComp.stdFile).open(splitComp.stdFile) as partFile:
+                    f.write(partFile.read())
         self.stdCmpFile = self.stdFile
         self.updateDifferenceCache(self.APPROVED)
 
@@ -438,6 +457,7 @@ class SplitFileComparison(FileComparison):
         self.parent = parent
         stemToUse = stem + "/" + os.path.basename(stdFile)
         FileComparison.__init__(self, test, stemToUse, stdFile, *args)
+        self.configuredEncoding = getattr(parent, "configuredEncoding", "locale")
 
     def getParent(self):
         return self.parent

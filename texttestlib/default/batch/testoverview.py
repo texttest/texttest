@@ -6,7 +6,6 @@ import time
 import html
 import sys
 import logging
-import locale
 from texttestlib.default.batch import HTMLgen, HTMLcolors
 from texttestlib.default.batch.ci import CIPlatform
 from texttestlib import plugins
@@ -110,13 +109,13 @@ class GenerateWebPages(object):
                     successTags.setdefault(fn, []).append(tag)
         for fn, tagsToRemove in list(successTags.items()):
             linesToKeep = []
-            with open(fn) as readFile:
+            with open(fn, encoding="utf-8", errors="replace") as readFile:
                 for line in readFile:
                     tag = line.strip().split()[0]
                     if tag not in tagsToRemove:
                         linesToKeep.append(line)
 
-            with open(fn, "w") as writeFile:
+            with open(fn, "w", encoding="utf-8") as writeFile:
                 for line in linesToKeep:
                     writeFile.write(line)
 
@@ -180,7 +179,7 @@ class GenerateWebPages(object):
                 for successFile, repository in successFiles:
                     testId = self.getTestIdentifier(successFile, repository)
                     extraVersion = self.findExtraVersion(repository)
-                    with open(successFile) as f:
+                    with open(successFile, encoding="utf-8", errors="replace") as f:
                         fileTags = set()
                         for line in f:
                             parts = line.strip().split(" ", 1)
@@ -319,7 +318,7 @@ class GenerateWebPages(object):
                         tagData.setdefault(tag, []).append(path)
                     elif file.startswith("succeeded_"):
                         successFiles.append((path, dir))
-                        with open(path) as f:
+                        with open(path, encoding="utf-8", errors="replace") as f:
                             for line in f:
                                 parts = line.split()
                                 if parts:
@@ -379,7 +378,7 @@ class GenerateWebPages(object):
     def createPage(self):
         style = "body,td {color: #000000;font-size: 11px;font-family: Helvetica;} th {color: #000000;font-size: 13px;font-family: Helvetica;}"
         title = "Test results for " + self.pageTitle
-        return HTMLgen.SimpleDocument(title=title, style=style, xhtml=True, meta='<meta charset="' + locale.getpreferredencoding() + '">')
+        return HTMLgen.SimpleDocument(title=title, style=style, xhtml=True, meta='<meta charset="utf-8">')
 
     def makeTableHeaderCell(self, tableHeader):
         container = HTMLgen.Container()
@@ -453,7 +452,7 @@ class GenerateWebPages(object):
     def writeCommentListPage(self):
         filename = os.path.join(self.pageDir, "commentlist.html")
         plugins.log.info("Writing comment html page at " + filename + "...")
-        doc = HTMLgen.SimpleDocument(title="All Comments", stylesheet="../javascript/commentliststyle.css", xhtml=True, meta='<meta charset="' + locale.getpreferredencoding() + '">')
+        doc = HTMLgen.SimpleDocument(title="All Comments", stylesheet="../javascript/commentliststyle.css", xhtml=True, meta='<meta charset="utf-8">')
         for scriptFile in ["jquery.js", "comment.js", "commentlist.js"]:
             doc.append(HTMLgen.Script(src="../javascript/" + scriptFile))
         doc.write(filename)
@@ -601,8 +600,7 @@ class TestTable:
 
     def escapeForHtml(self, text):
         text = html.escape(text, True)
-        localeEncoding = locale.getdefaultlocale()[1] or "utf-8"
-        return str(text.encode("ascii", "xmlcharrefreplace"), localeEncoding)
+        return str(text.encode("ascii", "xmlcharrefreplace"), "ascii")
 
     def generateTestRows(self, testName, extraVersion, results):
         bgColour = self.colourFinder.find("row_header_bg")
@@ -779,7 +777,7 @@ class TestDetails:
     def __init__(self, tag, pageTitle, pageSubTitles):
         tagText = getDisplayText(tag)
         pageDetailTitle = "Detailed test results for " + pageTitle + ": " + tagText
-        self.document = HTMLgen.SimpleDocument(title=TitleWithDateStamp(pageDetailTitle), meta='<meta charset="' + locale.getpreferredencoding() + '">')
+        self.document = HTMLgen.SimpleDocument(title=TitleWithDateStamp(pageDetailTitle), meta='<meta charset="utf-8">')
         headerText = tagText + " - detailed test results for " + pageTitle
         self.document.append(HTMLgen.Heading(1, headerText, align='center'))
         for subTitle, command in pageSubTitles:

@@ -331,7 +331,7 @@ class RunningAction(BasicRunningAction):
         tmpDir = os.path.join(writeDir, "temporary_settings")
         plugins.ensureDirectoryExists(tmpDir)
         fileName = os.path.join(tmpDir, fileType + "." + app.name + app.versionSuffix())
-        with open(fileName, "w") as f:
+        with plugins.openConfigFile(fileName, "w") as f:
             f.write(contents)
         return tmpDir
 
@@ -583,8 +583,11 @@ class RerunTests(RunningAction, guiplugins.ActionDialogGUI):
             return [v for v in app.versions if v in extrasGiven]
 
     def getAppIdentifier(self, app):
-        parts = [app.name] + self.getExtraVersions(app)
-        return ".".join(parts)
+        if self.getVersionString():
+            versions = self.getExtraVersions(app)
+        else:
+            versions = [v for v in app.versions if not v.startswith("copy_")]
+        return ".".join([app.name] + versions)
 
     def checkTestRun(self, errFile, testSel, filterFile, usecase):
         # Don't do anything with the files, but do produce popups on failures and notify when complete
@@ -803,7 +806,7 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
         if self.shouldAddShortcuts():
             storytextDir = self.storytextDirs[self.currAppSelection[0]]
             self.createShortcutApps(writeDir)
-            with open(filterFileName, "a") as filterFile:
+            with plugins.openConfigFile(filterFileName, "a") as filterFile:
                 filterFile.write("appdata=shortcut\n")
                 filterFile.write(os.path.basename(storytextDir) + "\n")
         return filterFileName
@@ -851,7 +854,7 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
 
     def createConfigFile(self, app, writeDir):
         configFileName = os.path.join(writeDir, "config.shortcut")
-        with open(configFileName, "w") as configFile:
+        with plugins.openConfigFile(configFileName, "w") as configFile:
             configFile.write("executable:None\n")
             configFile.write("filename_convention_scheme:standard\n")
             configFile.write("use_case_record_mode:GUI\n")
@@ -860,7 +863,7 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
 
     def createTestSuiteFile(self, app, storyTextHome, writeDir):
         suiteFileName = os.path.join(writeDir, "testsuite.shortcut")
-        with open(suiteFileName, "w") as suiteFile:
+        with plugins.openConfigFile(suiteFileName, "w") as suiteFile:
             suiteFile.write(storyTextHome + "\n")
         return suiteFileName
 
@@ -903,7 +906,8 @@ class TestFileFilterHelper:
             os.remove(bakFileName)
         if os.path.isfile(tmpFileName):
             os.rename(tmpFileName, bakFileName)
-        with open(tmpFileName, "w") as tmpFile:
+        # The text was filtered from the file, so write it as the file is encoded
+        with plugins.getFileEncoding(fileName, test).open(tmpFileName, "w", errors="replace") as tmpFile:
             tmpFile.write(text)
 
         # Don't want people editing by mistake, remove write permissions
@@ -1059,7 +1063,7 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
         self.dialog.vbox.pack_start(Gtk.Separator.new(Gtk.Orientation.HORIZONTAL), False, True, 0)
         frame, self.textBuffer = self.createTextWidget("Filter Text View", scroll=True)
         frame.set_label("Text to filter (copied from " + os.path.basename(fileName) + ")")
-        with open(fileName) as f:
+        with plugins.openTestDataFile(fileName, test, errors="replace") as f:
             self.textBuffer.set_text(f.read())
         self.dialog.vbox.pack_start(frame, True, True, 0)
 
@@ -1139,7 +1143,7 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
                 fullPath = os.path.join(app.getDirectory(), fileName)
                 currSection = None
                 currNewLines = []
-                with open(fullPath) as f:
+                with plugins.openConfigFile(fullPath, errors="surrogateescape") as f:
                     for line in f:
                         if line.startswith("["):
                             currSection = self.getSectionName(line)
@@ -1154,7 +1158,7 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
                                 currNewLines = []
                             newFileLines.append(line)
 
-                with open(fullPath, "w") as f:
+                with plugins.openConfigFile(fullPath, "w") as f:
                     for line in newFileLines:
                         f.write(line)
 

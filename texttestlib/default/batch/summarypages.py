@@ -153,7 +153,7 @@ class SummaryDataFinder:
             return
         anyFile = os.path.join(dirName, htmlFiles[0])
         finder = TitleFinder()
-        finder.feed(open(anyFile).read())
+        finder.feed(open(anyFile, encoding="utf-8", errors="replace").read())
         title = finder.title
         if title is not None:
             prefix = "est results for"
@@ -348,7 +348,7 @@ class SummaryDataFinder:
         return summaries
 
     def extractSummary(self, datedFile, summary):
-        for line in open(datedFile, errors="replace"):
+        for line in open(datedFile, encoding="utf-8", errors="replace"):
             if line.strip().startswith("<H2>"):
                 text = line.strip()[4:-5]  # drop the tags
                 for cat, num in list(self.parseSummaryText(text).items()):
@@ -437,14 +437,14 @@ class SummaryGenerator:
             jobLink = f"<br>{jobLink}"
 
         summaryPageTimeStamp = dataFinder.summaryPageName + "." + plugins.startTimeString(self.timeFormat)
-        with open(summaryPageTimeStamp, "w") as f:
+        with open(summaryPageTimeStamp, "w", encoding="utf-8") as f:
             versionOrder = ["default"]
             appOrder = []
             mostRecentInfo = dataFinder.getMostRecentDateAndTags()
             mostRecentTags = [i[1] for i in mostRecentInfo]
             self.diag.info("Most recent results are from " + repr(mostRecentTags))
             cssColours = []
-            for line in open(dataFinder.getTemplateFile()):
+            for line in open(dataFinder.getTemplateFile(), encoding="utf-8", errors="replace"):
                 if "<title>" in line:
                     f.write(line)
                 elif "historical_report_colours" in line:

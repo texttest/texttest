@@ -167,7 +167,7 @@ class BasicDocument:
           the file will be passed through before being added to the
           document.
         """
-        f = open(mpath(filename), 'r')
+        f = open(mpath(filename), 'r', encoding="utf-8", errors="replace")
         if marker_function:
             self.append(marker_function(f.read()))
         else:
@@ -202,7 +202,7 @@ class BasicDocument:
         Will print to stdout if no argument.
         """
         if filename:
-            f = open(mpath(filename), 'w')
+            f = open(mpath(filename), 'w', encoding="utf-8")
             f.write(str(self))
             f.close()
             if PRINTECHO:
@@ -270,7 +270,7 @@ class SimpleDocument(BasicDocument):
         self.contents = []
         # Read attributes from resource file into instance namespace
         if resource:
-            exec(compile(open(mpath(resource)).read(), mpath(resource), 'exec'), self.__dict__)
+            exec(compile(open(mpath(resource), encoding="utf-8", errors="replace").read(), mpath(resource), 'exec'), self.__dict__)
         for name, value in list(kw.items()):
             setattr(self, name, value)
 
@@ -604,7 +604,7 @@ class StringTemplate:
             if os.path.exists(filename):
                 s = str(self)
                 if compare_s2f(s, filename):
-                    f = open(filename, 'w')
+                    f = open(filename, 'w', encoding="utf-8")
                     f.write(str(self))
                     f.close()
                     if PRINTECHO:
@@ -613,7 +613,7 @@ class StringTemplate:
                     if PRINTECHO:
                         print('file unchanged: "'+filename+'"')
             else:
-                f = open(filename, 'w')
+                f = open(filename, 'w', encoding="utf-8")
                 f.write(str(self))
                 f.close()
                 if PRINTECHO:
@@ -652,7 +652,7 @@ class TemplateDocument(StringTemplate):
     """
 
     def set_template(self, template):
-        f = open(mpath(template))
+        f = open(mpath(template), encoding="utf-8", errors="replace")
         self.source = f.read()
         f.close()
 
@@ -762,7 +762,7 @@ class AutoTemplateDocument(AutoStringTemplate):
     """
 
     def set_template(self, template):
-        f = open(mpath(template))
+        f = open(mpath(template), encoding="utf-8", errors="replace")
         self.source = f.read()
         f.close()
 
@@ -793,7 +793,7 @@ class Container:
           the file will be passed through before being added to the
           document.
         """
-        f = open(mpath(filename), 'r')
+        f = open(mpath(filename), 'r', encoding="utf-8", errors="replace")
         if marker_function:
             self.append(marker_function(f.read()))
         else:
@@ -2736,9 +2736,9 @@ def compare_f2f(f1, f2):
     """Helper to compare two files, return 0 if they are equal."""
 
     BUFSIZE = 8192
-    fp1 = open(f1)
+    fp1 = open(f1, encoding="utf-8", errors="replace")
     try:
-        fp2 = open(f2)
+        fp2 = open(f2, encoding="utf-8", errors="replace")
         try:
             while 1:
                 b1 = fp1.read(BUFSIZE)
@@ -2759,7 +2759,7 @@ def compare_s2f(s, f2):
 
     BUFSIZE = 8192
     i = 0
-    fp2 = open(f2)
+    fp2 = open(f2, encoding="utf-8", errors="replace")
     try:
         while 1:
             try:

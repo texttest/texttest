@@ -199,8 +199,8 @@ class PrepareWriteDirectory(plugins.Action):
 
         if os.path.isfile(fullPath):
             if os.path.isfile(target):
-                with open(target, "a") as f:
-                    f.write(open(fullPath).read())
+                with plugins.openTestDataFile(target, test, "a") as f:
+                    f.write(plugins.openTestDataFile(fullPath, test).read())
             else:
                 self.copyfile(fullPath, target)
         if os.path.isdir(fullPath):
@@ -324,7 +324,7 @@ class PrepareWriteDirectory(plugins.Action):
         rootDir = os.path.split(sourcePath)[0]
         fullPaths = {rootDir: []}
         currentPaths = [rootDir]
-        for line in open(catFile).readlines():
+        for line in plugins.openTestDataFile(catFile, test, errors="replace").readlines():
             fileName, indent = self.parseCatalogue(line)
             if not fileName:
                 continue
@@ -711,20 +711,20 @@ class CollateFiles(plugins.Action):
             self.collate(test)
             self.removeUnwanted(test)
 
-    def containsRegexps(self, filePath, regexps):
-        with open(filePath) as f:
+    def containsRegexps(self, test, filePath, regexps):
+        with plugins.openTestDataFile(filePath, test, errors="replace") as f:
             for line in f:
                 if any((r.search(line) for r in regexps)):
                     return True
         return False
 
-    def isEmptyFile(self, filePath):
+    def isEmptyFile(self, test, filePath):
         # A file counts as empty if it has zero size or contains only whitespace.
         # Missing or unreadable (e.g. binary) files are not treated as empty, so they are kept.
         try:
             if os.path.getsize(filePath) == 0:
                 return True
-            with open(filePath) as f:
+            with plugins.openTestDataFile(filePath, test, errors="strict") as f:
                 for line in f:
                     if line.strip():
                         return False
@@ -747,7 +747,7 @@ class CollateFiles(plugins.Action):
 
         for stem in test.getConfigValue("discard_file_if_empty"):
             filePath = test.makeTmpFileName(stem)
-            if self.isEmptyFile(filePath):
+            if self.isEmptyFile(test, filePath):
                 self.removeUnwantedFile(filePath)
 
         for stemPattern, texts in list(test.getConfigValue("discard_file_text").items()):
@@ -757,7 +757,7 @@ class CollateFiles(plugins.Action):
                 stemPattern = "*"
             regexps = list(map(re.compile, texts))
             for filePath in glob.glob(test.makeTmpFileName(stemPattern)):
-                if self.containsRegexps(filePath, regexps):
+                if self.containsRegexps(test, filePath, regexps):
                     self.removeUnwantedFile(filePath)
 
     def findEditedFiles(self, test, patterns):
@@ -903,8 +903,15 @@ class CollateFiles(plugins.Action):
                 stdout = subprocess.PIPE
                 stderr = subprocess.STDOUT
 
+            prevProc = self.collationProc
             self.collationProc = self.runCollationScript(args, test, stdin, stdout, stderr)
             if not self.collationProc:
+                if prevProc:
+                    # An earlier script in the pipeline is already running, with its cwd in the
+                    # sandbox and the source files open. Stop it, or it will lock files on Windows.
+                    prevProc.stdout.close()
+                    killProcessAndChildren(prevProc.pid, cmd=test.getConfigValue("kill_command"))
+                    prevProc.wait()
                 if os.path.isfile(targetFile):
                     os.remove(targetFile)
                 errorMsg = "Could not find extract script '" + script + \
@@ -976,7 +983,7 @@ class CreateCatalogue(plugins.Action):
         pathsLost, pathsEdited, pathsGained = self.findDifferences(oldPaths, newPaths, ignoredPaths, tmpDir)
         processesGained = self.findProcessesGained(test)
         fileName = test.makeTmpFileName("catalogue")
-        with open(fileName, "w") as file:
+        with plugins.openTestDataFile(fileName, test, "w") as file:
             if len(pathsLost) == 0 and len(pathsEdited) == 0 and len(pathsGained) == 0:
                 file.write("No files or directories were created, edited or deleted.\n")
             if len(pathsGained) > 0:
@@ -1023,7 +1030,7 @@ class CreateCatalogue(plugins.Action):
         logFile = test.makeTmpFileName(test.getConfigValue("log_file"))
         if not os.path.isfile(logFile):
             return []
-        for line in open(logFile):
+        for line in plugins.openTestDataFile(logFile, test, errors="replace"):
             if line.startswith(searchString):
                 parts = line.strip().split(" : ")
                 try:
@@ -1219,7 +1226,7 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
                 self.diag.info("Looking for log files matching " + logFileStem)
                 for fileName in self.findLogFiles(test, logFileStem):
                     self.diag.info("Scanning log file for entry: " + entryFinder)
-                    values += self.findValues(fileName, entryFinder)
+                    values += self.findValues(test, fileName, entryFinder)
             if len(values) > 0:
                 fileName = self.getFileToWrite(test, fileStem)
                 self.diag.info("Writing performance to file " + fileName)
@@ -1263,9 +1270,9 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
         roundedSum = float(int(10*sum))/10
         return "Total " + fileStem.capitalize() + "  :      " + str(roundedSum)
 
-    def findValues(self, logFile, entryFinder):
+    def findValues(self, test, logFile, entryFinder):
         values = []
-        for line in open(logFile, errors="ignore"):
+        for line in plugins.openTestDataFile(logFile, test, errors="replace"):
             value = self.getValue(line, entryFinder)
             if value is not None:
                 self.diag.info(" found value: " + str(value))

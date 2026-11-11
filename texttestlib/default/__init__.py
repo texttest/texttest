@@ -15,7 +15,6 @@ from copy import copy
 from string import Template
 from fnmatch import fnmatch
 from threading import Thread
-from locale import getpreferredencoding
 # For back-compatibility
 from .runtest import RunTest, Running, Killed
 from .batch.externalreport import ExternalFormatResponder, ExternalFormatCollector
@@ -1114,7 +1113,7 @@ class Config:
         return self.expandCheckout(checkout, app)
 
     def expandCheckout(self, checkout, app):
-        if os.path.isabs(checkout):
+        if plugins.isAbsolutePath(checkout):
             return os.path.normpath(checkout)
         checkoutLocations = app.getCompositeConfigValue("checkout_location", checkout, expandVars=False)
         checkoutLocations.append(os.getcwd())
@@ -1424,6 +1423,10 @@ class Config:
         app.setConfigDefault("collect_traffic_python_ignore_callers", [], trafficText)
         app.setConfigDefault("collect_traffic_use_threads", "true", trafficText)
         app.setConfigDefault("collect_traffic_client_server", "false", trafficText)
+        # CaptureMock always writes its files in UTF-8
+        app.setConfigDefault("file_encoding", {"default": "locale", "externalmocks": "utf-8", "pythonmocks": "utf-8",
+                                               "httpmocks": "utf-8", "traffic": "utf-8"},
+                             "Mapping of file stems to the encoding of the test's files. A byte order mark in a file overrides this")
         app.setConfigDefault("run_dependent_text", {"default": []},
                              "Mapping of patterns to remove from result files", trackFiles=True)
         app.setConfigAlias("scrubbers", "run_dependent_text")
@@ -1592,7 +1595,7 @@ class Config:
             diag = logging.getLogger("remote commands")
             proc = subprocess.Popen(allArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             output = proc.communicate()[0]
-            outputStr = str(output, getpreferredencoding())
+            outputStr = str(output, plugins.getLocaleEncoding())
             diag.info("Running remote command " + repr(allArgs) + ", output was:\n" + outputStr)
             return searchStr not in outputStr  # Return an "exit code" which is 0 when we succeed!
         else:
@@ -1604,7 +1607,7 @@ class Config:
         output = proc.communicate()[0]
         exitCode = proc.returncode
         if exitCode > 0:
-            outputStr = str(output, getpreferredencoding()).strip()
+            outputStr = str(output, plugins.getLocaleEncoding()).strip()
             raise plugins.TextTestError("Unable to contact machine '" + machine +
                                         "'.\nMake sure you have passwordless access set up correctly. The failing command was:\n" +
                                         " ".join(allArgs) + "\n\nThe command produced exit code " + str(exitCode) + " and the following output:\n" + outputStr)
@@ -1795,7 +1798,7 @@ class GrepFilter(plugins.TextFilter):
         if self.fileStem == "free_text":
             return self.stringContainsText(test.state.freeText)
         for logFile in self.findAllFiles(test):
-            if self.matches(logFile):
+            if self.matches(logFile, test):
                 return True
         return False
 
@@ -1822,10 +1825,11 @@ class GrepFilter(plugins.TextFilter):
                 return self.findAllStdFiles(test)
         return logFiles
 
-    def matches(self, logFile):
-        for line in open(logFile, errors="ignore"):
-            if self.stringContainsText(line):
-                return True
+    def matches(self, logFile, test):
+        with plugins.openTestDataFile(logFile, test, errors="replace") as f:
+            for line in f:
+                if self.stringContainsText(line):
+                    return True
         return False
 
 

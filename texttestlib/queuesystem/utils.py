@@ -6,7 +6,6 @@ Utilities for both master and slave code
 import os
 import socket
 from texttestlib import plugins
-from locale import getpreferredencoding
 
 noReusePostfix = ".NO_REUSE"
 rerunPostfix = ".RERUN_TEST"
@@ -84,6 +83,7 @@ def parseIdentifier(line):
 dirText = "DIRECTORY_CONTENTS"
 fileText = "FILE_CONTENTS"
 endPrefix = "END_"
+noEolPostfix = "_NO_EOL"
 
 
 def directorySerialise(dirName, ignoreLinks=False):
@@ -94,30 +94,40 @@ def directorySerialise(dirName, ignoreLinks=False):
             if not os.path.islink(path):
                 relpath = plugins.relpath(path, dirName)
                 text += fileText + " " + relpath + "\n"
-                with open(path) as f:
-                    text += f.read()
-                if not text.endswith("\n"):
-                    text += "\n"
-                text += endPrefix + fileText + "\n"
+                # latin-1 maps every byte to a character, so files arrive unchanged whatever their encoding
+                with open(path, encoding="latin-1", newline="") as f:
+                    contents = f.read()
+                text += contents
+                if contents and not contents.endswith("\n"):
+                    # The end marker must be on its own line: mark the newline added for it, so it can be removed
+                    text += "\n" + endPrefix + fileText + noEolPostfix + "\n"
+                else:
+                    text += endPrefix + fileText + "\n"
     text += endPrefix + dirText
     return text
 
 
 def directoryUnserialise(rootDir, f):
     currFile = None
+    prevLine = ""  # Held back by one line, in case its newline was only added for the end marker
     for line in f:
-        lineStr = str(line, getpreferredencoding())
+        lineStr = str(line, "utf-8")
         if currFile is not None:
             if lineStr.startswith(endPrefix + fileText):
+                if lineStr.strip().endswith(noEolPostfix):
+                    prevLine = prevLine[:-1]
+                currFile.write(prevLine)
                 currFile.close()
                 currFile = None
             else:
-                currFile.write(lineStr)
+                currFile.write(prevLine)
+                prevLine = lineStr
         else:
             if lineStr.startswith(fileText):
                 fn = lineStr.strip().split()[-1]
                 path = os.path.join(rootDir, fn)
                 plugins.ensureDirExistsForFile(path)
-                currFile = open(path, "w")
+                currFile = open(path, "w", encoding="latin-1", newline="")
+                prevLine = ""
             elif lineStr.startswith(endPrefix + dirText):
                 break

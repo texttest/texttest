@@ -115,7 +115,7 @@ class Jenkins(CIPlatform):
         if os.path.isfile(cacheFileOldName):
             os.rename(cacheFileOldName, cacheFile)
         if os.path.isfile(cacheFile):
-            return eval(open(cacheFile).read().strip())
+            return eval(open(cacheFile, encoding="utf-8", errors="replace").read().strip())
         else:
             bugSystemData = getConfigValue("bug_system_location", allSubKeys=True)
             markedArtefacts = getConfigValue("batch_jenkins_marked_artefacts")
@@ -126,7 +126,7 @@ class Jenkins(CIPlatform):
                     allChanges = jenkinschanges.getChanges(
                         prevBuildNumber, buildNumber, bugSystemData, markedArtefacts, fileFinder, cacheDir)
                     plugins.ensureDirectoryExists(cacheDir)
-                    with open(cacheFile, "w") as f:
+                    with open(cacheFile, "w", encoding="utf-8") as f:
                         f.write(pformat(allChanges) + "\n")
                     return allChanges
                 except jenkinschanges.JobStillRunningException:

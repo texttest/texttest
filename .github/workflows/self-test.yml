@@ -60,7 +60,7 @@ jobs:
         update: true
         install: >-
           git
-          diffutils
+          mingw-w64-ucrt-x86_64-diffutils
           glib2-devel
           intltool
           patch

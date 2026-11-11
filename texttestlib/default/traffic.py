@@ -4,7 +4,6 @@ import shutil
 import subprocess
 import sys
 from texttestlib import plugins
-from locale import getpreferredencoding
 
 class SetUpCaptureMockHandlers(plugins.Action):
     def __init__(self, recordSetting):
@@ -138,7 +137,8 @@ class ModifyTraffic(plugins.ScriptWithArgs):
             return
 
         newFileName = fileName + "tmpedit"
-        newFile = open(newFileName, "w")
+        # CaptureMock files are UTF-8. surrogateescape keeps any other bytes as they are
+        newFile = open(newFileName, "w", encoding="utf-8", errors="surrogateescape")
         for text in newTexts:
             self.write(newFile, text)
         newFile.close()
@@ -148,7 +148,7 @@ class ModifyTraffic(plugins.ScriptWithArgs):
         # Copied from CaptureMock ReplayInfo, easier than trying to reuse it
         trafficList = []
         currTraffic = ""
-        for line in open(fileName):
+        for line in open(fileName, encoding="utf-8", errors="surrogateescape"):
             if line.startswith("<-") or line.startswith("->"):
                 if currTraffic:
                     trafficList.append(currTraffic)
@@ -169,9 +169,9 @@ class ModifyTraffic(plugins.ScriptWithArgs):
             proc = subprocess.Popen(args, cwd=dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             stdout, stderr = proc.communicate()
             if len(stderr) > 0:
-                raise plugins.TextTestError("Couldn't modify traffic :\n " + str(stderr, getpreferredencoding()))
+                raise plugins.TextTestError("Couldn't modify traffic :\n " + str(stderr, plugins.getLocaleEncoding()))
             else:
-                return fullLine[:6] + str(stdout, getpreferredencoding())
+                return fullLine[:6] + str(stdout, plugins.getLocaleEncoding())
         else:
             return fullLine
 
@@ -222,7 +222,8 @@ class ConvertToCaptureMock(plugins.Action):
 
         if len(parser.sections()) > 0:  # don't write empty files
             print("Wrote file at", newFile)
-            parser.write(open(newFile, "w"))
+            with plugins.openConfigFile(newFile, "w") as f:
+                parser.write(f)
 
     def setUpApplication(self, app):
         newFile = os.path.join(app.getDirectory(), "capturemockrc." + app.name + app.versionSuffix())

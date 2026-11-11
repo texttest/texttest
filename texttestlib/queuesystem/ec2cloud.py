@@ -159,9 +159,6 @@ class Ec2Machine:
                     self.stopRequested = True
                 return True
 
-        if not self.remoteProcessInfo:
-            return True
-
         for localPid, _ in list(self.remoteProcessInfo.values()):
             if localPid in processes:
                 proc = processes.get(localPid)

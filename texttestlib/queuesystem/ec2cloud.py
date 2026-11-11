@@ -57,6 +57,13 @@ class Ec2Machine:
     def hasJob(self, jobId):
         return jobId in self.remoteProcessInfo
 
+    def hasUnlaunchedJobs(self):
+        # Jobs only get a local PID when the worker thread launches them
+        if self.errorMessage or not self.workerRunning:
+            return False
+        with self.remoteProcessInfoLock:
+            return any((localPid is None for localPid, _ in self.remoteProcessInfo.values()))
+
     def setLocalProcessId(self, jobId, localPid):
         with self.remoteProcessInfoLock:
             remotePid = None
@@ -327,6 +334,10 @@ class QueueSystem(local.QueueSystem):
 
     def waitForLocalProcesses(self, timeout=10):
         deadline = time.time() + timeout
+        # Jobs are launched from the machine threads. Normally all are launched before all results can arrive,
+        # but when replaying with CaptureMock, results can be replayed before all jobs are launched.
+        while time.time() < deadline and any((machine.hasUnlaunchedJobs() for machine in self.machines)):
+            time.sleep(0.1)
         for proc in list(self.processes.values()):
             remaining = deadline - time.time()
             if remaining <= 0:

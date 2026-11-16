@@ -5,7 +5,7 @@ Requests and responses are plain Python data. This is kept in its own module so 
 all traffic with Nomad can be intercepted as a whole, e.g. by CaptureMock in the self-tests.
 Import it as "import texttestlib.queuesystem.nomadapi": "from ... import" forms bypass the
 import hooks CaptureMock relies on, so the self-tests would contact Nomad for real.
-The standard Nomad environment variables NOMAD_ADDR and NOMAD_TOKEN are respected, as are
+The standard Nomad environment variables NOMAD_ADDR, NOMAD_TOKEN and NOMAD_NAMESPACE are respected, as are
 NOMAD_CACERT or NOMAD_CAPATH (to trust a private certificate authority) and NOMAD_CLIENT_CERT
 with NOMAD_CLIENT_KEY (for servers that require client certificates) when using https.
 TLS 1.2 is the minimum version accepted.
@@ -25,7 +25,9 @@ REQUEST_TIMEOUT = 30
 
 
 class NomadError(Exception):
-    pass
+    def __init__(self, message, status=None):
+        Exception.__init__(self, message)
+        self.status = status  # HTTP status code, if Nomad answered at all
 
 
 def getAddress():
@@ -39,6 +41,11 @@ def get(path, **params):
 def request(method, path, body=None, params=None, parseJson=True):
     address = getAddress()
     url = address + path
+    params = dict(params or {})
+    namespace = os.getenv("NOMAD_NAMESPACE")
+    if namespace:
+        # Nomad also registers jobs that don't specify a namespace in the one given here
+        params.setdefault("namespace", namespace)
     if params:
         url += "?" + urllib.parse.urlencode(params)
     headers = {}
@@ -59,7 +66,7 @@ def request(method, path, body=None, params=None, parseJson=True):
             # Log output may be cut in the middle of a character
             text = response.read().decode("utf-8", "replace")
     except urllib.error.HTTPError as e:
-        raise NomadError(method + " " + url + " failed with HTTP status " + str(e.code) + ": " + readErrorBody(e))
+        raise NomadError(method + " " + url + " failed with HTTP status " + str(e.code) + ": " + readErrorBody(e), e.code)
     except (urllib.error.URLError, OSError, http.client.HTTPException) as e:
         raise NomadError("could not contact Nomad at " + address + ": " + str(getattr(e, "reason", e)))
     if not parseJson:

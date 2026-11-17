@@ -35,6 +35,16 @@ when tests fail, so Nomad will show such jobs as failed.
 The slaves need the same paths as the master, i.e. a shared file system. On Linux/Unix they run
 as the user running TextTest, which needs the Nomad client agents to run as root, as is usual
 for raw_exec. Otherwise they run as the user of the Nomad client agent.
+
+When tests are killed, slaves get 60 seconds to report back before Nomad force-kills them.
+Nomad clients cap this at their max_kill_timeout setting, 30 seconds by default.
+
+Known limitation on Windows nodes: Nomad stops a job by sending a console Ctrl-Break event,
+which reaches the running test and the slave at the same time. The test may therefore end
+before the slave knows it was killed, and then be reported as failed (exit code 0xC000013A)
+rather than killed. When the slave does register the kill, it describes it as killed by
+signal "1" instead of "killed explicitly". Fixing this needs changes outside this module
+(runtest.py, jobprocess.py, engine.py), which have been postponed.
 """
 
 import getpass
@@ -53,6 +63,9 @@ ALL_NODE_POOL = "all"  # built into Nomad, contains all nodes: no node has it as
 TASK_NAME = "slave"
 JOB_PREFIX = "texttest-"
 STDERR_TAIL_BYTES = 4096
+# How long a slave gets to report a killed test before Nomad force-kills it: as long as the
+# master waits for such reports (see waitForKill in masterprocess.py), rather than Nomad's 5s default
+KILL_TIMEOUT_SECONDS = 60
 
 
 class QueueSystem(abstractqueuesystem.QueueSystem):
@@ -157,7 +170,8 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
                 "Driver": "raw_exec",
                 "Config": {"command": cmdArgs[0], "args": cmdArgs[1:]},
                 "Env": dict(slaveEnv),
-                "Resources": {"CPU": self.getCpuRequest(nodes, submissionRules.processesNeeded)}}
+                "Resources": {"CPU": self.getCpuRequest(nodes, submissionRules.processesNeeded)},
+                "KillTimeout": KILL_TIMEOUT_SECONDS * 1000000000}  # nanoseconds in the HTTP API
         if os.name != "nt":
             # Run as the user running TextTest, as other grid engines do, not as the Nomad agent's user (often root).
             # Not done from Windows: Windows nodes, which raw_exec runs tasks on as the agent's user, are assumed then.
@@ -188,7 +202,11 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
             if not isinstance(job, dict) or not job.get("ID"):
                 continue
             status = job.get("Status")
-            if status == "pending":
+            if job.get("Stop") and isStillRunning(job):
+                # Nomad shows stopped jobs as dead at once, while the slave may still be reporting a killed test.
+                # Not listing it would make the master think the slave had crashed.
+                statusDict[job["ID"]] = "DEL", "In the process of being killed"
+            elif status == "pending":
                 statusDict[job["ID"]] = "PEND", "Waiting for a suitable Nomad node to become free"
             elif status == "running":
                 statusDict[job["ID"]] = "RUN", "Running"
@@ -267,6 +285,12 @@ def splitMachineResources(settings):
             elif resource.strip():
                 resources.append(resource)
     return resources, machineLists
+
+
+def isStillRunning(job):
+    """ Whether a job's allocation is still running, according to the job summary in the job list """
+    summary = ((job.get("JobSummary") or {}).get("Summary") or {}).get(TASK_NAME) or {}
+    return (summary.get("Running") or 0) + (summary.get("Starting") or 0) > 0
 
 
 def getCpuInfo(node):

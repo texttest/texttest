@@ -11,10 +11,7 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
         self.coreFileLocation = self.getCoreFileLocation(app)
 
     def fixDisplay(self, env):
-        # Must make sure SGE jobs don't get a locally referencing DISPLAY
-        display = os.environ.get("DISPLAY")
-        if display and (display.startswith(":") or display.startswith("localhost:")):
-            env["DISPLAY"] = plugins.gethostname() + ":" + display.split(":", 1)[1]
+        fixDisplay(env)
 
     def prepareEnvForSubmit(self, slaveEnv):
         self.fixDisplay(slaveEnv)
@@ -29,3 +26,10 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
             location = os.path.join(os.getenv("TEXTTEST_TMP"), "grid_core_files")
             plugins.ensureDirectoryExists(location)
         return location
+
+
+def fixDisplay(env):
+    # Must make sure grid jobs don't get a locally referencing DISPLAY
+    display = os.environ.get("DISPLAY")
+    if display and (display.startswith(":") or display.startswith("localhost:")):
+        env["DISPLAY"] = plugins.gethostname() + ":" + display.split(":", 1)[1]

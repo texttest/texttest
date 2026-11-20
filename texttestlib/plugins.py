@@ -884,7 +884,11 @@ class TestStateUnpickler(Unpickler):
                 try:
                     return self.find_class("texttestlib." + modName, className)
                 except:
-                    raise e
+                    try:
+                        # Handles Python 2 module names such as copy_reg, found in protocol 0 and 1 pickles
+                        return Unpickler.find_class(self, modName, className)
+                    except:
+                        raise e
             else:
                 raise e
 

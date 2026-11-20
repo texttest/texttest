@@ -373,7 +373,7 @@ class QueueSystemConfig(default.Config):
         app.setConfigDefault("min_time_for_performance_force", -1,
                              "Minimum CPU time for test to always run on performance machines")
         app.setConfigDefault("queue_system_module", "local",
-                             "Which queue system (grid engine) set-up to use. (\"local\", \"SGE\" or \"LSF\")")
+                             "Which queue system (grid engine) set-up to use. (\"local\", \"SGE\", \"LSF\", \"condor\", \"ec2cloud\" or \"nomad\")")
         app.setConfigDefault("performance_test_resource", {"default": []},
                              "Resources to request from queue system for performance testing")
         app.setConfigDefault("parallel_environment_name", "*",

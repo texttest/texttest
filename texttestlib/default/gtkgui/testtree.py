@@ -329,6 +329,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
             detailsColumn.set_resizable(True)
             guiutils.addRefreshTips(self.treeView, "test", recalcRenderer, detailsColumn, 6)
             self.treeView.append_column(detailsColumn)
+            self.treeView.connect("row-activated", self.testActivated)
 
         self.treeView.connect('row-expanded', self.rowExpanded)
         self.expandLevel(self.treeView, self.filteredModel.get_iter_first())
@@ -352,6 +353,18 @@ class TestTreeGUI(guiutils.ContainerGUI):
 
     def rowExpanded(self, treeview, iter, path):
         self.expandLevel(treeview, self.filteredModel.iter_children(iter), self.collapseStatic - len(path))
+
+    def testActivated(self, dummyView, path, *args):
+        pathIter = self.filteredModel.get_iter(path)
+        test = self.filteredModel.get_value(pathIter, 2)[0]
+        state = test.stateInGui
+        if state and state.isMarked():
+            state = state.oldState
+        if hasattr(state, "getComparisons") and len(state.getComparisons()) == 1 and len(state.changedResults) == 1:
+            comparison = state.changedResults[0]
+            fileName = comparison.getDisplayFileName()
+            if fileName:
+                self.notify("ViewFile", fileName, comparison, False)
 
     def userChangedSelection(self, *args):
         if not self.selecting and not hasattr(self.selection, "unseen_changes"):

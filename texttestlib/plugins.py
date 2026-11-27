@@ -1692,15 +1692,18 @@ class MultilineTextTrigger(TextTrigger):
 # Used for application and personal configuration files
 class MultiEntryDictionary(OrderedDict):
     warnings = []
+    TRUE_STRINGS = ("true", "1", "yes", "on")
+    FALSE_STRINGS = ("false", "0", "no", "off")
 
-    def __init__(self, importKey="", importFileFinder=None, aliases={}, allowSectionHeaders=True, fileTrackSections={}, *args, **kw):
-        OrderedDict.__init__(self, *args, **kw)
+    def __init__(self, importKey="", importFileFinder=None, aliases={}, allowSectionHeaders=True, fileTrackSections={}, items=(), valueParsers={}):
+        OrderedDict.__init__(self, items)
         self.diag = logging.getLogger("MultiEntryDictionary")
         self.aliases = aliases
         self.importKey = importKey
         self.importFileFinder = importFileFinder
         self.allowSectionHeaders = allowSectionHeaders
         self.fileTrackSections = fileTrackSections
+        self.valueParsers = dict(valueParsers)
         self._currentFiles = deque()
 
     def __reduce__(self):
@@ -1709,7 +1712,32 @@ class MultiEntryDictionary(OrderedDict):
         # Used when doing deepcopy()
         items = [[k, self[k]] for k in self]
         return self.__class__, (self.importKey, Callable(self.importFileFinder),
-                                self.aliases, self.allowSectionHeaders, self.fileTrackSections, items)
+                                self.aliases, self.allowSectionHeaders, self.fileTrackSections, items, self.valueParsers)
+
+    def addValueParser(self, key, resultType=str, extraAllowed=()):
+        self.valueParsers[key] = (resultType, tuple(extraAllowed))
+
+    def getValueParser(self, entryName, currSection="<global>"):
+        if currSection and currSection != "<global>":
+            return self.valueParsers.get((currSection, entryName)) or self.valueParsers.get(currSection)
+        return self.valueParsers.get(entryName)
+
+    def parseConfigValue(self, entry, parserSpec):
+        resultType, extraAllowed = parserSpec
+        if not isinstance(entry, str):
+            if resultType is int:
+                return 1 if entry else 0
+            return "true" if entry else "false"
+        if "$" in entry and resultType is str:
+            return entry
+        lower = entry.strip().lower()
+        if lower in self.TRUE_STRINGS:
+            return 1 if resultType is int else "true"
+        if lower in self.FALSE_STRINGS:
+            return 0 if resultType is int else "false"
+        if lower in extraAllowed:
+            return lower
+        raise ValueError(f"Invalid boolean value '{entry}'")
 
     def addFileTracking(self, key):
         self.fileTrackSections[key] = {}
@@ -1822,11 +1850,11 @@ class MultiEntryDictionary(OrderedDict):
         entryExists = entryName in currDict
         if entryExists:
             self.diag.info("Entry existed, setting " + entryName + "=" + str(entry))
-            self.insertEntry(entryName, entry, currDict)
+            self.insertEntry(entryName, entry, currDict, currSection)
         else:
             if insert or not currDict is self:
                 self.diag.info("Inserting " + entryName + "=" + repr(entry))
-                currDict[entryName] = self.castEntry(entryName, entry, currDict)
+                currDict[entryName] = self.castEntry(entryName, entry, currDict, currSection)
             elif errorOnUnknown:
                 self.warn(f"Config entry name '{entryName}' not recognised.")
 
@@ -1837,7 +1865,10 @@ class MultiEntryDictionary(OrderedDict):
         else:
             return type(val[0])
 
-    def castEntry(self, dummy, entry, currDict):
+    def castEntry(self, entryName, entry, currDict, currSection="<global>"):
+        parserSpec = self.getValueParser(entryName, currSection)
+        if parserSpec is not None:
+            return self.parseConfigValue(entry, parserSpec)
         if type(entry) not in (str, bytes):
             return entry
         dictValType = self.getDictionaryValueType(currDict)
@@ -1864,30 +1895,44 @@ class MultiEntryDictionary(OrderedDict):
             currentList.append(entry)
         return currentList
 
-    def insertEntry(self, entryName, entry, currDict):
+    def insertEntry(self, entryName, entry, currDict, currSection="<global>"):
         currEntry = currDict[entryName]
         if isinstance(currEntry, list):
             currDict[entryName] = self.getListValue(entry, currDict[entryName])
         elif isinstance(currEntry, dict):
             newCurrDict = self.getSectionInfo(entryName)[0]
             if "default" in newCurrDict:
-                self.insertEntry("default", entry, newCurrDict)
+                self.insertEntry("default", entry, newCurrDict, entryName)
             else:
                 self.warn(f"Config entry name '{entryName}' is only valid as a section marker.")
         else:
-            currDict[entryName] = type(currEntry)(entry)
+            parserSpec = self.getValueParser(entryName, currSection)
+            if parserSpec is not None:
+                currDict[entryName] = self.parseConfigValue(entry, parserSpec)
+            else:
+                currDict[entryName] = type(currEntry)(entry)
+
+    def _normalizeExpanded(self, key, subKey, value):
+        if isinstance(value, str) and "$" not in value:
+            parserSpec = self.getValueParser(subKey, key) if subKey is not None else self.getValueParser(key)
+            if parserSpec is not None:
+                try:
+                    return self.parseConfigValue(value, parserSpec)
+                except ValueError:
+                    pass
+        return value
 
     def getSingle(self, key, expandVars=True, envMapping=os.environ):
         value = self.get(key)
         if expandVars:
-            return self.expandEnvironment(value, envMapping)
+            return self._normalizeExpanded(key, None, self.expandEnvironment(value, envMapping))
         else:
             return value
 
     def getComposite(self, key, subKey, expandVars=True, envMapping=os.environ, defaultKey="default"):
         value = self.getCompositeUnexpanded(key, subKey, defaultKey)
         if expandVars:
-            return self.expandEnvironment(value, envMapping)
+            return self._normalizeExpanded(key, subKey, self.expandEnvironment(value, envMapping))
         else:
             return value
 

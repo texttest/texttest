@@ -131,7 +131,9 @@ class GUIConfig:
         self.setConfigDefault("file_colours", copy(colourDict), "Colours to use for each file state")
         self.setConfigDefault("window_size", self.getWindowSizeSettings(),
                               "To set the initial size of the dynamic/static GUI.")
+        self.configDir.addValueParser(("window_size", "maximize"), int)
         self.setConfigDefault("hide_gui_element", self.getDefaultHideWidgets(), "List of widgets to hide by default")
+        self.configDir.addValueParser("hide_gui_element", int)
         self.setConfigDefault("hide_test_category", [
                               "cancelled"], "Categories of tests which should not appear in the dynamic GUI test view")
         self.setConfigDefault("show_test_category", ["failed"],
@@ -143,13 +145,18 @@ class GUIConfig:
                               "Which matching type to use for entry completion. 0 means turn entry completions off, 1 means match the start of possible completions, 2 means match any part of possible completions")
         self.setConfigDefault("gui_entry_completion_inline", 0,
                               "Automatically inline common completion prefix in entry.")
+        self.configDir.addValueParser("gui_entry_completion_inline", int)
         self.setConfigDefault("gui_entry_completions", {"default": []},
                               "Add these completions to the entry completion lists initially")
         self.setConfigDefault("sort_test_suites_recursively", 1, "Sort subsuites when sorting test suites")
+        self.configDir.addValueParser("sort_test_suites_recursively", int)
         self.setConfigDefault("retro_icons", 0, "Use the old TextTest icons in the dynamic and static GUIs")
+        self.configDir.addValueParser("retro_icons", int)
 
     def setConfigDefault(self, key, value, docString):
         self.configDir[key] = value
+        if value in ("true", "false") or (isinstance(value, dict) and len(value) == 1 and value.get("default") in ("true", "false")):
+            self.configDir.addValueParser(key, str)
         self.configDocs[key] = docString
 
     def _simpleValue(self, app, entryName):

@@ -73,7 +73,8 @@ class SocketResponder(plugins.Responder, plugins.Observable):
         plugins.Responder.__init__(self)
         plugins.Observable.__init__(self)
         self.killed = False
-        self.transferAll = optionMap.get("keepslave") or optionMap.get("keeptmp")
+        keeptmp = optionMap.get("keeptmp")
+        self.transferAll = bool(optionMap.get("keepslave") or (keeptmp and keeptmp.lower() not in ("0", "fail", "failed")))
         self.testsForRerun = []
         self.serverAddress = self.getServerAddress(optionMap)
 

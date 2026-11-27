@@ -114,7 +114,7 @@ class Config:
                 self.addDefaultOption(group, "name", "Name this run")
                 group.addOption("vanilla", "Ignore configuration files", self.defaultVanillaValue(),
                                 possibleValues=["", "site", "personal", "all"])
-                self.addDefaultSwitch(group, "keeptmp", "Keep temporary write-directories")
+                group.addSwitch("keeptmp", "Keep temporary write-directories", self.keeptmpSwitchValue())
                 group.addSwitch("ignorefilters", "Ignore all run-dependent text filtering")
             elif group.name.startswith("Self-diagnostics"):
                 self.addDefaultSwitch(group, "x", "Enable self-diagnostics")
@@ -780,17 +780,28 @@ class Config:
     def actualBatchMode(self):
         return self.batchMode() and not self.isReconnecting() and not self.runningScript() and not "coll" in self.optionMap
 
+    def keepFailedTemporaryDirectoriesOnly(self):
+        return (self.optionMap.get("keeptmp") or "").lower() in ("fail", "failed")
+
+    def keeptmpSwitchValue(self):
+        if self.keepFailedTemporaryDirectoriesOnly():
+            return 2
+        return self.optionIntValue("keeptmp")
+
     def keepTemporaryDirectories(self):
         if "keeptmp" in self.optionMap:
-            return self.optionMap.get("keeptmp") != "0"
+            return self.optionMap.get("keeptmp") != "0" and not self.keepFailedTemporaryDirectoriesOnly()
         else:
             return self.actualBatchMode()
 
     def hasKeeptmpFlag(self):
-        return "keeptmp" in self.optionMap and self.optionMap.get("keeptmp") != "0"
+        return "keeptmp" in self.optionMap and self.optionMap.get("keeptmp") != "0" and not self.keepFailedTemporaryDirectoriesOnly()
 
     def cleanPreviousTempDirs(self):
         return self.actualBatchMode() and "keeptmp" not in self.optionMap
+
+    def _hasUnsucceededTests(self, suite):
+        return any(not test.state.hasSucceeded() for test in suite.testCaseList())
 
     def cleanWriteDirectory(self, suite):
         if self.removePreviousThread and self.removePreviousThread.is_alive():
@@ -801,20 +812,42 @@ class Config:
             self._cleanLocalWriteDirectory(suite)
         if not self.keepTemporaryDirectories():
             self._cleanWriteDirectory(suite)
-            machine, tmpDir = self.getRemoteTmpDirectory(suite.app)
-            if tmpDir:
-                self.cleanRemoteDir(suite.app, machine, tmpDir)
+            if not (self.keepFailedTemporaryDirectoriesOnly() and self._hasUnsucceededTests(suite)):
+                machine, tmpDir = self.getRemoteTmpDirectory(suite.app)
+                if tmpDir:
+                    self.cleanRemoteDir(suite.app, machine, tmpDir)
 
     def cleanRemoteDir(self, app, machine, tmpDir):
         self.runCommandOn(app, machine, ["rm", "-rf", tmpDir])
 
+    def _removePassedDir(self, writeDir, rootDir):
+        if os.path.isdir(writeDir):
+            plugins.rmtree(writeDir)
+        parent = os.path.dirname(writeDir)
+        while parent and os.path.isdir(parent) and not plugins.samefile(parent, rootDir):
+            try:
+                os.rmdir(parent)
+            except OSError:
+                break
+            parent = os.path.dirname(parent)
+
     def _cleanWriteDirectory(self, suite):
         if os.path.isdir(suite.app.writeDirectory):
-            plugins.rmtree(suite.app.writeDirectory)
+            if self.keepFailedTemporaryDirectoriesOnly() and self._hasUnsucceededTests(suite):
+                for test in suite.testCaseList():
+                    if test.state.hasSucceeded():
+                        self._removePassedDir(test.getDirectory(temporary=1), suite.app.writeDirectory)
+            else:
+                plugins.rmtree(suite.app.writeDirectory)
 
     def _cleanLocalWriteDirectory(self, suite):
         if suite.app.localWriteDirectory != suite.app.writeDirectory and os.path.isdir(suite.app.localWriteDirectory):
-            plugins.rmtree(suite.app.localWriteDirectory)
+            if self.keepFailedTemporaryDirectoriesOnly() and self._hasUnsucceededTests(suite):
+                for test in suite.testCaseList():
+                    if test.state.hasSucceeded():
+                        self._removePassedDir(test.getDirectory(temporary=1, local=True), suite.app.localWriteDirectory)
+            else:
+                plugins.rmtree(suite.app.localWriteDirectory)
 
     def findRemotePreviousDirInfo(self, app):
         machine, tmpDir = self.getRemoteTmpDirectory(app)
@@ -918,7 +951,7 @@ class Config:
     def getStateSaver(self):
         if self.actualBatchMode():
             return batch.SaveState
-        elif self.keepTemporaryDirectories() or "rerun" in self.optionMap:
+        elif self.keepTemporaryDirectories() or self.keepFailedTemporaryDirectoriesOnly() or "rerun" in self.optionMap:
             return SaveState
 
     def getConfigEnvironment(self, test, allVars):

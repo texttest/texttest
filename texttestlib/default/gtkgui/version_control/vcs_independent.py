@@ -43,7 +43,9 @@ class VersionControlInterface:
             return False
 
     def getFileStatus(self, basicArgs, file):
-        output = self.getProcessResults(basicArgs + [file])[1]
+        retcode, output, _ = self.getProcessResults(basicArgs + [file])
+        if retcode and not output:
+            return "Unknown"
         return self.getStateFromStatus(output)
 
     def callProgram(self, cmdName, fileArgs=[], **kwargs):
@@ -155,7 +157,10 @@ class VersionControlInterface:
             os.rename(oldPath, newPath)
 
     def _movePath(self, oldPath, newPath):
-        self.callProgram("mv", [oldPath, newPath])
+        retCode = self.callProgram("mv", [oldPath, newPath])
+        if retCode and os.path.exists(oldPath) and not os.path.exists(newPath):
+            raise OSError(self.name + " '" + self.getMoveCommand() + "' failed (exit code " + str(retCode) +
+                          ") when moving '" + oldPath + "' to '" + newPath + "'")
 
     def getMoveSuffix(self):
         if self.lastMoveInVCS:

@@ -193,7 +193,7 @@ class BasicActionGUI(SubGUI, GtkActionWrapper):
             dialog = Gtk.Dialog(self.getDialogTitle(), self.getParentWindow(), flags=Gtk.DialogFlags.MODAL)
             dialog.set_modal(True)
         else:
-            dialog = Gtk.Dialog(self.getDialogTitle())
+            dialog = Gtk.Dialog(self.getDialogTitle(), self.getParentWindow())
 
         dialog.set_default_response(Gtk.ResponseType.ACCEPT)
         # may need review MB 2018-12-04

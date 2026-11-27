@@ -130,7 +130,7 @@ class QueueSystemServer(BaseActionRunner):
     def addTestToQueues(self, test):
         with self.counterLock:
             self.testCount += 1
-        queue = self.findQueueForTest(test)
+            queue = self.findQueueForTest(test)
         if queue:
             queue.put(test)
 
@@ -206,7 +206,9 @@ class QueueSystemServer(BaseActionRunner):
 
     def findQueueForTest(self, test):
         # If we've gone into reuse mode and there are no active tests for reuse, use the "reuse failure queue"
+        # for a single test to wake the submission thread, keeping remaining tests in the normal queue.
         if self.reuseOnly and self.testsSubmitted == 0:
+            self.reuseOnly = False
             self.diag.info("Putting " + test.uniqueName + " in reuse failure queue " + self.remainStr())
             return self.reuseFailureQueue
         else:
@@ -268,6 +270,9 @@ class QueueSystemServer(BaseActionRunner):
             if self.exited and self.testsSubmitted == 0:
                 self.diag.info("Forcing termination")
                 self.submitTerminators()
+            elif self.reuseOnly and self.testsSubmitted == 0 and self.testCount > 0:
+                self.reuseOnly = False
+                self.submitTerminators()
 
     def allowReuse(self, oldTest, oldState, newTest):
         # Don't reuse jobs that have been killed
@@ -324,7 +329,8 @@ class QueueSystemServer(BaseActionRunner):
             sock.close()
 
     def getTestForRunNormalMode(self, block):
-        self.reuseOnly = False
+        with self.counterLock:
+            self.reuseOnly = False
         reuseFailure = self.getItemFromQueue(self.reuseFailureQueue, block=False)
         if reuseFailure:
             self.diag.info("Found a reuse failure...")
@@ -340,7 +346,14 @@ class QueueSystemServer(BaseActionRunner):
                 return self.getItemFromQueue(self.reuseFailureQueue, block=False)
 
     def getTestForRunReuseOnlyMode(self, block):
-        self.reuseOnly = True
+        with self.counterLock:
+            if self.testCount > 0 and self.testsSubmitted < self.maxCapacity:
+                retryNormal = True
+            else:
+                self.reuseOnly = True
+                retryNormal = False
+        if retryNormal:
+            return self.getTestForRunNormalMode(block)
         self.diag.info("Waiting for reuse failures...")
         reuseFailure = self.getItemFromQueue(self.reuseFailureQueue, block=block)
         if reuseFailure:

@@ -338,7 +338,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         self.treeView.show()
 
         self.popupGUI.createView()
-        return self.addScrollBars(self.treeView, hpolicy=Gtk.PolicyType.NEVER)
+        return self.addScrollBars(self.treeView, hpolicy=Gtk.PolicyType.AUTOMATIC)
 
     def notifyTopWindow(self, *args):
         # avoid the quit button getting initial focus, give it to the tree view (why not?)

@@ -278,7 +278,7 @@ class GUIController(plugins.Responder, plugins.Observable):
     def shouldShrinkMainPanes(self):
         # If we maximise there is no point in banning pane shrinking: there is nothing to gain anyway and
         # it doesn't seem to work very well :)
-        return not self.dynamic or guiConfig.getWindowOption("maximize")
+        return bool(guiConfig.getWindowOption("maximize"))
 
     def createTopWindowGUI(self, *args):
         mainWindowGUI = PaneGUI(self.testTreeGUI, self.rightWindowGUI,
@@ -589,14 +589,16 @@ class PaneGUI(guiutils.ContainerGUI):
             if subgui.shouldShow():
                 frame = Gtk.Frame()
                 frame.set_shadow_type(Gtk.ShadowType.IN)
+                if self.horizontal and not self.shrink:
+                    frame.set_size_request(150, -1)
                 frame.add(subgui.createView())
                 frame.show()
                 frames.append(frame)
 
         if len(frames) > 1:
             self.paned = self.createPaned()
-            self.paned.pack1(frames[0], resize=True)
-            self.paned.pack2(frames[1], resize=True)
+            self.paned.pack1(frames[0], resize=True, shrink=self.shrink)
+            self.paned.pack2(frames[1], resize=True, shrink=self.shrink)
             self.separatorHandler = self.paned.connect('notify::max-position', self.adjustSeparator)
             self.paned.show()
             return self.paned

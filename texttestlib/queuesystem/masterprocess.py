@@ -125,6 +125,7 @@ class QueueSystemServer(BaseActionRunner):
     def queueTestForRerun(self, test):
         # Clear out the previous job reference, otherwise our grid polling will kill it off
         self.jobs[test] = []
+        self.reusedTests.pop(test, None)
         self.addTestToQueues(test)
 
     def addTestToQueues(self, test):
@@ -258,7 +259,8 @@ class QueueSystemServer(BaseActionRunner):
                         self.reuseFailureQueue.put(newTest)
                 else:
                     self.diag.info("No tests available for reuse : " + test.uniqueName)
-                self.reusedTests[test] = None
+                if not doneRerun:
+                    self.reusedTests[test] = None
 
         # Allowed a submitted job to terminate
         with self.counterLock:
@@ -305,6 +307,10 @@ class QueueSystemServer(BaseActionRunner):
     def getTest(self, block, replaceTerminators=False):
         testOrStatus = self.getItemFromQueue(self.testQueue, block, replaceTerminators)
         if not testOrStatus:
+            if not replaceTerminators and not self.testQueue.empty():
+                testOrStatus = self.getTest(False)
+                self.testQueue.put(None)
+                return testOrStatus
             return
         if type(testOrStatus) == str:
             self.sendServerState(testOrStatus)

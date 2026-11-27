@@ -1459,8 +1459,11 @@ class Config:
             app.addConfigEntry("implied", "rectraffic", "base_version")
         if self.isRecording():
             app.addConfigEntry("implied", "recusecase", "base_version")
-        if homeOS != "any" and homeOS != os.name:
-            app.addConfigEntry("implied", os.name, "base_version")
+        if homeOS not in ("any", sys.platform):
+            if sys.platform != os.name and sys.platform != "win32" and not (homeOS == "posix" and sys.platform.startswith("linux")):
+                app.addConfigEntry("implied", sys.platform, "base_version")
+            if homeOS != os.name:
+                app.addConfigEntry("implied", os.name, "base_version")
         app.setConfigAlias("collect_traffic_py_module", "collect_traffic_python")
 
     def defaultViewProgram(self, homeOS):

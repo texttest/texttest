@@ -95,6 +95,7 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
 
     def showVersions(self, *args):
         newDialog = ShowVersions(self.validApps)
+        newDialog.notifyTopWindow(self.dialog)
         newDialog.performOnCurrent()
 
 

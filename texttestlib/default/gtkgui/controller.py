@@ -206,7 +206,7 @@ class GUIController(plugins.Responder, plugins.Observable):
         # Don't put ourselves in the observers twice or lots of weird stuff happens.
         # Important that closing the GUI is the last thing to be done, so make sure we go at the end...
         frameworkExitObservers = list(filter(self.isFrameworkExitObserver, frameworkObservers))
-        return [self.statusMonitor] + self.defaultActionGUIs + [guiplugins.processMonitor, self.testTreeGUI, self.menuBarGUI] + \
+        return [self.statusMonitor] + self.allActionGUIs() + [guiplugins.processMonitor, self.testTreeGUI, self.menuBarGUI] + \
             frameworkExitObservers + [self.idleManager, self]
 
     def getTestColumnObservers(self):

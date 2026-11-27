@@ -11,9 +11,10 @@ import time
 import sys
 from texttestlib import plugins
 from texttestlib.jobprocess import killProcessAndChildren
-from .runtest import Killed
+from .runtest import Killed, MultiTimer
 from collections import OrderedDict
 from string import Template
+from threading import Lock
 
 
 def getScriptArgs(script):
@@ -640,6 +641,10 @@ class CollateFiles(plugins.Action):
     def __init__(self):
         self.filesPresentBefore = {}
         self.collationProc = None
+        self.collationProcs = []
+        self.killedTests = set()
+        self.killSignal = None
+        self.lock = Lock()
         self.diag = logging.getLogger("Collate Files")
 
     def expandCollations(self, test):
@@ -771,13 +776,38 @@ class CollateFiles(plugins.Action):
         return editedFiles
 
     def collate(self, test):
-        for targetStem, sourcePatterns in self.expandCollations(test):
-            sourceFiles = self.findEditedFiles(test, sourcePatterns)
-            if sourceFiles:
-                targetFile = test.makeTmpFileName(targetStem)
-                collationErrFile = test.makeTmpFileName(targetStem + ".collate_errs", forFramework=1)
-                self.diag.info("Extracting " + ",".join(sourceFiles) + " to " + targetFile)
-                self.extract(test, sourceFiles, targetFile, collationErrFile)
+        with self.lock:
+            if self.killSignal == "timeout":
+                self.killSignal = None
+            self.killedTests.discard(test)
+
+        killTimeout = test.getConfigValue("kill_timeout")
+        timer = None
+        if killTimeout and not test.app.isRecording() and not test.app.isActionReplay():
+            timer = MultiTimer(killTimeout, self.kill, (test, "timeout"))
+        try:
+            for targetStem, sourcePatterns in self.expandCollations(test):
+                if test in self.killedTests:
+                    break
+                sourceFiles = self.findEditedFiles(test, sourcePatterns)
+                if sourceFiles:
+                    if test in self.killedTests:
+                        break
+                    targetFile = test.makeTmpFileName(targetStem)
+                    collationErrFile = test.makeTmpFileName(targetStem + ".collate_errs", forFramework=1)
+                    self.diag.info("Extracting " + ",".join(sourceFiles) + " to " + targetFile)
+                    self.extract(test, sourceFiles, targetFile, collationErrFile)
+            if test in self.killedTests and test.state.category != "killed":
+                if self.killSignal == "timeout":
+                    briefText = "TIMEOUT"
+                    freeText = "Collation exceeded wallclock time limit of " + str(killTimeout) + " seconds\n"
+                else:
+                    briefText = "KILLED"
+                    freeText = "Collation terminated before completion\n"
+                test.changeState(Killed(briefText, freeText, test.state))
+        finally:
+            if timer:
+                timer.cancel()
 
     def tryFetchRemoteFiles(self, test):
         machine, remoteTmpDir = test.app.getRemoteTestTmpDir(test)
@@ -871,10 +901,14 @@ class CollateFiles(plugins.Action):
                 stderr.close()
 
     def kill(self, test, sig):
-        if self.collationProc:
-            proc = self.collationProc
+        with self.lock:
+            self.killedTests.add(test)
+            self.killSignal = sig
+            procs = list(self.collationProcs)
             self.collationProc = None
-            killProcessAndChildren(proc, cmd=test.getConfigValue("kill_command"))
+            self.collationProcs = []
+        for proc in reversed(procs):
+            killProcessAndChildren(proc.pid, cmd=test.getConfigValue("kill_command"))
 
     def extract(self, test, sourceFiles, targetFile, collationErrFile):
         stem = os.path.splitext(os.path.basename(targetFile))[0]
@@ -887,12 +921,15 @@ class CollateFiles(plugins.Action):
                 sys.stderr.write(msg)
             return shutil.copyfile(sourceFiles[0], targetFile)
 
-        self.collationProc = None
+        with self.lock:
+            self.collationProc = None
+            self.collationProcs = []
         stdin = None
+        spawnedProcs = []
         for script in scripts:
             args = script.split()
-            if self.collationProc:
-                stdin = self.collationProc.stdout
+            if spawnedProcs:
+                stdin = spawnedProcs[-1].stdout
             else:
                 args += sourceFiles
             self.diag.info("Opening extract process with args " + repr(args))
@@ -903,15 +940,18 @@ class CollateFiles(plugins.Action):
                 stdout = subprocess.PIPE
                 stderr = subprocess.STDOUT
 
-            prevProc = self.collationProc
-            self.collationProc = self.runCollationScript(args, test, stdin, stdout, stderr)
-            if not self.collationProc:
-                if prevProc:
+            proc = self.runCollationScript(args, test, stdin, stdout, stderr)
+            if not proc:
+                for prevProc in reversed(spawnedProcs):
                     # An earlier script in the pipeline is already running, with its cwd in the
                     # sandbox and the source files open. Stop it, or it will lock files on Windows.
-                    prevProc.stdout.close()
+                    if prevProc.stdout:
+                        prevProc.stdout.close()
                     killProcessAndChildren(prevProc.pid, cmd=test.getConfigValue("kill_command"))
                     prevProc.wait()
+                with self.lock:
+                    self.collationProc = None
+                    self.collationProcs = []
                 if os.path.isfile(targetFile):
                     os.remove(targetFile)
                 errorMsg = "Could not find extract script '" + script + \
@@ -922,19 +962,42 @@ class CollateFiles(plugins.Action):
                 stderr.close()
                 return
 
-        if self.collationProc:
+            spawnedProcs.append(proc)
+            killNow = False
+            with self.lock:
+                if test in self.killedTests:
+                    killNow = True
+                else:
+                    self.collationProc = proc
+                    self.collationProcs.append(proc)
+            if killNow:
+                killProcessAndChildren(proc.pid, cmd=test.getConfigValue("kill_command"))
+
+        if spawnedProcs:
             self.diag.info("Waiting for collation process to terminate...")
-            self.collationProc.wait()
-            if self.collationProc:
+            for p in spawnedProcs[:-1]:
+                if p.stdout:
+                    p.stdout.close()
+            for p in reversed(spawnedProcs):
+                p.wait()
+            with self.lock:
+                wasKilled = test in self.killedTests or self.collationProc is None
                 self.collationProc = None
-            else:
-                procName = args[0]
-                briefText = "KILLED (" + os.path.basename(procName) + ")"
-                freeText = "Killed collation script '" + procName + \
-                    "'\n while collating file(s) at " + sourceFilesStr + "\n"
-                test.changeState(Killed(briefText, freeText, test.state))
+                self.collationProcs = []
             stdout.close()
             stderr.close()
+            if wasKilled:
+                procName = args[0]
+                if self.killSignal == "timeout":
+                    briefText = "TIMEOUT (" + os.path.basename(procName) + ")"
+                    freeText = "Collation script '" + procName + "' exceeded wallclock time limit of " + \
+                        str(test.getConfigValue("kill_timeout")) + " seconds\n while collating file(s) at " + sourceFilesStr + "\n"
+                else:
+                    briefText = "KILLED (" + os.path.basename(procName) + ")"
+                    freeText = "Killed collation script '" + procName + \
+                        "'\n while collating file(s) at " + sourceFilesStr + "\n"
+                test.changeState(Killed(briefText, freeText, test.state))
+                return
 
         if len(sourceFiles) > 0 and any((os.path.getsize(fn) > 0 for fn in sourceFiles)) and os.path.getsize(targetFile) == 0 and os.path.getsize(collationErrFile) == 0:
             # Collation scripts that don't write anything shouldn't produce empty files...

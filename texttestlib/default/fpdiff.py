@@ -65,8 +65,10 @@ def _fpequal(l1, l2, tolerance, relTolerance):
     return equal and l1 == "" and l2 == ""
 
 
-def _cmpLines(fromlines, tolines, outlines, tolerance, relTolerance, split):
+def _cmpLines(fromlines, tolines, outlines, tolerance, relTolerance, split, checkAbort=None):
     for fromline, toline in zip(fromlines, tolines):
+        if checkAbort is not None:
+            checkAbort()
         equal = True
         if fromline != toline:
             if split != '':
@@ -88,16 +90,18 @@ def _cmpLines(fromlines, tolines, outlines, tolerance, relTolerance, split):
             outlines.write(toline)
 
 
-def fpfilter(fromlines, tolines, outlines, tolerance, relTolerance=None, useDifflib=False, split=''):
+def fpfilter(fromlines, tolines, outlines, tolerance, relTolerance=None, useDifflib=False, split='', checkAbort=None):
     if split == 'None':
         split = None
     if not useDifflib:
-        _cmpLines(fromlines, tolines, outlines, tolerance, relTolerance, split)
+        _cmpLines(fromlines, tolines, outlines, tolerance, relTolerance, split, checkAbort=checkAbort)
         outlines.writelines(tolines[len(fromlines):])
         return
     s = difflib.SequenceMatcher(None, fromlines, tolines)
     for tag, i1, i2, j1, j2 in s.get_opcodes():
+        if checkAbort is not None:
+            checkAbort()
         if tag == "replace" and i2 - i1 == j2 - j1:
-            _cmpLines(fromlines[i1:i2], tolines[j1:j2], outlines, tolerance, relTolerance, split)
+            _cmpLines(fromlines[i1:i2], tolines[j1:j2], outlines, tolerance, relTolerance, split, checkAbort=checkAbort)
         else:
             outlines.writelines(tolines[j1:j2])

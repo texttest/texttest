@@ -2,6 +2,7 @@
 
 
 import os
+import sys
 import logging
 import shutil
 from texttestlib.default import fpdiff
@@ -105,7 +106,7 @@ class FilterAction(plugins.Action):
 
     def changedOs(self, app):
         homeOs = app.getConfigValue("home_operating_system")
-        return homeOs != "any" and os.name != homeOs
+        return homeOs not in ("any", os.name, sys.platform)
 
     def constantPostfix(self, files, postfix):
         return [(file, postfix) for file in files]

@@ -2014,6 +2014,8 @@ class Application(object):
 
     def filterUnsaveable(self, versions):
         unsaveableVersions = self.getConfigValue("unsaveable_version")
+        if os.name in unsaveableVersions and sys.platform not in self.versions:
+            unsaveableVersions = unsaveableVersions + [sys.platform]
         return [v for v in versions if v not in unsaveableVersions]
 
     def getBaseVersions(self, baseVersionKey="implied"):
@@ -2074,12 +2076,19 @@ class Application(object):
             self.diag.info("Version count " + repr(versionCount1) + " vs " + repr(versionCount2))
             return self.cmp(versionCount1, versionCount2)
 
-        baseVersions = set(self.getBaseVersions())
+        baseVersionList = self.getBaseVersions()
+        baseVersions = set(baseVersionList)
         baseCount1 = len(vset1.intersection(baseVersions))
         baseCount2 = len(vset2.intersection(baseVersions))
         self.diag.info("Base count " + repr(baseCount1) + " vs " + repr(baseCount2))
-        # More base versions implies higher priority.
-        return self.cmp(baseCount1, baseCount2)
+        if baseCount1 != baseCount2:
+            # More base versions implies higher priority.
+            return self.cmp(baseCount1, baseCount2)
+        if baseCount1 > 0:
+            baseIndex1 = min(baseVersionList.index(v) for v in vset1.intersection(baseVersions))
+            baseIndex2 = min(baseVersionList.index(v) for v in vset2.intersection(baseVersions))
+            return self.cmp(baseIndex2, baseIndex1)
+        return 0
 
     def getVersionSetPriority(self, vlist):
         if len(vlist) == 0:

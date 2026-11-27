@@ -1264,7 +1264,8 @@ class Config:
         app.setConfigDefault("batch_use_collection", {"default": "false"},
                              "Do we collect multiple mails into one in batch mode")
         app.setConfigDefault("batch_external_format", {"default": "false"},
-                             "Do we write out results in external format in batch mode. Supports junit, trx")
+                             "Do we write out results in external format in batch mode. Supports junit, trx",
+                             allowedValues=("junit", "trx", "jetbrains"))
         app.setConfigDefault("batch_include_comment_plugin", {"default": "true"},
                              "Do we include the comment plugin in the HTML report (requires PHP)")
         app.setConfigDefault("batch_external_folder", {
@@ -1288,6 +1289,7 @@ class Config:
     def setPerformanceDefaults(self, app):
         # Performance values
         app.setConfigDefault("cputime_include_system_time", 0, "Include system time when measuring CPU time?")
+        app.configDir.addValueParser("cputime_include_system_time", int)
         app.setConfigDefault("default_performance_stem", "performance",
                              "Which performance statistic to use when selecting tests by performance, placing performance in Junit XML reports etc")
         app.setConfigDefault("performance_logfile", {"default": []},
@@ -1515,10 +1517,12 @@ class Config:
                              "External program(s) to use for viewing and editing text files")
         app.setConfigDefault("view_file_on_remote_machine", {
                              "default": 0}, "Do we try to start viewing programs on the test execution machine?")
+        app.configDir.addValueParser("view_file_on_remote_machine", int)
         app.setConfigDefault("follow_program", {"default": self.defaultFollowProgram()},
                              "External program to use for following progress of a file")
         app.setConfigDefault("follow_file_by_default", 0,
                              "When double-clicking running files, should we follow progress or just view them?")
+        app.configDir.addValueParser("follow_file_by_default", int)
         app.setConfigDefault("bug_system_location", {},
                              "The location of the bug system we wish to extract failure information from.")
         app.setConfigDefault("bug_system_username", {},

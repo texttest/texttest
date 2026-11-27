@@ -2136,8 +2136,10 @@ class Application(object):
     def removeConfigEntry(self, key, value, sectionName=""):
         self.configDir.removeEntry(key, value, sectionName)
 
-    def setConfigDefault(self, key, value, docString="", trackFiles=False):
+    def setConfigDefault(self, key, value, docString="", trackFiles=False, allowedValues=()):
         self.configDir[key] = value
+        if value in ("true", "false") or (isinstance(value, dict) and len(value) == 1 and value.get("default") in ("true", "false")):
+            self.configDir.addValueParser(key, str, allowedValues)
         if trackFiles:
             self.configDir.addFileTracking(key)
         if len(docString) > 0:

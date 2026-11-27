@@ -164,11 +164,23 @@ class TextTest(plugins.Responder, plugins.Observable):
         if os.name == "posix":
             # To aid in debugging tests that hang...
             signal.signal(signal.SIGQUIT, self.printStackTrace)
+        elif sys.platform == "win32":
+            self.suppressWindowsErrorDialogs()
         self.setSignalHandlers(self.handleSignalWhileStarting)
         self.inputOptions = testmodel.OptionFinder()
         self.diag = logging.getLogger("Find Applications")
         self.appSuites = OrderedDict()
         self.exitCode = 0
+
+    def suppressWindowsErrorDialogs(self):
+        try:
+            import ctypes
+            SEM_FAILCRITICALERRORS = 0x0001
+            SEM_NOGPFAULTERRORBOX = 0x0002
+            previous = ctypes.windll.kernel32.GetErrorMode()
+            ctypes.windll.kernel32.SetErrorMode(previous | SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX)
+        except (ImportError, AttributeError, OSError):
+            pass
 
     def printStackTrace(self, *args):
         # Swiped from http://stackoverflow.com/questions/1032813/dump-stacktraces-of-all-active-threads

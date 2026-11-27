@@ -124,6 +124,9 @@ class QueueSystemConfig(default.Config):
         return ["gx", "s", "coll", "record", "autoreplay"]
 
     def calculateUseQueueSystem(self, allApps):
+        if any((not isinstance(app.configObject, QueueSystemConfig) for app in allApps)):
+            return False
+
         for localFlag in self.getLocalRunArgs():
             if localFlag in self.optionMap:
                 return False

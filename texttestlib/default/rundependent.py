@@ -5,9 +5,15 @@ import os
 import logging
 import shutil
 from texttestlib.default import fpdiff
+from texttestlib.default.runtest import Killed, MultiTimer, RunTest
 from texttestlib import plugins
 from optparse import OptionParser
 from io import StringIO
+from threading import Lock
+
+
+class FilterKilled(RuntimeError):
+    pass
 
 
 class Filtering(plugins.TestState):
@@ -21,16 +27,53 @@ class FilterAction(plugins.Action):
     def __init__(self, useFilteringStates=False):
         self.diag = logging.getLogger("Filter Actions")
         self.useFilteringStates = useFilteringStates
+        self.killedTests = set()
+        self.killSignal = None
+        self.lock = Lock()
+
+    def kill(self, test, sig):
+        with self.lock:
+            self.killedTests.add(test)
+            self.killSignal = sig
 
     def __call__(self, test):
+        with self.lock:
+            if self.killSignal == "timeout":
+                self.killSignal = None
+            self.killedTests.discard(test)
+
         if self.useFilteringStates:
             self.changeToFilteringState(test)
 
-        for fileName, postfix in self.filesToFilter(test):
-            self.diag.info("Considering for filtering : " + fileName)
-            stem = self.getStem(fileName)
-            newFileName = test.makeTmpFileName(stem + "." + test.app.name + postfix, forFramework=1)
-            self.performAllFilterings(test, stem, fileName, newFileName)
+        killTimeout = test.getConfigValue("kill_timeout")
+        timer = None
+        if killTimeout and not test.app.isRecording() and not test.app.isActionReplay():
+            timer = MultiTimer(killTimeout, self.kill, (test, "timeout"))
+
+        def checkAbort():
+            if test in self.killedTests:
+                raise FilterKilled()
+
+        try:
+            for fileName, postfix in self.filesToFilter(test):
+                checkAbort()
+                self.diag.info("Considering for filtering : " + fileName)
+                stem = self.getStem(fileName)
+                newFileName = test.makeTmpFileName(stem + "." + test.app.name + postfix, forFramework=1)
+                self.performAllFilterings(test, stem, fileName, newFileName, checkAbort=checkAbort)
+        except FilterKilled:
+            if self.killSignal == "timeout":
+                briefText = "TIMEOUT"
+                freeText = "Filtering exceeded wallclock time limit of " + str(killTimeout) + " seconds\n"
+            else:
+                runTest = RunTest()
+                runTest.killSignal = self.killSignal
+                briefText, fullText = runTest.getKillInfo(test)
+                freeText = "Filtering " + fullText + "\n"
+            test.changeState(Killed(briefText, freeText, test.state))
+        finally:
+            if timer:
+                timer.cancel()
 
     def getStem(self, fileName):
         return os.path.basename(fileName).split(".")[0]
@@ -38,12 +81,14 @@ class FilterAction(plugins.Action):
     def changeToFilteringState(self, *args):  # pragma: no cover - documentation only
         pass
 
-    def performAllFilterings(self, test, stem, fileName, newFileName):
+    def performAllFilterings(self, test, stem, fileName, newFileName, checkAbort=None):
         currFileName = fileName
         filters = self.makeAllFilters(test, stem, test.app)
         # Filtered files keep the encoding of the original, as they are compared bytewise and can be saved
         encoding = plugins.getFileEncoding(fileName, test)
         for fileFilter in filters:
+            if checkAbort is not None:
+                checkAbort()
             writeFileName = newFileName + "." + fileFilter.postfix
             self.diag.info("Applying " + fileFilter.__class__.__name__ +
                            " to make\n" + writeFileName + " from\n " + currFileName)
@@ -52,9 +97,11 @@ class FilterAction(plugins.Action):
                 os.remove(writeFileName)
             currFile = encoding.open(currFileName)
             writeFile = plugins.openForWrite(writeFileName, encoding=encoding)
-            fileFilter.filterFile(currFile, writeFile)
-            currFile.close()
-            writeFile.close()
+            try:
+                fileFilter.filterFile(currFile, writeFile, checkAbort=checkAbort)
+            finally:
+                currFile.close()
+                writeFile.close()
             currFileName = writeFileName
         if len(filters) > 0 and currFileName != newFileName:
             shutil.move(currFileName, newFileName)
@@ -193,11 +240,11 @@ class FloatingPointFilter:
         self.relative = relative if relative else None
         self.split = split
 
-    def filterFile(self, inFile, writeFile):
+    def filterFile(self, inFile, writeFile, checkAbort=None):
         with plugins.FileEncoding.forFile(self.origFileName, self.encoding).open(self.origFileName) as f:
             fromlines = f.readlines()
         tolines = inFile.readlines()
-        fpdiff.fpfilter(fromlines, tolines, writeFile, self.tolerance, self.relative, split=self.split)
+        fpdiff.fpfilter(fromlines, tolines, writeFile, self.tolerance, self.relative, split=self.split, checkAbort=checkAbort)
 
 
 class RunDependentTextFilter(plugins.Observable):
@@ -209,7 +256,7 @@ class RunDependentTextFilter(plugins.Observable):
         self.diag = logging.getLogger("Run Dependent Text")
         self.lineFilters = [LineFilter(text, testId, self.diag) for text in filterTexts]
 
-    def findRelevantFilters(self, file):
+    def findRelevantFilters(self, file, checkAbort=None):
         relevantFilters, sectionFilters = [], []
         for lineFilter in self.lineFilters:
             if lineFilter.untrigger is not None:
@@ -218,7 +265,7 @@ class RunDependentTextFilter(plugins.Observable):
                 relevantFilters.append(lineFilter)
         if sectionFilters:
             # Must preserve the original order
-            relevantSectionFilters = self.findRelevantSectionFilters(sectionFilters, file)
+            relevantSectionFilters = self.findRelevantSectionFilters(sectionFilters, file, checkAbort=checkAbort)
             orderedRelevantFilters = []
             for lineFilter in self.lineFilters:
                 if lineFilter in relevantFilters:
@@ -236,10 +283,12 @@ class RunDependentTextFilter(plugins.Observable):
             if f is lineFilter:
                 return lastLine
 
-    def findRelevantSectionFilters(self, sectionFilters, file):
+    def findRelevantSectionFilters(self, sectionFilters, file, checkAbort=None):
         lineNumber = 0
         matchedFirst, relevantFilters = [], []
         for line in file:
+            if checkAbort is not None:
+                checkAbort()
             lineNumber += 1
             for sectionFilter in matchedFirst:
                 if sectionFilter not in relevantFilters and sectionFilter.untrigger.matches(line, lineNumber):
@@ -254,11 +303,13 @@ class RunDependentTextFilter(plugins.Observable):
         file.seek(0)
         return relevantFilters
 
-    def filterFile(self, file, newFile, filteredAway=None):
+    def filterFile(self, file, newFile, filteredAway=None, checkAbort=None):
         lineNumber = 0
         seekPoints = []
-        lineFilters = self.findRelevantFilters(file)
+        lineFilters = self.findRelevantFilters(file, checkAbort=checkAbort)
         for line in file:
+            if checkAbort is not None:
+                checkAbort()
             # We don't want to stack up ActionProgreess calls in ThreaderNotificationHandler ...
             self.notifyIfMainThread("ActionProgress")
             lineNumber += 1
@@ -306,13 +357,15 @@ class UnorderedTextFilter(RunDependentTextFilter):
     configKey = "unordered_text"
     postfix = "sorted"
 
-    def filterFile(self, file, newFile):
+    def filterFile(self, file, newFile, checkAbort=None):
         unorderedLines = {}
-        RunDependentTextFilter.filterFile(self, file, newFile, unorderedLines)
-        self.writeUnorderedText(newFile, unorderedLines)
+        RunDependentTextFilter.filterFile(self, file, newFile, unorderedLines, checkAbort=checkAbort)
+        self.writeUnorderedText(newFile, unorderedLines, checkAbort=checkAbort)
 
-    def writeUnorderedText(self, newFile, lines):
+    def writeUnorderedText(self, newFile, lines, checkAbort=None):
         for filter in self.lineFilters:
+            if checkAbort is not None:
+                checkAbort()
             unordered = lines.get(filter, [])
             if len(unordered) == 0:
                 continue

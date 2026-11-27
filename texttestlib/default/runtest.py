@@ -40,6 +40,36 @@ class Killed(plugins.TestState):
         self.failedPrediction = self
 
 
+class MultiTimer:
+    def __init__(self, timeout, method, args):
+        # Break the timer up into 5 sub-timers
+        # The point is to prevent timing out too early if the process gets suspended
+        self.currentTimer = None
+        self.cancelled = False
+        self.lock = Lock()
+        subTimerCount = 5  # whatever
+        subTimerTimeout = float(timeout) / subTimerCount
+        timer = Timer(subTimerTimeout, method, args)
+        timer.daemon = True
+        for _ in range(subTimerCount - 1):
+            timer = Timer(subTimerTimeout, self.startTimer, [timer])
+            timer.daemon = True
+        self.startTimer(timer)
+
+    def startTimer(self, timer):
+        with self.lock:
+            if not self.cancelled:
+                self.currentTimer = timer
+                self.currentTimer.start()
+
+    def cancel(self):
+        with self.lock:
+            self.cancelled = True
+            if self.currentTimer:
+                self.currentTimer.cancel()
+                self.currentTimer = None
+
+
 class RunTest(plugins.Action):
     def __init__(self):
         self.diag = logging.getLogger("run test")
@@ -71,21 +101,10 @@ class RunTest(plugins.Action):
         # Default to not bothering to print the machine name: all is local anyway
         return ""
 
-    def startTimer(self, timer):
-        self.currentTimer = timer
-        self.currentTimer.start()
-
-    def runMultiTimer(self, timeout, method, args):
-        # Break the timer up into 5 sub-timers
-        # The point is to prevent timing out too early if the process gets suspended
-        subTimerCount = 5  # whatever
-        subTimerTimeout = float(timeout) / subTimerCount
-        timer = Timer(subTimerTimeout, method, args)
-        for _ in range(subTimerCount - 1):
-            timer = Timer(subTimerTimeout, self.startTimer, [timer])
-        self.startTimer(timer)
-
     def runTest(self, test):
+        if test.state.category == "killed":
+            return
+
         # If previous test (or test run) timed out, don't leave killSignal set, other tests can still run here
         if self.killSignal == "timeout":
             self.killSignal = None
@@ -107,10 +126,12 @@ class RunTest(plugins.Action):
                 self.changeToRunningState(test)
 
             if killTimeout and not test.app.isRecording() and not test.app.isActionReplay():
-                self.runMultiTimer(killTimeout, self.kill, (test, "timeout"))
-                self.wait(process)
-                self.currentTimer.cancel()
-                self.currentTimer = None
+                self.currentTimer = MultiTimer(killTimeout, self.kill, (test, "timeout"))
+                try:
+                    self.wait(process)
+                finally:
+                    self.currentTimer.cancel()
+                    self.currentTimer = None
             else:
                 self.wait(process)
             self.checkAndClear(test, postfix)

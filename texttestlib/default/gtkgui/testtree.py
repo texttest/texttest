@@ -688,14 +688,14 @@ class TestTreeGUI(guiutils.ContainerGUI):
 
     def removeTest(self, test, iter):
         self.diag.info("Removing test " + self.model.get_value(iter, 0))
-        iterValid, filteredIter = self.findIter(test)
+        foundIter = self.findIter(test)
         self.selecting = True
-        if self.selection.iter_is_selected(filteredIter):
-            self.selection.unselect_iter(filteredIter)
+        if foundIter and foundIter[0] and self.selection.iter_is_selected(foundIter[1]):
+            self.selection.unselect_iter(foundIter[1])
         self.selecting = False
-        self.selectionChanged(direct=False)
         self.model.remove(iter)
         self.itermap.remove(test)
+        self.selectionChanged(direct=False)
 
     def notifyNameChange(self, test, origRelPath):
         iter = self.itermap.updateIterator(test, origRelPath)
@@ -714,13 +714,28 @@ class TestTreeGUI(guiutils.ContainerGUI):
         self.model.set_sort_column_id(Gtk.TREE_SORTABLE_DEFAULT_SORT_COLUMN_ID, Gtk.SortType.ASCENDING)
 
     def sortByTestCases(self, model, iter1, iter2, *args):
-        test1 = self.model.get_value(iter1, 2)[0]
-        test2 = self.model.get_value(iter2, 2)[0]
+        tests1 = model.get_value(iter1, 2)
+        tests2 = model.get_value(iter2, 2)
+        if not tests1 or not tests2:
+            return 0
+        test1, test2 = tests1[0], tests2[0]
+        if test1.parent is not test2.parent:
+            for candidate1 in tests1:
+                for candidate2 in tests2:
+                    if candidate1.parent is candidate2.parent:
+                        test1, test2 = candidate1, candidate2
+                        break
+                else:
+                    continue
+                break
         if test1.parent is None or test2.parent is None:
             return 0
-        index1 = test1.parent.testcases.index(test1)
-        index2 = test2.parent.testcases.index(test2)
-        return -1 if index1 < index2 else 1
+        try:
+            index1 = test1.parent.testcases.index(test1)
+            index2 = test2.parent.testcases.index(test2)
+        except ValueError:
+            return 0
+        return (index1 > index2) - (index1 < index2)
 
     def notifyVisibility(self, tests, newValue):
         self.diag.info("Visibility change for " + repr(tests) + " to " + repr(newValue))

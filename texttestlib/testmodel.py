@@ -1472,9 +1472,8 @@ class TestSuite(Test):
             pass
 
     def removeFromMemory(self):
-        for test in self.testcases:
-            test.notify("Remove")
-        self.testcases = []
+        for test in list(self.testcases):
+            test.removeFromMemory()
         Test.removeFromMemory(self)
 
     def removeFromTestFile(self, testName):

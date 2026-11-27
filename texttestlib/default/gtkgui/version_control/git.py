@@ -1,4 +1,5 @@
 import datetime
+import shlex
 import time
 import os
 from texttestlib import plugins
@@ -30,11 +31,16 @@ class GitInterface(vcs_independent.VersionControlInterface):
                 return datetime.datetime.strptime(line.split()[1], DATE_FORMAT)
 
     def getGraphicalDiffArgs(self, diffProgram):
+        if os.sep in diffProgram or "/" in diffProgram or " " in diffProgram:
+            extCmd = shlex.quote(diffProgram.replace("\\", "/")) if os.path.isfile(diffProgram) else diffProgram
+            return ["git", "difftool", "-x", extCmd, "-y"]
         return ["git", "difftool", "-t", diffProgram, "-y"]
 
     def startGUIProcess(self, cmdArgs, **kw):
-        relArgs = list(map(self.makeRelPath, cmdArgs))
-        vcs_independent.VersionControlInterface.startGUIProcess(self, relArgs, **kw)
+        if cmdArgs and cmdArgs[0] == "git":
+            cmdArgs = list(map(self.makeRelPath, cmdArgs))
+            kw.setdefault("cwd", self.vcsDirectory)
+        vcs_independent.VersionControlInterface.startGUIProcess(self, cmdArgs, **kw)
 
     def getStateFromStatus(self, output):
         words = output.split()
@@ -51,7 +57,7 @@ class GitInterface(vcs_independent.VersionControlInterface):
             return fileNames
 
         ignored = self.getIgnoredFiles(fileArg)
-        return [f for f in fileNames if self.makeRelPath(f) not in ignored]
+        return [f for f in fileNames if self.makeRelPath(f).replace("\\", "/") not in ignored]
 
     def getIgnoredFiles(self, path):
         if not os.path.isdir(path):
@@ -108,7 +114,7 @@ class FilteredDiffGUI(vcs_independent.FilteredDiffGUI):
 
     def getTmpFileArgs(self, fileName, revision):
         revStr = revision or "master"
-        return [revStr + ":" + vcs_independent.vcs.makeRelPath(fileName)]
+        return [revStr + ":" + vcs_independent.vcs.makeRelPath(fileName).replace("\\", "/")]
 
 
 class FilteredDiffGUIRecursive(FilteredDiffGUI):

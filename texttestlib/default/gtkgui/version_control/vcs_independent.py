@@ -382,8 +382,14 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         revOptions = self.getExtraArgs()
         graphDiffArgs = vcs.getGraphicalDiffArgs(diffProgram)
         if not graphDiffArgs[0] == diffProgram:
-            # In order to get the correct error message if it doesn't exist
-            subprocess.call([diffProgram, "--help"], stderr=open(os.devnull, "w"), stdout=open(os.devnull, "w"))
+            if os.name == "nt":
+                if not os.path.isfile(diffProgram) and not shutil.which(diffProgram):
+                    exe = plugins.splitcmd(diffProgram)[0]
+                    if not os.path.isfile(exe) and not shutil.which(exe):
+                        raise OSError("Cannot find graphical difference program '" + diffProgram + "'")
+            else:
+                # In order to get the correct error message if it doesn't exist
+                subprocess.call([diffProgram, "--help"], stderr=open(os.devnull, "w"), stdout=open(os.devnull, "w"))
         return graphDiffArgs + revOptions + [path], ()
 
     def diffingComplete(self, *args):

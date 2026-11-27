@@ -1577,6 +1577,7 @@ class Application(object):
 
         # Read our pre-existing config files
         self.readConfigFiles(configModuleInitialised=False)
+        self.configDir.readValues(self.getPersonalConfigFiles(), insert=False, errorOnUnknown=False)
 
         self.diag.info("Basic Config file settings are: " + "\n" + repr(self.configDir))
         self.diag.info("Found application '" + self.name + "'")
@@ -1756,6 +1757,9 @@ class Application(object):
             else:
                 self.diag.info("Reading explicit config files : " + "\n".join(allFiles))
                 self.configDir.readValues(allFiles, insert=False, errorOnUnknown=configModuleInitialised)
+                homeOS = self.getConfigValue("home_operating_system")
+                if homeOS != "any" and homeOS != os.name:
+                    self.addConfigEntry("implied", os.name, "base_version")
                 prevFiles = allFiles
 
     def readValues(self, multiEntryDict, stem, dircaches, insert=True, errorOnUnknown=False):

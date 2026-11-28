@@ -300,11 +300,23 @@ class GUIController(plugins.Responder, plugins.Observable):
         tabGUIs = [testTab, self.progressMonitor] + self.actionTabGUIs + [self.appFileGUI, runInfoTab]
         return actionholders.NotebookGUI(tabGUIs)
 
+    exited = False
+
     def run(self):
-        Gtk.main()
+        if not self.exited:
+            Gtk.main()
+
+    def quitMainLoop(self):
+        if Gtk.main_level() > 0:
+            Gtk.main_quit()
+        return False
 
     def notifyExit(self):
-        Gtk.main_quit()
+        self.exited = True
+        if Gtk.main_level() > 0:
+            Gtk.main_quit()
+        else:
+            GObject.idle_add(self.quitMainLoop)
 
     def notifyLifecycleChange(self, test, state, changeDesc):
         test.stateInGui = state
@@ -340,7 +352,7 @@ class GUIController(plugins.Responder, plugins.Observable):
                 # We've added a new suite, we should also select it as it's likely the user wants to add stuff under it
                 # Also include the knock-on effects, i.e. selecting the test tab etc
                 self.notify("SetTestSelection", [suite], direct=True)
-        if self.dynamic and len(suites) == 0:
+        if self.dynamic and all((suite.isEmpty() for suite in suites)):
             self.topWindowGUI.forceQuit()
 
     def notifyAdd(self, test, initial):
